@@ -1,10 +1,5 @@
 # Documento de Diseño de Software (DDS): Sistema VAAET
 
-**Versión:** 1.2
-**Fecha:** 15 de Octubre de 2025
-**Autor:** Facundo Nicolás González
-**Proyecto:** VAAET - Sistema Avanzado de Análisis de Tráfico Vehicular
-
 ---
 
 ## 1. Arquitectura del Sistema

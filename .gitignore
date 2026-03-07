@@ -38,3 +38,5 @@ Thumbs.db
 
 # Database
 database/sqlite/
+
+./data/raw/

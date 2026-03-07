@@ -73,3 +73,12 @@ Formato: ver cualquier ADR existente en `Docs/adr/` como plantilla.
 - Hacer commit de archivos `.pt` (modelos YOLO)
 - Eliminar `test_sistema()` o el generador de demos
 - Romper compatibilidad con Colab Free Tier
+
+## Phase 2 — Contribuciones al Clasificador
+
+- Ejecutar `02_traffic_state_classifier.ipynb` completo después de cambios
+- Verificar F1-macro ≥ 0.85 en test set
+- Leer [ADR-008](Docs/adr/ADR-008-tensorflow-keras-traffic-classifier.md) antes de modificar umbrales de auto-labeling o arquitectura MLP
+- No modificar `telemetry_raw` ni `traffic_classifications` sin nuevo ADR
+- No hacer commit de `*.keras`, `*.joblib` ni `data/processed/*.csv`
+- Los campos HITL (`is_human_validated`, `human_override_state`, `validated_at`) son intocables

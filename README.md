@@ -5,46 +5,52 @@ Para contexto agéntico ver AGENTS.md. Para diseño técnico ver Docs/DDS.md. --
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-Sistema avanzado de análisis de tránsito vehicular para el puente General Manuel Belgrano, optimizado para cámaras SISE dinámicas y videos de larga duración. Cumple 13 requisitos funcionales y de calidad, con selección automática de modelo YOLO 11, tracking persistente, cálculo híbrido de velocidad, multi-cámara, perspectiva, históricos, persistencia segura y outputs concisos.
+Sistema avanzado de análisis de tránsito vehicular para el puente General Manuel Belgrano, optimizado para cámaras SISE dinámicas y videos de larga duración. Pipeline de dos etapas: **percepción** (YOLO 11 + tracking + velocidad) y **inteligencia** (TF/Keras clasificador de estado de tráfico).
 
 ## 🏗️ Arquitectura
 
 ```mermaid
 flowchart LR
-    A[👤 Usuario] -->|Sube .mp4| B[Google Colab]
+    A[👤 Usuario] -->|Sube .mp4| B[Google Colab<br/>Etapa 1: Percepción]
     B -->|Inferencia| C[GPU T4/V100]
     C -->|Detecciones| B
     B -->|INSERT por minuto| D[(AWS RDS<br/>PostgreSQL)]
+    D -->|Telemetría| E[Google Colab<br/>Etapa 2: Inteligencia]
+    E -->|Clasificación| D
     B -->|Video anotado| A
+    E -->|Estado del tráfico| A
 ```
 
-- **Ejecución**: Google Colab (notebook monolítico, sin CI/CD)
-- **Persistencia**: PostgreSQL en AWS RDS (opcional)
-- **Detección**: YOLO 11 con selección adaptativa de modelo por duración
+- **Etapa 1 — Percepción**: YOLO 11 + OpenCV + SORT → telemetría cruda por minuto
+- **Etapa 2 — Inteligencia**: TF/Keras MLP → clasificación de estado de tráfico (Normal/Reducido/Atascado/Accidente)
+- **Persistencia**: PostgreSQL en AWS RDS (3 tablas: `traffic_data`, `telemetry_raw`, `traffic_classifications`)
 
 ## 📂 Estructura del Proyecto
 
 ```
 vaaet/
-├── vaaet.ipynb              # Todo el código (9 celdas)
-├── README.md                # Este archivo
-├── AGENTS.md                # Contexto para agentes de IA
-├── CONTRIBUTING.md          # Guía de contribución
-├── CHANGELOG.md             # Historial de cambios
-├── LICENSE                  # MIT
-├── requirements.txt         # Dependencias
-├── llms.txt                 # Índice para agentes RAG
-├── llms-full.txt            # Documentación completa para LLMs
-├── .gitignore
-└── Docs/
-    ├── PRD.md               # Requisitos del producto
-    ├── DDS.md               # Diseño de software
-    ├── GUIA_USUARIO.md      # Guía de usuario
-    ├── DATA_LINEAGE.md      # Linaje de datos
-    ├── BIAS_AND_LIMITATIONS.md
-    ├── KPIs/KPIs.md         # Métricas y validación
-    ├── adr/                 # Decisiones arquitectónicas (7 ADRs)
-    └── diagrams/            # Diagramas Mermaid (6 diagramas)
+├── notebooks/
+│   ├── phase_1_perception/
+│   │   └── 01_legacy_collection.ipynb   # Etapa 1: YOLO 11 + tracking + velocidad
+│   └── phase_2_intelligence/
+│       └── 02_traffic_state_classifier.ipynb  # Etapa 2: clasificación TF/Keras
+├── models/
+│   ├── perception/                      # Modelos YOLO (descargados en runtime)
+│   └── intelligence/                    # Artefactos Etapa 2 (.keras, .joblib)
+├── data/
+│   ├── raw/                             # Backups de BD (gitignored)
+│   ├── processed/                       # CSVs de features (gitignored)
+│   └── samples/                         # Datos de ejemplo
+├── src/utils/                           # Utilidades compartidas (futuro)
+├── docs/
+│   ├── PRD.md, DDS.md, GUIA_USUARIO.md
+│   ├── DATA_LINEAGE.md, BIAS_AND_LIMITATIONS.md
+│   ├── KPIs/KPIs.md
+│   ├── adr/                             # Decisiones arquitectónicas (8 ADRs)
+│   └── diagrams/                        # Diagramas Mermaid (8 diagramas)
+├── README.md, AGENTS.md, CONTRIBUTING.md, CHANGELOG.md
+├── requirements.txt, llms.txt, llms-full.txt
+└── LICENSE
 ```
 
 ## 🚦 Requisitos clave implementados
@@ -67,6 +73,7 @@ vaaet/
 11. **Modularidad y robustez**: Código desacoplado, funciones auxiliares, logging y gestión de errores.
 12. **Notebook compacto**: ~8–10 celdas claras y fáciles de seguir.
 13. **Outputs claros**: Mensajes de éxito/error en cada paso.
+14. **Clasificación de estado de tráfico**: TF/Keras MLP clasifica cada minuto en 4 estados (Normal/Reducido/Atascado/Accidente) a partir de 14 features de ingeniería.
 
 ## 📝 Uso paso a paso
 
@@ -88,7 +95,14 @@ vaaet/
 5. **Descarga automática** del video procesado al finalizar.
 
 6. Nota: Si tus pesos se llaman “yolov11*.pt”, el sistema los normaliza automáticamente a “yolo11*.pt”.
+### Etapa 2 — Clasificación de Estado de Tráfico
 
+1. **Abre** `notebooks/phase_2_intelligence/02_traffic_state_classifier.ipynb` en Colab
+2. **Ejecuta las 8 celdas de código en orden** — cada celda markdown explica qué hace la siguiente
+3. **Configura la BD** (Cell 2) con las mismas credenciales de Etapa 1
+4. El sistema extrae telemetría, genera 14 features, entrena un MLP y clasifica cada minuto
+5. **Artefactos**: `models/intelligence/traffic_classifier.keras`, `feature_scaler.joblib`, `label_mapping.joblib`
+6. **Métrica objetivo**: F1-macro ≥ 0.85
 ## ⚡ Mejoras avanzadas
 
 - **Tracking y Optical Flow**: Habilítalos ejecutando la celda de mejoras avanzadas.
@@ -107,7 +121,10 @@ vaaet/
 ## 🧩 Dependencias
 
 - Python 3.8+
-- ultralytics, opencv-python, numpy, scikit-learn, psycopg2-binary
+
+**Etapa 1**: ultralytics, opencv-python, numpy, scikit-learn, psycopg2-binary
+
+**Etapa 2**: tensorflow, pandas, sqlalchemy, imbalanced-learn, joblib, matplotlib, seaborn
 
 Instala dependencias con:
 
@@ -115,13 +132,9 @@ Instala dependencias con:
 pip install -r requirements.txt
 ```
 
-O manualmente:
-
-```bash
-pip install ultralytics opencv-python numpy scikit-learn psycopg2-binary
-```
-
 ## 📋 Esquema PostgreSQL esperado
+
+### Etapa 1 — Telemetría cruda
 
 ```sql
 CREATE TABLE IF NOT EXISTS traffic_data (
@@ -139,6 +152,40 @@ CREATE TABLE IF NOT EXISTS traffic_data (
 );
 ```
 
+### Etapa 2 — Features + Clasificación
+
+```sql
+CREATE TABLE IF NOT EXISTS telemetry_raw (
+  id SERIAL PRIMARY KEY,
+  source_record_id INTEGER REFERENCES traffic_data(id),
+  record_time TIMESTAMP NOT NULL,
+  avg_speed NUMERIC(5,2),
+  total_vehicles INTEGER,
+  count_car INTEGER, count_truck INTEGER, count_bus INTEGER,
+  count_motorcycle INTEGER, count_bicycle INTEGER,
+  heavy_vehicle_ratio NUMERIC(5,4),
+  delta_speed NUMERIC(6,2), delta_count INTEGER,
+  transition_flag SMALLINT DEFAULT 0,
+  speed_variance NUMERIC(6,2),
+  hour_of_day SMALLINT, weather_condition SMALLINT DEFAULT 0,
+  UNIQUE (source_record_id)
+);
+
+CREATE TABLE IF NOT EXISTS traffic_classifications (
+  id SERIAL PRIMARY KEY,
+  telemetry_id INTEGER REFERENCES telemetry_raw(id),
+  classified_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  traffic_state SMALLINT NOT NULL,
+  state_label TEXT NOT NULL,
+  confidence NUMERIC(5,4) NOT NULL,
+  model_version TEXT NOT NULL,
+  is_human_validated BOOLEAN DEFAULT FALSE,
+  human_override_state SMALLINT,
+  validated_at TIMESTAMP,
+  UNIQUE (telemetry_id, model_version)
+);
+```
+
 ## 🎬 Demos Sintéticas
 
 El sistema incluye un generador de videos sintéticos (Celdas 8-9) para ejecutar demos de portfolio sin necesidad de footage real del puente. Escenarios disponibles: light, normal, busy, mixed, stationary_test.
@@ -147,14 +194,14 @@ El sistema incluye un generador de videos sintéticos (Celdas 8-9) para ejecutar
 
 | Documento | Descripción |
 |---|---|
-| [Docs/PRD.md](Docs/PRD.md) | Requisitos del producto |
-| [Docs/DDS.md](Docs/DDS.md) | Diseño de software y diagramas |
-| [Docs/GUIA_USUARIO.md](Docs/GUIA_USUARIO.md) | Guía de usuario |
-| [Docs/KPIs/KPIs.md](Docs/KPIs/KPIs.md) | Métricas y validación |
-| [Docs/DATA_LINEAGE.md](Docs/DATA_LINEAGE.md) | Linaje de datos |
-| [Docs/BIAS_AND_LIMITATIONS.md](Docs/BIAS_AND_LIMITATIONS.md) | Sesgos y limitaciones |
-| [Docs/adr/](Docs/adr/) | Decisiones arquitectónicas (7 ADRs) |
-| [Docs/diagrams/](Docs/diagrams/) | Diagramas Mermaid (6) |
+| [docs/PRD.md](docs/PRD.md) | Requisitos del producto |
+| [docs/DDS.md](docs/DDS.md) | Diseño de software y diagramas |
+| [docs/GUIA_USUARIO.md](docs/GUIA_USUARIO.md) | Guía de usuario |
+| [docs/KPIs/KPIs.md](docs/KPIs/KPIs.md) | Métricas y validación |
+| [docs/DATA_LINEAGE.md](docs/DATA_LINEAGE.md) | Linaje de datos |
+| [docs/BIAS_AND_LIMITATIONS.md](docs/BIAS_AND_LIMITATIONS.md) | Sesgos y limitaciones |
+| [docs/adr/](docs/adr/) | Decisiones arquitectónicas (8 ADRs) |
+| [docs/diagrams/](docs/diagrams/) | Diagramas Mermaid (8) |
 | [AGENTS.md](AGENTS.md) | Contexto para agentes de IA |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Guía de contribución |
 

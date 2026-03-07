@@ -1,6 +1,6 @@
 <!-- context: VAAET/Docs/DDS.md — Documento de Diseño de Software del sistema VAAET.
-Complementa PRD.md (requisitos) y se implementa en vaaet.ipynb (notebook único).
-Las decisiones de diseño están documentadas en Docs/adr/. -->
+Complementa PRD.md (requisitos). Etapa 1 se implementa en 01_legacy_collection.ipynb,
+Etapa 2 en 02_traffic_state_classifier.ipynb. Las decisiones están en Docs/adr/. -->
 
 # Documento de Diseño de Software (DDS): Sistema VAAET
 
@@ -265,3 +265,76 @@ El sistema adopta una **degradación silenciosa**: los errores se capturan, se r
 | PostgreSQL AWS RDS | [ADR-005](adr/ADR-005-postgresql-aws-rds.md) |
 | Estacionarios conservadores | [ADR-006](adr/ADR-006-deteccion-estacionarios-conservadora.md) |
 | Google Colab runtime | [ADR-007](adr/ADR-007-google-colab-como-runtime.md) |
+| TF/Keras clasificación de tráfico | [ADR-008](adr/ADR-008-tensorflow-keras-traffic-classifier.md) |
+
+---
+
+## 8. Capa de Inteligencia (Etapa 2)
+
+La Etapa 2 toma la telemetría cruda producida por la Etapa 1 (tabla `traffic_data`) y la transforma en una clasificación de estado de tráfico. Se implementa en `02_traffic_state_classifier.ipynb`.
+
+Consultar [ADR-008](adr/ADR-008-tensorflow-keras-traffic-classifier.md) para el razonamiento completo.
+
+### 8.1 Arquitectura del Clasificador
+
+MLP tabular con TensorFlow/Keras `Sequential`, diseñado para evolucionar a LSTM en Fase 2.
+
+Consultar [diagrama del pipeline de inteligencia](diagrams/intelligence-pipeline.md).
+
+```
+Input(14 features)
+  → Dense(64, relu) → BatchNormalization → Dropout(0.3)
+  → Dense(32, relu) → BatchNormalization → Dropout(0.2)
+  → Dense(n_classes, softmax)
+```
+
+- **Optimizer**: Adam
+- **Loss**: Sparse Categorical Crossentropy
+- **Callbacks**: EarlyStopping(patience=15), ReduceLROnPlateau(patience=5, factor=0.5)
+- **Seed**: 42 (reproducibilidad)
+
+### 8.2 Ingeniería de Features
+
+| Feature | Fórmula / Origen | Tipo | Justificación |
+|---|---|---|---|
+| `avg_speed` | Directo de `traffic_data` | NUMERIC(5,2) | Indicador primario de flujo |
+| `total_vehicles` | Directo | INTEGER | Volumen absoluto |
+| `count_car` ... `count_bicycle` | Directo (5 campos) | INTEGER | Composición vehicular |
+| `heavy_vehicle_ratio` | `(truck+bus)/total.clip(1)` | NUMERIC(5,4) | Impacto de pesados en flujo |
+| `delta_speed` | `avg_speed.diff()` | NUMERIC(6,2) | Aceleración/desaceleración |
+| `delta_count` | `total_vehicles.diff()` | INTEGER | Tasa de cambio en volumen |
+| `transition_flag` | `abs(delta_speed)>10 AND abs(delta_count)>5` | SMALLINT | Cambio brusco simultáneo |
+| `speed_variance` | `avg_speed.rolling(5).std()` | NUMERIC(6,2) | Estabilidad del flujo |
+| `hour_of_day` | `record_time.dt.hour` | SMALLINT | Patrón circadiano |
+| `weather_condition` | Proxy por hora (nocturno=1) | SMALLINT | Condición ambiental simulada |
+
+### 8.3 Auto-Labeling
+
+Reglas de ingeniería que asignan estados como proxy de ground truth. Orden de evaluación: severo primero.
+
+| Estado | Código | Condiciones |
+|---|---|---|
+| Accidente | 3 | `avg_speed < 2` AND `delta_speed < -20` AND 3+ registros consecutivos |
+| Atascado | 2 | `avg_speed < 5` AND `total_vehicles > 25` AND 2+ registros consecutivos |
+| Reducido | 1 | `avg_speed ∈ [5, 40]` AND `total_vehicles ∈ [15, 25]` |
+| Normal | 0 | Todo lo demás (default) |
+
+### 8.4 Entrenamiento
+
+- **Escalado**: StandardScaler fit en training, transform en ambos sets
+- **Partición**: 80/20 estratificada por clase (seed=42)
+- **Balanceo**: SMOTE solo en training set (k_neighbors adaptativo)
+- **Métrica objetivo**: F1-macro ≥ 0.85
+
+### 8.5 Esquema de Persistencia
+
+Dos tablas nuevas con FK chain: `traffic_data` → `telemetry_raw` → `traffic_classifications`.
+
+Consultar [diagrama ERD Phase 2](diagrams/erd-phase2.md) para detalle visual.
+
+**Campos HITL** (Human-in-the-Loop) en `traffic_classifications`:
+- `is_human_validated`: Booleano, default FALSE
+- `human_override_state`: Estado corregido por operador SISE
+- `validated_at`: Timestamp de validación
+
+Diseñados para Fase 2 futura; en Fase 1 todos los registros son automáticos.

@@ -11,10 +11,12 @@
 
 ### Arquitectura Fundamental
 
-- **Notebook monolítico**: Todo el código vive en `vaaet.ipynb` — un único Jupyter Notebook con 9 celdas de código
+- **Pipeline de dos etapas en notebooks separados**:
+  - **Etapa 1 — Percepción**: `01_legacy_collection.ipynb` — YOLO 11 + OpenCV + SORT → telemetría cruda cada minuto
+  - **Etapa 2 — Inteligencia**: `02_traffic_state_classifier.ipynb` — TF/Keras MLP → clasificación de estado de tráfico
 - **Entorno de ejecución**: Google Colab (acceso a GPU gratuita). NO hay servidor, API REST, microservicios ni contenedores
-- **Persistencia**: PostgreSQL en AWS RDS (opcional). No hay SQLite, CSV ni JSON de salida
-- **No hay CI/CD clásico**: No hay pipeline de build, no hay deploy. El "deploy" es abrir el notebook en Colab y ejecutar las celdas
+- **Persistencia**: PostgreSQL en AWS RDS (opcional). 3 tablas: `traffic_data` (Etapa 1), `telemetry_raw` + `traffic_classifications` (Etapa 2)
+- **No hay CI/CD clásico**: No hay pipeline de build, no hay deploy. El "deploy" es abrir los notebooks en Colab y ejecutar las celdas
 
 ### Stack Tecnológico
 
@@ -24,7 +26,10 @@
 | Visión por computadora | OpenCV — video I/O, optical flow, anotaciones |
 | Cómputo numérico | NumPy — operaciones vectoriales, estadísticas |
 | ML (suavizado) | scikit-learn `MLPRegressor` — NO es una CNN real |
-| Base de datos | PostgreSQL via `psycopg2-binary` (AWS RDS) |
+| Clasificación de tráfico | TensorFlow/Keras — MLP Sequential (evolucionable a LSTM) |
+| Análisis de datos | Pandas + SQLAlchemy — feature engineering y persistencia |
+| Balanceo de clases | imbalanced-learn SMOTE — oversampling sintético |
+| Base de datos | PostgreSQL via `psycopg2-binary` / SQLAlchemy (AWS RDS) |
 | Runtime | Google Colab (primario) o Python 3.8+ local |
 
 ---
@@ -33,46 +38,50 @@
 
 ```
 vaaet/
-├── vaaet.ipynb          # Todo el código (9 celdas)
-├── README.md            # Visión general y uso
-├── AGENTS.md            # Este archivo
-├── CONTRIBUTING.md      # Guía de contribución
-├── CHANGELOG.md         # Historial de cambios
-├── LICENSE              # MIT
-├── requirements.txt     # Dependencias pinneadas
-├── llms.txt             # Índice para agentes RAG
-├── llms-full.txt        # Documentación completa para LLMs
-├── .gitignore
-└── Docs/
-    ├── PRD.md           # Requisitos del producto
-    ├── DDS.md           # Diseño de software
-    ├── GUIA_USUARIO.md  # Guía de usuario
-    ├── DATA_LINEAGE.md  # Linaje de datos
-    ├── BIAS_AND_LIMITATIONS.md  # Sesgos y limitaciones
-    ├── KPIs/
-    │   └── KPIs.md      # Métricas y validación
-    ├── adr/             # Registros de Decisiones Arquitectónicas
-    │   ├── ADR-001-notebook-monolitico.md
-    │   ├── ADR-002-yolo11-seleccion-adaptativa.md
-    │   ├── ADR-003-sort-sobre-deepsort.md
-    │   ├── ADR-004-mlp-como-suavizador.md
-    │   ├── ADR-005-postgresql-aws-rds.md
-    │   ├── ADR-006-deteccion-estacionarios-conservadora.md
-    │   └── ADR-007-google-colab-como-runtime.md
-    └── diagrams/
-        ├── pipeline-flow.md
-        ├── speed-calculation.md
-        ├── erd.md
-        ├── colab-aws-architecture.md
-        ├── model-selection.md
-        └── multi-camera-layout.md
+├── notebooks/
+│   ├── phase_1_perception/
+│   │   └── 01_legacy_collection.ipynb   # Etapa 1: YOLO 11 + tracking + velocidad
+│   └── phase_2_intelligence/
+│       └── 02_traffic_state_classifier.ipynb  # Etapa 2: clasificación de estado
+├── models/
+│   ├── perception/                      # Modelos YOLO (descargados en runtime)
+│   └── intelligence/                    # Artefactos Etapa 2 (.keras, .joblib)
+├── data/
+│   ├── raw/                             # Backups de BD (gitignored)
+│   ├── processed/                       # CSVs de features (gitignored)
+│   └── samples/                         # Datos de ejemplo
+├── src/utils/                           # Utilidades compartidas (futuro)
+├── docs/
+│   ├── PRD.md                           # Requisitos del producto
+│   ├── DDS.md                           # Diseño de software
+│   ├── GUIA_USUARIO.md                  # Guía de usuario
+│   ├── DATA_LINEAGE.md                  # Linaje de datos
+│   ├── BIAS_AND_LIMITATIONS.md          # Sesgos y limitaciones
+│   ├── KPIs/KPIs.md                     # Métricas y validación
+│   ├── adr/                             # Decisiones arquitectónicas (8 ADRs)
+│   │   ├── ADR-001 a ADR-007            # Etapa 1
+│   │   └── ADR-008-tensorflow-keras-traffic-classifier.md  # Etapa 2
+│   └── diagrams/                        # Diagramas Mermaid (8 diagramas)
+│       ├── pipeline-flow.md, speed-calculation.md, erd.md
+│       ├── colab-aws-architecture.md, model-selection.md, multi-camera-layout.md
+│       ├── intelligence-pipeline.md     # Pipeline Etapa 2
+│       └── erd-phase2.md                # ERD con 3 tablas
+├── README.md
+├── AGENTS.md                            # Este archivo
+├── CONTRIBUTING.md
+├── CHANGELOG.md
+├── LICENSE
+├── requirements.txt
+├── llms.txt
+├── llms-full.txt
+└── .gitignore
 ```
 
 ---
 
 ## Orden de Ejecución de Celdas
 
-Las celdas del notebook DEBEN ejecutarse en este orden secuencial:
+### Etapa 1 — Percepción (`01_legacy_collection.ipynb`)
 
 | Celda | Contenido | Dependencias |
 |---|---|---|
@@ -86,28 +95,52 @@ Las celdas del notebook DEBEN ejecutarse en este orden secuencial:
 | 8 | Generador de videos sintéticos para demos | Celdas 2, 3 |
 | 9 | Ejecutor de demos | Celda 8 |
 
+### Etapa 2 — Inteligencia (`02_traffic_state_classifier.ipynb`)
+
+| Celda | Contenido | Dependencias |
+|---|---|---|
+| 0 | Setup de entorno (Colab clone/cd, local no-op) | Ninguna |
+| 1 | Dependencias + imports (TF/Keras, pandas, etc.) | Celda 0 |
+| 2 | Conexión BD + extracción de telemetría | Celda 1 |
+| 3 | Ingeniería de features (9 → 14 columnas) | Celda 2 |
+| 4 | Auto-labeling (reglas de ingeniería → 4 estados) | Celda 3 |
+| 5 | SMOTE + Train/Test split | Celdas 3, 4 |
+| 6 | Definición del modelo MLP + entrenamiento | Celda 5 |
+| 7 | Evaluación + exportación del modelo | Celda 6 |
+| 8 | Crear tablas BD + persistir resultados | Celdas 2, 7 |
+
 ---
 
 ## Contrato de Validación
 
 No hay build ni CI/CD. El equivalente funcional es:
 
+### Etapa 1
 1. **Smoke test**: Ejecutar Cell 2 sin errores de importación
 2. **Test funcional**: Ejecutar `test_sistema()` en Cell 7 — verifica que todos los componentes se inicializan correctamente
 3. **Test end-to-end**: Generar un video sintético (Cells 8-9) y verificar que produce un video de salida anotado
 4. **Test de BD**: Si hay acceso a AWS RDS, verificar que `save_to_database()` persiste un registro y no expone credenciales
 
+### Etapa 2
+5. **Smoke test**: Ejecutar Cell 1 sin errores de importación (TF/Keras)
+6. **Data**: Cell 2 carga DataFrame con >0 filas desde `traffic_data`
+7. **Features**: Cell 3 produce DataFrame con 14 columnas, sin NaN
+8. **Clasificación**: Cell 7 muestra F1-macro ≥ 0.85
+9. **Artefactos**: Existen `traffic_classifier.keras`, `feature_scaler.joblib`, `label_mapping.joblib` en `models/intelligence/`
+
 ---
 
 ## Límites Arquitectónicos (NO MODIFICAR sin ADR)
 
-1. **Todo el código vive en `vaaet.ipynb`** — NO crear módulos `.py` separados
-2. **`VAAETHybrid` es la única clase del sistema** — NO subdividir en múltiples clases
+1. **Todo el código de Etapa 1 vive en `01_legacy_collection.ipynb`** — NO crear módulos `.py` separados
+2. **`VAAETHybrid` es la única clase de Etapa 1** — NO subdividir en múltiples clases
 3. **Cell 5 (`BRIDGE_CONFIG`) es el ÚNICO punto de configuración** para parámetros del puente
-4. **Cell 1 es el ÚNICO punto de configuración** de base de datos
+4. **Cell 1 es el ÚNICO punto de configuración** de base de datos en Etapa 1
 5. **La fusión de velocidad es 70% física + 30% MLP** — no alterar sin evidencia experimental
 6. **Los criterios de `is_stationary()` usan AND-conjunction** — no relajar a OR sin ADR
 7. **El formato de nombre de archivo es estricto**: `bridge_YYYY-MM-DD_HH-MM-SS_to_HH-MM-SS.mp4`
+8. **`01_legacy_collection.ipynb` es INTOCABLE** — no modificar el notebook de Etapa 1
+9. **Las tablas `telemetry_raw` y `traffic_classifications` requieren ADR-008** — no modificar esquema sin nuevo ADR
 
 ---
 
@@ -141,6 +174,8 @@ No hay build ni CI/CD. El equivalente funcional es:
 - Modificar la lógica de selección de modelo YOLO (`select_optimal_model()`)
 - Refactorizaciones que afecten más del 20% de una celda
 - Cambiar umbrales de confianza o NMS
+- Cambiar umbrales de auto-labeling de estados de tráfico (Etapa 2)
+- Modificar arquitectura del MLP/LSTM clasificador (Etapa 2)
 
 ### 🔴 Never (restricciones absolutas)
 
@@ -152,6 +187,9 @@ No hay build ni CI/CD. El equivalente funcional es:
 - Eliminar la validación estricta de nombre de archivo
 - Hacer commit de archivos `.pt` (modelos YOLO) al repositorio
 - Imprimir credenciales en outputs de celdas
+- Modificar `telemetry_raw` o `traffic_classifications` sin ADR
+- Eliminar campos HITL de `traffic_classifications`
+- Hacer commit de archivos `.keras`, `.joblib` o CSVs de `data/processed/`
 
 ---
 
@@ -182,6 +220,7 @@ Consultar los ADRs en `Docs/adr/` antes de proponer cambios que contradigan esta
 | ADR-005 | PostgreSQL (AWS RDS) sobre SQLite/local |
 | ADR-006 | Detección de estacionarios ultra-conservadora |
 | ADR-007 | Google Colab como entorno de ejecución principal |
+| ADR-008 | TF/Keras para clasificación de tráfico + dos tablas + auto-labeling |
 
 ---
 

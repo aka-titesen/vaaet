@@ -130,3 +130,42 @@ El sistema NO ha sido evaluado sistemáticamente en las siguientes condiciones:
 6. **Fine-tuning de YOLO** con datos de tráfico argentino — mejorar detección de bicicletas
 7. **Agregar SSL** a la conexión PostgreSQL — seguridad
 8. **Implementar checkpointing** — resiliencia ante desconexiones de Colab
+
+---
+
+## 6. Sesgos y Limitaciones del Clasificador de Tráfico (Etapa 2)
+
+### 6.1 Sesgo de Auto-Labeling
+
+Las etiquetas de entrenamiento NO son ground truth humano. Se generan con reglas de ingeniería de tránsito (umbrales de velocidad, volumen, persistencia). Esto introduce un sesgo circular: el modelo aprende los umbrales que lo etiquetaron, no necesariamente el estado real del tráfico.
+
+**Mitigación actual**: Los umbrales están calibrados con experiencia de dominio del Puente Belgrano.
+
+**Mitigación futura**: HITL (campos `is_human_validated`, `human_override_state` en `traffic_classifications`) permitirá que operadores SISE refinen las etiquetas.
+
+### 6.2 Desbalance de Clases
+
+| Clase | Frecuencia esperada | Riesgo |
+|---|---|---|
+| Normal | ~80% | Sobre-representada — modelo tiende a predecir Normal |
+| Reducido | ~15% | Baja representación |
+| Atascado | ~4% | Muy baja representación |
+| Accidente | ~0.1% | Extremadamente rara — posible recall 0 sin SMOTE |
+
+**Mitigación**: SMOTE genera muestras sintéticas de clases minoritarias en el training set. Sin embargo, las muestras sintéticas de Accidente (interpolación en feature space) pueden no ser físicamente realistas.
+
+### 6.3 Supuestos Temporales
+
+Los umbrales de persistencia en auto-labeling asumen que cada registro representa exactamente 1 minuto de observación. Si la frecuencia de escritura de Etapa 1 cambia (ej: cada 30s o cada 2min), los estados Reducido (>60s), Atascado (>120s) y Accidente (>180s) quedan invalidados.
+
+### 6.4 Weather Simulado
+
+El feature `weather_condition` es un proxy basado en la hora del día (0=diurno 6-18h, 1=nocturno). NO es un dato meteorológico real. Esto limita la capacidad del modelo para aprender patrones climáticos.
+
+### 6.5 Sin Temporalidad en MLP (Fase 1)
+
+El MLP procesa cada registro independientemente — no tiene memoria de registros anteriores. No puede aprender patrones secuenciales como "velocidad decreciente durante 5 minutos consecutivos". La evolución a LSTM en Fase 2 corregirá esta limitación.
+
+### 6.6 Generalización
+
+El modelo está entrenado exclusivamente con datos del Puente General Manuel Belgrano. NO es transferible a otros puentes, rutas o contextos urbanos sin reentrenamiento con datos locales.

@@ -1,6 +1,6 @@
 # VAAET - Documentación Completa para Consumo de Agentes de IA
 
-Versión: 1.0.0 | Fecha: 2026-03-06 | Licencia: MIT
+Versión: 2.0.0 | Fecha: 2026-03-07 | Licencia: MIT
 
 ---
 
@@ -10,10 +10,13 @@ Versión: 1.0.0 | Fecha: 2026-03-06 | Licencia: MIT
 
 VAAET (Video Análisis Avanzado de Tráfico) es un sistema de visión por computadora para analizar tráfico vehicular en el Puente General Manuel Belgrano (Corrientes, Argentina). Detecta, clasifica, rastrea y estima la velocidad de vehículos usando video de cámaras de vigilancia SISE.
 
-- Notebook monolítico: Todo el código vive en vaaet.ipynb (9 celdas de código)
+### Pipeline de dos etapas
+- Etapa 1 — Percepción: 01_legacy_collection.ipynb — YOLO 11 + OpenCV + SORT → telemetría cruda cada minuto
+- Etapa 2 — Inteligencia: 02_traffic_state_classifier.ipynb — TF/Keras MLP → clasificación de estado de tráfico
 - Entorno: Google Colab (GPU gratuita). NO hay servidor, API, microservicios ni CI/CD
-- Persistencia: PostgreSQL en AWS RDS (opcional)
-- Stack: YOLO 11 + OpenCV + NumPy + scikit-learn MLPRegressor + psycopg2
+- Persistencia: PostgreSQL en AWS RDS (opcional). 3 tablas: traffic_data (Etapa 1), telemetry_raw + traffic_classifications (Etapa 2)
+- Stack Etapa 1: YOLO 11 + OpenCV + NumPy + scikit-learn MLPRegressor + psycopg2
+- Stack Etapa 2: TensorFlow/Keras + pandas + SQLAlchemy + imbalanced-learn SMOTE + joblib
 
 ## Límites Arquitectónicos
 
@@ -24,14 +27,16 @@ VAAET (Video Análisis Avanzado de Tráfico) es un sistema de visión por comput
 5. La fusión de velocidad es 70% física + 30% MLP
 6. Los criterios de is_stationary() usan AND-conjunction
 7. Formato de archivo estricto: bridge_YYYY-MM-DD_HH-MM-SS_to_HH-MM-SS.mp4
+8. 01_legacy_collection.ipynb es INTOCABLE — no modificar el notebook de Etapa 1
+9. Las tablas telemetry_raw y traffic_classifications requieren ADR-008 — no modificar esquema sin nuevo ADR
 
 ## Always / Ask / Never
 
 Always: Corregir errores de sintaxis, actualizar docstrings, agregar type hints, agregar markdown cells, formatear código PEP 8, corregir inconsistencias config.
 
-Ask: Cambiar parámetros de calibración, modificar calculate_enhanced_speed() o is_stationary(), agregar dependencias, cambiar esquema de BD, modificar selección de modelo.
+Ask: Cambiar parámetros de calibración, modificar calculate_enhanced_speed() o is_stationary(), agregar dependencias, cambiar esquema de BD, modificar selección de modelo, cambiar umbrales de auto-labeling de estados de tráfico, modificar arquitectura del MLP/LSTM clasificador.
 
-Never: Hardcodear credenciales AWS, crear archivos .py fuera del notebook, eliminar test_sistema() o demos sintéticas, modificar tabla traffic_data sin ADR, romper compatibilidad Colab Free, commit de archivos .pt.
+Never: Hardcodear credenciales AWS, crear archivos .py fuera del notebook, eliminar test_sistema() o demos sintéticas, modificar tabla traffic_data sin ADR, romper compatibilidad Colab Free, commit de archivos .pt, modificar telemetry_raw o traffic_classifications sin ADR, eliminar campos HITL de traffic_classifications, commit de archivos .keras/.joblib o CSVs de data/processed/.
 
 ---
 
@@ -52,6 +57,7 @@ Never: Hardcodear credenciales AWS, crear archivos .py fuera del notebook, elimi
 11. Modularidad: Código desacoplado, funciones auxiliares, logging
 12. Notebook compacto: 9 celdas claras
 13. Outputs claros: Mensajes de éxito/error con emoji
+14. Clasificación de estado de tráfico: 4 estados (Normal, Reducido, Atascado, Accidente) con MLP TF/Keras
 
 ## Casos de uso
 
@@ -79,6 +85,12 @@ Requiere ALL (AND): >=200 frames, desplazamiento<5px, segmento<3px, std<2.5px, a
 ### 3.4 Estrategias anti-error
 Compensación de cámara (optical flow), perspectiva adaptativa, filtro de plausibilidad, suavizado temporal
 
+### 3.5 Clasificador de Estado de Tráfico (Etapa 2)
+Modelo: TF/Keras Sequential MLP — Input(14) → Dense(64,relu) → BatchNorm → Dropout(0.3) → Dense(32,relu) → BatchNorm → Dropout(0.2) → Dense(n_classes,softmax).
+Compile: optimizer=adam, loss=sparse_categorical_crossentropy, metrics=accuracy.
+Callbacks: EarlyStopping(patience=15, restore_best_weights), ReduceLROnPlateau(patience=5, factor=0.5).
+Auto-labeling: Normal (avg_speed>40, total_vehicles<15), Reducido (10≤speed≤40 y 15≤vehicles≤25), Atascado (speed<5, vehicles>25, 2+ consecutivos), Accidente (speed≈0, delta_speed<-20, 3+ consecutivos).
+
 ## Esquema de BD
 
 ```sql
@@ -95,7 +107,37 @@ CREATE TABLE traffic_data (
   total_vehicles INTEGER NOT NULL,
   UNIQUE (clip_id, record_time)
 );
+
+CREATE TABLE telemetry_raw (
+  id SERIAL PRIMARY KEY,
+  source_record_id INTEGER NOT NULL REFERENCES traffic_data(id),
+  clip_id TEXT NOT NULL,
+  record_time TIMESTAMP NOT NULL,
+  avg_speed NUMERIC(5,2), total_vehicles INTEGER,
+  count_car INTEGER, count_truck INTEGER, count_bus INTEGER,
+  count_motorcycle INTEGER, count_bicycle INTEGER,
+  heavy_vehicle_ratio NUMERIC(5,4), delta_speed NUMERIC(6,2),
+  delta_count INTEGER, transition_flag SMALLINT,
+  speed_variance NUMERIC(8,4), hour_of_day INTEGER,
+  weather_condition SMALLINT DEFAULT 0,
+  ingested_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE traffic_classifications (
+  id SERIAL PRIMARY KEY,
+  telemetry_id INTEGER NOT NULL REFERENCES telemetry_raw(id),
+  model_version TEXT NOT NULL,
+  predicted_state SMALLINT NOT NULL,
+  confidence NUMERIC(5,4),
+  human_override_state SMALLINT,
+  human_override_by TEXT,
+  human_override_at TIMESTAMP,
+  classified_at TIMESTAMP DEFAULT NOW()
+);
 ```
+
+FK chain: traffic_classifications → telemetry_raw → traffic_data.
+Campos HITL: human_override_state, human_override_by, human_override_at (diseñados, no implementados).
 
 ---
 
@@ -122,6 +164,9 @@ Decisión: AND-conjunction de 6 criterios estadísticos. Consecuencia: precision
 ## ADR-007: Google Colab como Runtime
 Decisión: GPU gratuita, zero config, portabilidad. Consecuencia: sin CI/CD, sesiones efímeras, GPU no garantizada.
 
+## ADR-008: TensorFlow/Keras para Clasificación de Tráfico
+Decisión: MLP Sequential (Dense 64→32→n_classes) con auto-labeling + SMOTE. 2 tablas nuevas (telemetry_raw, traffic_classifications) con FK a traffic_data. 4 estados: Normal(0), Reducido(1), Atascado(2), Accidente(3). Campos HITL diseñados para corrección humana futura. Consecuencia: dependencia TF (~500MB), auto-labeling hereda sesgos Etapa 1, evolución futura a LSTM.
+
 ---
 
 # 5. KPIs
@@ -133,17 +178,28 @@ Decisión: GPU gratuita, zero config, portabilidad. Consecuencia: sin CI/CD, ses
 | Tracking | ID Switches | Minimizar | Sin medición formal |
 | Procesamiento | FPS | Variable por modelo | Sin benchmark publicado |
 | Estacionarios | Precisión clasificación | Alta | Sin evaluación cuantitativa |
+| Clasificación tráfico | F1-macro | ≥ 0.85 | Pendiente entrenamiento con datos reales |
+| Recall Accidente | Recall clase 3 | ≥ 0.90 | Pendiente entrenamiento con datos reales |
 
-Guía de validación: Ground truth con CVAT/VIA -> Ejecución VAAET -> Comparación IoU>0.5 -> Cálculo F1.
+Guía de validación Etapa 1: Ground truth con CVAT/VIA -> Ejecución VAAET -> Comparación IoU>0.5 -> Cálculo F1.
+Guía de validación Etapa 2: Cell 7 genera classification_report + confusion matrix. F1-macro ≥ 0.85 requerido. Recall Accidente ≥ 0.90 crítico.
 
 ---
 
 # 6. LINAJE DE DATOS
 
 Fuente: Cámaras SISE Puente Belgrano, video MP4.
+
+## Etapa 1 — Percepción
 Pipeline: Video -> Frames 30fps -> YOLO detecciones -> SORT tracks -> Velocidad híbrida -> Agregación/minuto -> PostgreSQL.
 MLP: Entrenado con datos random (scaffold). No hay ground truth de velocidad.
 Salida: Video anotado .mp4 + registros en traffic_data.
+
+## Etapa 2 — Inteligencia
+Pipeline: traffic_data (SQL) → DataFrame → Feature Engineering (9→13 cols) → Auto-Labeling (4 estados) → SMOTE → StandardScaler → MLP Training → Evaluación → Export (.keras, .joblib) → Persistencia (telemetry_raw + traffic_classifications).
+14 features: avg_speed, total_vehicles, count_car, count_truck, count_bus, count_motorcycle, count_bicycle, heavy_vehicle_ratio (truck+bus/total), delta_speed (diff t-1), delta_count (diff t-1), transition_flag (delta_speed>10 & delta_count>5), speed_variance (rolling 5), hour_of_day (hora), weather_condition (nocturno=1).
+Artefactos: traffic_classifier.keras, feature_scaler.joblib, label_mapping.joblib en models/intelligence/.
+
 Privacidad: Videos pueden contener patentes. No se almacenan frames, solo agregados por minuto.
 
 ---
@@ -156,6 +212,10 @@ Privacidad: Videos pueden contener patentes. No se almacenan frames, solo agrega
 - MLP con datos random: no mejora precisión, nombre "CNN" es incorrecto
 - Tracking sin ReID: pierde identidad en oclusiones >1 segundo
 - Colab efímero: sesiones max 12h, GPU no garantizada, sin retry automático
+- Auto-labeling hereda sesgos de Etapa 1: si YOLO falla, las etiquetas de estado son incorrectas
+- Clase Accidente infrarrepresentada (~2%): SMOTE mitiga parcialmente, puede generar artefactos sintéticos
+- Sin temporalidad: MLP no captura secuencias, evolución futura a LSTM
+- Weather simulado: weather_condition=0 constante hasta integrar API meteorológica
 
 ---
 

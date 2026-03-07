@@ -150,3 +150,65 @@ Consultar [ADR-004](adr/ADR-004-mlp-como-suavizador.md) para el razonamiento det
 - Patentes individuales
 - Imágenes de personas
 - Datos de tracking individual fuera del video procesado
+
+---
+
+## 6. Pipeline Etapa 2 (Inteligencia)
+
+La Etapa 2 NO procesa video ni accede a frames. Opera exclusivamente sobre la telemetría tabular de `traffic_data`.
+
+```
+traffic_data (PostgreSQL)
+  │
+  ├── [1] SQL query ─────────── SELECT 9 campos + id, ordenado por record_time
+  │
+  ├── [2] DataFrame ─────────── ~2000 registros × 10 columnas (pandas)
+  │
+  ├── [3] Feature Engineering ── 9 campos crudos → 14 features:
+  │     │   heavy_vehicle_ratio, delta_speed, delta_count,
+  │     │   transition_flag, speed_variance, hour_of_day, weather_condition
+  │     │
+  │     └── Drop primeras filas con NaN de diff()
+  │
+  ├── [4] Auto-Labeling ─────── Reglas de ingeniería → 4 estados:
+  │     │   Accidente(3) → Atascado(2) → Reducido(1) → Normal(0)
+  │     │
+  │     └── NO es ground truth humano. Proxy de ingeniería.
+  │
+  ├── [5] SMOTE ─────────────── Balanceo del training set (solo train)
+  │     │   StandardScaler fit en train, transform en ambos
+  │     │
+  │     └── Test set permanece con distribución original
+  │
+  ├── [6] MLP Training ─────── Dense(64) → Dense(32) → Softmax(4)
+  │     │   EarlyStopping + ReduceLROnPlateau, seed=42
+  │     │
+  │     └── Exporta: traffic_classifier.keras, feature_scaler.joblib
+  │
+  ├── [7] Evaluación ──────────  F1-macro, confusion matrix, recall por clase
+  │
+  └── [8] Persistencia ────────  2 tablas nuevas:
+        │   telemetry_raw: 14 features + FK a traffic_data(id)
+        │   traffic_classifications: predicción + confianza + HITL
+        │
+        └── Opcional — falla silenciosa si no hay BD
+```
+
+### Artefactos Generados
+
+| Artefacto | Ruta | Formato | Gitignored |
+|---|---|---|---|
+| Modelo entrenado | `models/intelligence/traffic_classifier.keras` | Keras nativo | Sí |
+| Scaler | `models/intelligence/feature_scaler.joblib` | joblib | Sí |
+| Label mapping | `models/intelligence/label_mapping.joblib` | joblib | Sí |
+| Dataset features | `data/processed/traffic_telemetry.csv` | CSV | Sí |
+
+### Datos de Entrenamiento
+
+| Atributo | Valor |
+|---|---|
+| **Fuente** | Telemetría real de `traffic_data` (~2000 registros) |
+| **Backup** | `data/raw/traffic_data.backup` (pg_dump binary) |
+| **Etiquetas** | Auto-labeling con reglas de ingeniería (NO ground truth) |
+| **Balanceo** | SMOTE en training set |
+| **Partición** | 80/20 estratificada, seed=42 |

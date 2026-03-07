@@ -39,3 +39,10 @@
 - [Arquitectura Colab+AWS](Docs/diagrams/colab-aws-architecture.md): Infraestructura de ejecución
 - [Selección de modelo](Docs/diagrams/model-selection.md): Lógica adaptativa YOLO 11
 - [Multi-cámara](Docs/diagrams/multi-camera-layout.md): Layouts 1/2/4 cámaras
+
+## Etapa 2 — Inteligencia
+
+- [ADR-008](Docs/adr/ADR-008-tensorflow-keras-traffic-classifier.md): TF/Keras + auto-labeling + dos tablas
+- [Pipeline de inteligencia](Docs/diagrams/intelligence-pipeline.md): Flujo de clasificación completo
+- [ERD Phase 2](Docs/diagrams/erd-phase2.md): Esquema de 3 tablas con FK chain
+- [Notebook Phase 2](notebooks/phase_2_intelligence/02_traffic_state_classifier.ipynb): Clasificador de estado de tráfico

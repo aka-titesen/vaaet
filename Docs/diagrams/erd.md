@@ -3,7 +3,9 @@ Referenciado por DDS.md, ADR-005, README.md. -->
 
 # Esquema de Base de Datos (ERD)
 
-Tabla única `traffic_data` en PostgreSQL (AWS RDS).
+Tabla `traffic_data` (Etapa 1) con extensión Phase 2: `telemetry_raw` y `traffic_classifications`.
+
+Para el ERD completo con las 3 tablas, ver [erd-phase2.md](erd-phase2.md).
 
 ```mermaid
 erDiagram
@@ -19,6 +21,33 @@ erDiagram
         integer count_bicycle "Conteo de bicicletas"
         integer total_vehicles "Total de vehículos"
     }
+
+    TELEMETRY_RAW {
+        serial id PK "Auto-incremento"
+        integer source_record_id FK "FK a traffic_data.id"
+        timestamp record_time "Timestamp del registro"
+        numeric heavy_vehicle_ratio "Ratio pesados"
+        numeric delta_speed "Cambio de velocidad"
+        integer delta_count "Cambio de volumen"
+        smallint transition_flag "Flag de transicion"
+        numeric speed_variance "Variabilidad velocidad"
+        smallint hour_of_day "Hora del dia"
+        smallint weather_condition "Condicion meteorologica"
+    }
+
+    TRAFFIC_CLASSIFICATIONS {
+        serial id PK "Auto-incremento"
+        integer telemetry_id FK "FK a telemetry_raw.id"
+        timestamp classified_at "Timestamp clasificacion"
+        smallint traffic_state "Codigo estado 0-3"
+        text state_label "Nombre del estado"
+        numeric confidence "Confianza del modelo"
+        text model_version "Version del modelo"
+        boolean is_human_validated "Validado HITL"
+    }
+
+    TRAFFIC_DATA ||--o{ TELEMETRY_RAW : "source_record_id"
+    TELEMETRY_RAW ||--o{ TRAFFIC_CLASSIFICATIONS : "telemetry_id"
 ```
 
 ## Constraints

@@ -116,6 +116,8 @@ El valor del **F1-Score** será un número entre 0 y 1. Si el resultado es **0.9
 | ID Switches | Minimizar | Sin medición formal. Requiere ground truth con IDs consistentes |
 | FPS Procesamiento | Variable | No publicado. Depende de modelo YOLO y GPU asignada por Colab |
 | Precisión Estacionarios | Alta | Sin evaluación cuantitativa. Validado cualitativamente con demos sintéticas |
+| F1-macro Clasificación | ≥ 0.85 | Pendiente de primera ejecución de Etapa 2 |
+| Recall clase Accidente | > 0 | Pendiente. Clase extremadamente rara |
 
 ### Prerequisitos para Validación
 
@@ -127,3 +129,41 @@ El valor del **F1-Score** será un número entre 0 y 1. Si el resultado es **0.9
 ### Limitaciones Conocidas
 
 Para un análisis completo de sesgos y limitaciones que afectan los KPIs, consultar [BIAS_AND_LIMITATIONS.md](../BIAS_AND_LIMITATIONS.md).
+
+---
+
+## 4. KPIs de Clasificación de Estado de Tráfico (Etapa 2)
+
+Estos KPIs evalúan la calidad del clasificador MLP implementado en `02_traffic_state_classifier.ipynb`.
+
+### 4.1 F1-Score Macro
+
+* **¿Qué es?** Promedio no ponderado del F1-Score de cada clase. Trata todas las clases por igual, independientemente de su frecuencia.
+* **¿Por qué es importante?** Penaliza equitativamente el rendimiento en clases raras (Accidente, ~0.1%) y frecuentes (Normal, ~80%). Un accuracy alto puede ocultar que el modelo ignora las clases minoritarias.
+* **Target**: ≥ 0.85
+* **Cómo se mide**: `sklearn.metrics.f1_score(y_test, y_pred, average='macro')`
+
+### 4.2 Recall por Clase
+
+* **¿Qué es?** De todos los registros que realmente pertenecen a una clase, ¿qué porcentaje detectó el modelo?
+* **¿Por qué es importante?** Un recall de 0 en Accidente significaría que el modelo NUNCA detecta la clase más crítica operacionalmente.
+* **Target**: > 0 para todas las clases presentes
+* **Especialmente crítico**: Accidente (recall > 0 es el mínimo aceptable)
+
+### 4.3 Confusion Matrix
+
+* **¿Qué es?** Tabla que muestra la distribución de predicciones vs realidad para cada par de clases.
+* **Confusiones esperadas**:
+  - Normal ↔ Reducido: frontera difusa en ~40 km/h
+  - Atascado ↔ Reducido: frontera difusa en ~5 km/h
+  - Accidente raramente confundido con Normal (velocidades muy diferentes)
+
+### 4.4 Estado Actual de Medición (Etapa 2)
+
+| KPI | Target | Estado |
+|---|---|---|
+| F1-macro | ≥ 0.85 | Pendiente de primera ejecución |
+| Recall Accidente | > 0 | Pendiente (clase rara, SMOTE mitiga) |
+| Recall Normal | > 0.90 | Pendiente (clase mayoritaria) |
+| Recall Reducido | > 0.50 | Pendiente |
+| Recall Atascado | > 0.50 | Pendiente |

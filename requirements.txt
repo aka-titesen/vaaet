@@ -1,0 +1,16 @@
+# VAAET - Dependencias
+# Instalar con: pip install -r requirements.txt
+
+# Core - Detección y visión por computadora
+ultralytics>=8.0.0
+opencv-python>=4.8.0
+numpy>=1.24.0
+
+# ML - Suavizado de velocidad (MLPRegressor)
+scikit-learn>=1.3.0
+
+# Base de datos - PostgreSQL (AWS RDS)
+psycopg2-binary>=2.9.0
+
+# Opcional - Widgets para interfaz en Colab
+# ipywidgets>=8.0.0

@@ -1,3 +1,6 @@
+<!-- context: VAAET/Docs/PRD.md — Requisitos del producto del sistema VAAET.
+Complementa DDS.md (diseño técnico) y KPIs.md (métricas de rendimiento). -->
+
 # 📋 PRD - VAAET: Sistema Avanzado de Análisis de Tráfico Vehicular
 
 ## ✅ Validación de Cumplimiento de Requisitos

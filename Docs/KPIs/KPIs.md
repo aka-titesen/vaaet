@@ -1,3 +1,6 @@
+<!-- context: VAAET/Docs/KPIs/KPIs.md — Métricas de rendimiento y guía de validación.
+Complementa PRD.md (requisitos) y BIAS_AND_LIMITATIONS.md (limitaciones). -->
+
 # Métricas de Rendimiento (KPIs) y Guía de Validación para el Sistema VAAET
 
 Este documento describe los Indicadores Clave de Rendimiento (KPIs) que definen el éxito del sistema VAAET y proporciona una guía detallada para validar el objetivo de precisión del 97% mencionado en la documentación del proyecto.
@@ -99,3 +102,28 @@ Ahora tienes dos archivos: el Ground Truth (realidad) y las Predicciones (lo que
 ### **Paso 4: Interpretación del Resultado**
 
 El valor del **F1-Score** será un número entre 0 y 1. Si el resultado es **0.97 o superior**, has validado exitosamente que tu sistema VAAET cumple con el objetivo de precisión del 97%. Si no, el análisis de la Precisión y el Recall te dirá dónde mejorar (por ejemplo, un Recall bajo significa que necesitas hacer tu modelo más sensible para que no omita vehículos).
+
+---
+
+## 3. Estado Actual de Medición
+
+> **Importante**: Los targets de KPIs listados en este documento son **objetivos declarados** que aún no han sido validados con benchmarks reales.
+
+| KPI | Target | Estado de Medición |
+|---|---|---|
+| F1-Score Detección | 97% | Sin benchmark real. Requiere ground truth anotado manualmente |
+| MAE Velocidad | < 5 km/h | Sin ground truth de velocidades. No existen datos de referencia para el puente |
+| ID Switches | Minimizar | Sin medición formal. Requiere ground truth con IDs consistentes |
+| FPS Procesamiento | Variable | No publicado. Depende de modelo YOLO y GPU asignada por Colab |
+| Precisión Estacionarios | Alta | Sin evaluación cuantitativa. Validado cualitativamente con demos sintéticas |
+
+### Prerequisitos para Validación
+
+1. **Video de prueba** representativo del puente (2-5 minutos)
+2. **Anotación manual** con herramienta como CVAT o VIA (Paso 1 de la guía)
+3. **Script de comparación** IoU > 0.5 (no proporcionado actualmente — debe implementarse)
+4. **Datos de velocidad real** (radar o GPS) para validar MAE — actualmente no disponibles
+
+### Limitaciones Conocidas
+
+Para un análisis completo de sesgos y limitaciones que afectan los KPIs, consultar [BIAS_AND_LIMITATIONS.md](../BIAS_AND_LIMITATIONS.md).

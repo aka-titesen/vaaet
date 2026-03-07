@@ -1,3 +1,6 @@
+<!-- context: VAAET/Docs/GUIA_USUARIO.md — Guía de usuario para VAAET.
+Complementa README.md (visión general) y DDS.md (diseño técnico). -->
+
 # 📖 GUÍA DE USUARIO - VAAET (actualizada)
 
 ## 🚦 ¿Qué es VAAET?
@@ -76,3 +79,45 @@ No se generan JSON/CSV locales.
 
 - Video MP4 con cajas verdes, texto con borde (sin caja negra), tipo + ID y velocidad (si es coherente). Hub informativo minimalista.
 - Descarga automática al finalizar en Colab.
+
+---
+
+## 🎬 Demos Sintéticas
+
+Si no tienes un video real del puente, puedes generar videos de demostración:
+
+1. Ejecuta **Celda 8** (Generador de Videos Sintéticos) — define los escenarios disponibles
+2. Ejecuta **Celda 9** (Ejecutor de Demos) — genera 4 videos de demostración automáticamente
+
+### Escenarios disponibles
+
+| Escenario | Descripción |
+|---|---|
+| `light` | Tráfico ligero, pocos vehículos |
+| `normal` | Flujo de tráfico normal |
+| `busy` | Tráfico denso |
+| `mixed` | Combinación de condiciones |
+| `stationary_test` | Vehículos detenidos (valida `is_stationary()`) |
+
+Los videos generados se descargan automáticamente en Colab.
+
+---
+
+## ⚠️ Limitaciones Conocidas
+
+- **Velocidad sin ground truth**: La precisión del cálculo de velocidad depende de la calibración manual de `pixels_per_meter`
+- **Tracking sin re-ID**: Si un vehículo es ocluido >1 segundo, pierde su ID
+- **Colab efímero**: Los archivos se pierden al cerrar la sesión — descarga el video procesado antes de cerrar
+- **GPU no garantizada**: En horas pico de Colab Free, puede asignarse solo CPU (procesamiento ~10x más lento)
+
+Para un análisis completo, consultar [BIAS_AND_LIMITATIONS.md](BIAS_AND_LIMITATIONS.md).
+
+---
+
+## 🔗 Documentación relacionada
+
+- [README.md](../README.md) — Visión general y requisitos
+- [DDS.md](DDS.md) — Diseño técnico detallado
+- [KPIs.md](KPIs/KPIs.md) — Métricas y guía de validación
+- [DATA_LINEAGE.md](DATA_LINEAGE.md) — Linaje de datos
+- [ADRs](adr/) — Decisiones arquitectónicas

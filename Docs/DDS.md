@@ -1,3 +1,7 @@
+<!-- context: VAAET/Docs/DDS.md — Documento de Diseño de Software del sistema VAAET.
+Complementa PRD.md (requisitos) y se implementa en vaaet.ipynb (notebook único).
+Las decisiones de diseño están documentadas en Docs/adr/. -->
+
 # Documento de Diseño de Software (DDS): Sistema VAAET
 
 ---
@@ -6,7 +10,61 @@
 
 La arquitectura de VAAET está diseñada como un **pipeline de procesamiento secuencial**, encapsulado en un entorno de Jupyter Notebook para facilitar la reproducibilidad y la inspección de resultados intermedios. Esta arquitectura es **modular**, centrada en la clase `VAAETHybrid`, lo que permite un flujo de datos claro desde la ingesta del video hasta la generación de resultados analíticos.
 
-### **Diagrama de Flujo Lógico de Datos**
+Consultar [ADR-001](adr/ADR-001-notebook-monolitico.md) y [ADR-007](adr/ADR-007-google-colab-como-runtime.md) para el razonamiento detrás de la arquitectura de notebook monolítico en Google Colab.
+
+### Diagrama de Flujo Lógico de Datos
+
+```mermaid
+flowchart TD
+    A[📹 Video Input<br/>bridge_YYYY-MM-DD_HH-MM-SS_to_HH-MM-SS.mp4] --> B[Validar nombre<br/>y extraer duración]
+    B --> C{Duración}
+    C -->|< 1h| D1[yolo11x.pt]
+    C -->|1-3h| D2[yolo11l.pt]
+    C -->|3-6h| D3[yolo11m.pt]
+    C -->|6-12h| D4[yolo11s.pt]
+    C -->|> 12h| D5[yolo11n.pt]
+    
+    D1 & D2 & D3 & D4 & D5 --> E[Cargar modelo YOLO 11]
+    
+    E --> F[Inicializar VAAETHybrid]
+    F --> G[Leer frame del video]
+    
+    G --> H[Detectar vehículos<br/>YOLO inference + NMS]
+    H --> I[Matching de tracks<br/>SORT por distancia euclidiana]
+    I --> J[Calcular velocidad<br/>Fusión híbrida 70/30]
+    J --> K{¿Estacionario?<br/>AND-conjunction 6 criterios}
+    
+    K -->|Sí| L[Marcar como estacionado<br/>Velocidad = 0]
+    K -->|No| M[Registrar velocidad<br/>en historial del track]
+    
+    L & M --> N[Dibujar anotaciones<br/>Bounding boxes + HUD]
+    N --> O[Escribir frame anotado<br/>al video de salida]
+    
+    O --> P{¿Cada 60s?}
+    P -->|Sí| Q[Persistir en PostgreSQL<br/>AWS RDS - opcional]
+    P -->|No| R{¿Más frames?}
+    Q --> R
+    
+    R -->|Sí| G
+    R -->|No| S[Finalizar video]
+    S --> T[📥 Descargar video anotado<br/>Auto-download en Colab]
+```
+
+Para diagramas adicionales, consultar el directorio [diagrams/](diagrams/).
+
+### Arquitectura de Infraestructura
+
+```mermaid
+flowchart LR
+    A[👤 Usuario] -->|Sube .mp4| B[Google Colab]
+    B -->|Inferencia| C[GPU T4/V100]
+    C -->|Detecciones| B
+    B -->|INSERT por minuto| D[(AWS RDS<br/>PostgreSQL)]
+    B -->|Video anotado| A
+    E[Ultralytics Hub] -->|modelo .pt| B
+```
+
+Consultar [diagrama detallado de arquitectura Colab+AWS](diagrams/colab-aws-architecture.md).
 
 ---
 
@@ -76,3 +134,134 @@ La arquitectura de VAAET está diseñada como un **pipeline de procesamiento sec
 * **Corrección de Perspectiva Adaptativa:** El uso de un factor de escala dinámico basado en la coordenada `y` proporciona una **calibración implícita y flexible**, superior a una matriz de homografía estática en escenarios con zoom variable.
 * **Filtrado de Velocidades por Plausibilidad Física:** El uso de `speed_limits` como un **filtro a posteriori** elimina outliers evidentes que pueden surgir de errores de tracking (ej. un cambio de ID momentáneo). Esto previene la contaminación de las métricas agregadas como la velocidad promedio.
 * **Suavizado Temporal de la Velocidad Promedio:** La implementación de una **media móvil ponderada** introduce una inercia temporal en la velocidad promedio. Esto actúa como un **filtro paso bajo**, eliminando el ruido de alta frecuencia (fluctuaciones momentáneas) y reflejando de manera más fiel las tendencias reales del flujo de tráfico.
+
+---
+
+## 3. Diseño de Base de Datos
+
+Consultar [ADR-005](adr/ADR-005-postgresql-aws-rds.md) para el razonamiento de PostgreSQL sobre SQLite.
+
+### Esquema
+
+```sql
+CREATE TABLE IF NOT EXISTS traffic_data (
+    id SERIAL PRIMARY KEY,
+    clip_id TEXT NOT NULL,
+    record_time TIMESTAMP NOT NULL,
+    avg_speed NUMERIC(5,2) NOT NULL,
+    count_car INTEGER NOT NULL,
+    count_truck INTEGER NOT NULL,
+    count_bus INTEGER NOT NULL,
+    count_motorcycle INTEGER NOT NULL,
+    count_bicycle INTEGER NOT NULL,
+    total_vehicles INTEGER NOT NULL,
+    UNIQUE (clip_id, record_time)
+);
+```
+
+Consultar [diagrama ERD](diagrams/erd.md) para detalle visual.
+
+### Patrón de Conexión
+
+- **Librería**: `psycopg2-binary`
+- **Frecuencia de escritura**: Un INSERT cada 60 segundos de video procesado
+- **Connection pooling**: No implementado — cada escritura abre y cierra conexión
+- **Manejo de fallos**: Degradación silenciosa — si la conexión falla, el procesamiento continúa sin persistencia
+- **Credenciales**: Variables de entorno (`DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`) o input via `getpass`
+
+### Funciones de BD (Cell 1)
+
+| Función | Responsabilidad |
+|---|---|
+| `configure_database()` | Solicita credenciales al usuario (env vars o getpass) |
+| `create_table_if_not_exists(db_config)` | Ejecuta CREATE TABLE IF NOT EXISTS |
+| `save_to_database(db_config, data)` | INSERT de métricas por minuto |
+
+---
+
+## 4. Diseño Multi-Cámara
+
+El sistema detecta automáticamente el layout de cámaras en el video y procesa cada ROI independientemente.
+
+### Layouts Soportados
+
+| Layout | Detección | ROIs |
+|---|---|---|
+| 1 cámara | Frame sin divisiones | Frame completo |
+| 2 cámaras | División vertical central | Mitad izquierda + mitad derecha |
+| 4 cámaras | División en cuadrantes | 4 cuadrantes independientes |
+
+Consultar [diagrama multi-cámara](diagrams/multi-camera-layout.md) para detalle visual.
+
+### Procesamiento por ROI
+
+Cada ROI se procesa con su propia instancia de tracking, lo que significa:
+- IDs de vehículos son independientes entre ROIs
+- Las velocidades se calculan con la perspectiva de cada vista
+- Las métricas agregadas combinan datos de todas las ROIs
+
+---
+
+## 5. Generador de Videos Sintéticos
+
+El sistema incluye un generador de demos (Cells 8-9) que produce videos sintéticos realistas del puente para demostraciones de portfolio sin necesidad de footage real.
+
+### Escenarios Disponibles
+
+| Escenario | Descripción | Duración |
+|---|---|---|
+| `light` | Tráfico ligero, pocos vehículos | Configurable |
+| `normal` | Flujo normal de tráfico | Configurable |
+| `busy` | Tráfico denso, alta densidad | Configurable |
+| `mixed` | Combinación de condiciones | Configurable |
+| `stationary_test` | Vehículos detenidos para validar `is_stationary()` | Configurable |
+
+### Distribución de Vehículos Generados
+
+car: 65%, truck: 15%, bus: 8%, motorcycle: 10%, bicycle: 2%
+
+---
+
+## 6. Manejo de Errores
+
+### Estrategia General
+
+El sistema adopta una **degradación silenciosa**: los errores se capturan, se reportan al usuario via `print()` con emoji, y el procesamiento continúa cuando es posible.
+
+### Tabla de Errores
+
+| Componente | Error | Comportamiento |
+|---|---|---|
+| BD PostgreSQL | Conexión fallida | Continúa sin persistencia |
+| BD PostgreSQL | INSERT fallido | Salta el minuto, continúa procesando |
+| Optical Flow | Frame sin puntos de interés | Usa velocidad sin compensación de cámara |
+| YOLO | Frame sin detecciones | Usa promedios históricos |
+| Tracking | No match para detección | Crea nuevo track |
+| MLP | Predicción fuera de [5, 100] | Usa solo velocidad física (100%) |
+| Video | Frame corrupto | Salta al siguiente frame |
+| Archivo | Nombre inválido | Aborta procesamiento (error fatal) |
+
+### Patrones de Emoji
+
+```
+✅  Operación exitosa
+⚠️  Advertencia (no fatal)
+🔴  Error (recuperable o fatal)
+📊  Resultado/métrica
+🎬  Inicio/fin de procesamiento
+📥  Descarga de archivo
+```
+
+---
+
+## 7. Decisiones Arquitectónicas Relacionadas
+
+| Decisión | ADR |
+|---|---|
+| Notebook monolítico | [ADR-001](adr/ADR-001-notebook-monolitico.md) |
+| YOLO 11 adaptativo | [ADR-002](adr/ADR-002-yolo11-seleccion-adaptativa.md) |
+| SORT vs DeepSORT | [ADR-003](adr/ADR-003-sort-sobre-deepsort.md) |
+| MLP como suavizador | [ADR-004](adr/ADR-004-mlp-como-suavizador.md) |
+| PostgreSQL AWS RDS | [ADR-005](adr/ADR-005-postgresql-aws-rds.md) |
+| Estacionarios conservadores | [ADR-006](adr/ADR-006-deteccion-estacionarios-conservadora.md) |
+| Google Colab runtime | [ADR-007](adr/ADR-007-google-colab-como-runtime.md) |

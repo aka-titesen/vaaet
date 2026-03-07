@@ -1,6 +1,51 @@
+<!-- context: VAAET/README.md — Visión general del proyecto VAAET.
+Para contexto agéntico ver AGENTS.md. Para diseño técnico ver Docs/DDS.md. -->
+
 # VAAET - Puente General Manuel Belgrano (YOLO 11)
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 Sistema avanzado de análisis de tránsito vehicular para el puente General Manuel Belgrano, optimizado para cámaras SISE dinámicas y videos de larga duración. Cumple 13 requisitos funcionales y de calidad, con selección automática de modelo YOLO 11, tracking persistente, cálculo híbrido de velocidad, multi-cámara, perspectiva, históricos, persistencia segura y outputs concisos.
+
+## 🏗️ Arquitectura
+
+```mermaid
+flowchart LR
+    A[👤 Usuario] -->|Sube .mp4| B[Google Colab]
+    B -->|Inferencia| C[GPU T4/V100]
+    C -->|Detecciones| B
+    B -->|INSERT por minuto| D[(AWS RDS<br/>PostgreSQL)]
+    B -->|Video anotado| A
+```
+
+- **Ejecución**: Google Colab (notebook monolítico, sin CI/CD)
+- **Persistencia**: PostgreSQL en AWS RDS (opcional)
+- **Detección**: YOLO 11 con selección adaptativa de modelo por duración
+
+## 📂 Estructura del Proyecto
+
+```
+vaaet/
+├── vaaet.ipynb              # Todo el código (9 celdas)
+├── README.md                # Este archivo
+├── AGENTS.md                # Contexto para agentes de IA
+├── CONTRIBUTING.md          # Guía de contribución
+├── CHANGELOG.md             # Historial de cambios
+├── LICENSE                  # MIT
+├── requirements.txt         # Dependencias
+├── llms.txt                 # Índice para agentes RAG
+├── llms-full.txt            # Documentación completa para LLMs
+├── .gitignore
+└── Docs/
+    ├── PRD.md               # Requisitos del producto
+    ├── DDS.md               # Diseño de software
+    ├── GUIA_USUARIO.md      # Guía de usuario
+    ├── DATA_LINEAGE.md      # Linaje de datos
+    ├── BIAS_AND_LIMITATIONS.md
+    ├── KPIs/KPIs.md         # Métricas y validación
+    ├── adr/                 # Decisiones arquitectónicas (7 ADRs)
+    └── diagrams/            # Diagramas Mermaid (6 diagramas)
+```
 
 ## 🚦 Requisitos clave implementados
 
@@ -62,12 +107,18 @@ Sistema avanzado de análisis de tránsito vehicular para el puente General Manu
 ## 🧩 Dependencias
 
 - Python 3.8+
-- ultralytics, opencv-python, numpy, scikit-learn, scipy, psycopg2-binary
+- ultralytics, opencv-python, numpy, scikit-learn, psycopg2-binary
 
 Instala dependencias con:
 
 ```bash
-pip install ultralytics opencv-python numpy scikit-learn scipy psycopg2-binary
+pip install -r requirements.txt
+```
+
+O manualmente:
+
+```bash
+pip install ultralytics opencv-python numpy scikit-learn psycopg2-binary
 ```
 
 ## 📋 Esquema PostgreSQL esperado
@@ -88,6 +139,25 @@ CREATE TABLE IF NOT EXISTS traffic_data (
 );
 ```
 
+## 🎬 Demos Sintéticas
+
+El sistema incluye un generador de videos sintéticos (Celdas 8-9) para ejecutar demos de portfolio sin necesidad de footage real del puente. Escenarios disponibles: light, normal, busy, mixed, stationary_test.
+
+## 📚 Documentación
+
+| Documento | Descripción |
+|---|---|
+| [Docs/PRD.md](Docs/PRD.md) | Requisitos del producto |
+| [Docs/DDS.md](Docs/DDS.md) | Diseño de software y diagramas |
+| [Docs/GUIA_USUARIO.md](Docs/GUIA_USUARIO.md) | Guía de usuario |
+| [Docs/KPIs/KPIs.md](Docs/KPIs/KPIs.md) | Métricas y validación |
+| [Docs/DATA_LINEAGE.md](Docs/DATA_LINEAGE.md) | Linaje de datos |
+| [Docs/BIAS_AND_LIMITATIONS.md](Docs/BIAS_AND_LIMITATIONS.md) | Sesgos y limitaciones |
+| [Docs/adr/](Docs/adr/) | Decisiones arquitectónicas (7 ADRs) |
+| [Docs/diagrams/](Docs/diagrams/) | Diagramas Mermaid (6) |
+| [AGENTS.md](AGENTS.md) | Contexto para agentes de IA |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | Guía de contribución |
+
 ## ❓ Soporte
 
-Para calibración, integración avanzada o dudas, consulta el notebook y los comentarios en cada celda.
+Para calibración, integración avanzada o dudas, consulta el notebook, la [guía de usuario](Docs/GUIA_USUARIO.md) y los comentarios en cada celda.

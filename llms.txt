@@ -1,0 +1,41 @@
+# VAAET - Video Análisis Avanzado de Tráfico
+
+> Sistema de detección, clasificación, tracking y estimación de velocidad vehicular para el Puente General Manuel Belgrano (Corrientes, Argentina) usando YOLO 11. Notebook monolítico para Google Colab + AWS RDS PostgreSQL.
+
+## Documentación
+
+- [README](README.md): Visión general, requisitos implementados, uso paso a paso, esquema de BD
+- [AGENTS](AGENTS.md): Contexto agéntico, reglas Always/Ask/Never, límites arquitectónicos
+- [CONTRIBUTING](CONTRIBUTING.md): Guía de contribución, convenciones de código
+- [CHANGELOG](CHANGELOG.md): Historial de cambios del proyecto
+
+## Especificaciones
+
+- [PRD](Docs/PRD.md): Requisitos del producto, arquitectura, casos de uso, KPIs
+- [DDS](Docs/DDS.md): Diseño de software, flujos de detección, velocidad, estacionarios
+- [Guía de Usuario](Docs/GUIA_USUARIO.md): Inicio rápido, troubleshooting, salida esperada
+- [KPIs](Docs/KPIs/KPIs.md): Métricas de rendimiento, guía de validación del 97% F1
+
+## Gobernanza
+
+- [Data Lineage](Docs/DATA_LINEAGE.md): Linaje de datos, pipeline de transformación, privacidad
+- [Bias y Limitaciones](Docs/BIAS_AND_LIMITATIONS.md): Sesgos de detección, limitaciones conocidas
+
+## Decisiones Arquitectónicas
+
+- [ADR-001](Docs/adr/ADR-001-notebook-monolitico.md): Notebook monolítico sobre módulos Python
+- [ADR-002](Docs/adr/ADR-002-yolo11-seleccion-adaptativa.md): YOLO 11 con selección adaptativa
+- [ADR-003](Docs/adr/ADR-003-sort-sobre-deepsort.md): SORT sobre DeepSORT/ByteTrack
+- [ADR-004](Docs/adr/ADR-004-mlp-como-suavizador.md): MLP como suavizador, no estimador
+- [ADR-005](Docs/adr/ADR-005-postgresql-aws-rds.md): PostgreSQL (AWS RDS) sobre SQLite
+- [ADR-006](Docs/adr/ADR-006-deteccion-estacionarios-conservadora.md): Detección ultra-conservadora de estacionarios
+- [ADR-007](Docs/adr/ADR-007-google-colab-como-runtime.md): Google Colab como runtime principal
+
+## Diagramas
+
+- [Pipeline completo](Docs/diagrams/pipeline-flow.md): Flujo de procesamiento end-to-end
+- [Cálculo de velocidad](Docs/diagrams/speed-calculation.md): Pipeline híbrido 70/30
+- [Base de datos](Docs/diagrams/erd.md): Esquema de traffic_data
+- [Arquitectura Colab+AWS](Docs/diagrams/colab-aws-architecture.md): Infraestructura de ejecución
+- [Selección de modelo](Docs/diagrams/model-selection.md): Lógica adaptativa YOLO 11
+- [Multi-cámara](Docs/diagrams/multi-camera-layout.md): Layouts 1/2/4 cámaras

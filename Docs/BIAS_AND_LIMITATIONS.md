@@ -1,171 +1,172 @@
-<!-- context: VAAET/Docs/BIAS_AND_LIMITATIONS.md — Sesgos y limitaciones del sistema.
-Complementa KPIs.md (métricas) y DATA_LINEAGE.md (linaje). -->
+<!-- context: VAAET/docs/BIAS_AND_LIMITATIONS.md -- Biases and limitations.
+Complements KPIs.md (metrics) and DATA_LINEAGE.md (lineage). -->
 
-# Sesgos y Limitaciones — VAAET
+# Biases and Limitations -- VAAET
 
-Este documento describe los sesgos conocidos, limitaciones técnicas y restricciones operativas del sistema VAAET. Su propósito es proveer transparencia sobre las condiciones en las cuales el sistema puede no operar correctamente.
+This document describes known biases, technical limitations, and operational constraints of the VAAET system. Its purpose is to provide transparency about conditions under which the system may not operate correctly.
 
 ---
 
-## 1. Sesgos de Detección
+## 1. Detection Biases
 
-### 1.1 Sesgo del Dataset COCO
+### 1.1 COCO Dataset Bias
 
-YOLO 11 está pre-entrenado en MS COCO 2017, cuya distribución de clases vehiculares no es representativa del tráfico argentino:
+YOLO 11 is pre-trained on MS COCO 2017, whose vehicular class distribution is not representative of Argentine traffic:
 
-| Clase | Representación en COCO | Impacto Esperado |
+| Class | COCO Representation | Expected Impact |
 |---|---|---|
-| car | Alta (sobre-representado) | Detección confiable |
-| truck | Media | Detección aceptable |
-| bus | Baja | Posible confusión con trucks grandes |
-| motorcycle | Media | Aceptable, pero motos argentinas pueden diferir visualmente |
-| bicycle | Baja (sub-representado) | **Riesgo de sub-detección**, especialmente a distancia |
+| car | High (over-represented) | Reliable detection |
+| truck | Medium | Acceptable detection |
+| bus | Low | Possible confusion with large trucks |
+| motorcycle | Medium | Acceptable, but Argentine motorcycles may differ visually |
+| bicycle | Low (under-represented) | **Risk of under-detection**, especially at distance |
 
-**Mitigación actual**: Ninguna. Se confía en la capacidad de generalización de YOLO 11.
+**Current mitigation**: None. Relies on YOLO 11 generalization capability.
 
-**Mitigación futura recomendada**: Fine-tuning con dataset de tráfico argentino (especialmente bicicletas y colectivos).
+**Recommended future mitigation**: Fine-tuning with Argentine traffic dataset (especially bicycles and buses).
 
-### 1.2 Sesgo por Condiciones Ambientales
+### 1.2 Environmental Condition Bias
 
-El sistema NO ha sido evaluado sistemáticamente en las siguientes condiciones:
+The system has NOT been systematically evaluated under:
 
-| Condición | Riesgo | Evaluación |
+| Condition | Risk | Evaluation |
 |---|---|---|
-| Lluvia intensa | Reflexiones en pavimento, gotas en lente | No evaluado |
-| Niebla | Reducción de contraste y visibilidad | No evaluado |
-| Noche (sin iluminación) | Baja señal en sensor de cámara | No evaluado |
-| Contraluz (amanecer/atardecer) | Siluetas, pérdida de detalle | No evaluado |
-| Sombras pronunciadas | Posibles falsos positivos | No evaluado |
-| Nieve/escarcha | N/A para Corrientes (clima subtropical) | No aplica |
+| Heavy rain | Pavement reflections, lens droplets | Not evaluated |
+| Fog | Reduced contrast and visibility | Not evaluated |
+| Night (no illumination) | Low camera sensor signal | Not evaluated |
+| Backlight (sunrise/sunset) | Silhouettes, detail loss | Not evaluated |
+| Pronounced shadows | Possible false positives | Not evaluated |
+| Snow/frost | N/A for Corrientes (subtropical climate) | Not applicable |
 
-### 1.3 Sesgo por Geometría de Cámara
+### 1.3 Camera Geometry Bias
 
-- Las cámaras SISE son dinámicas (pan/tilt/zoom), lo que introduce variabilidad en perspectiva
-- La corrección de perspectiva usa un modelo simplificado (factor por zona Y), no una homografía completa
-- Vehículos en los extremos laterales del frame tienen corrección de perspectiva menos precisa
-- El zoom variable puede alterar la relación `pixels_per_meter` durante el video
-
----
-
-## 2. Limitaciones Técnicas
-
-### 2.1 Velocidad sin Ground Truth
-
-- La conversión pixel → metro depende de `pixels_per_meter` calibrado manualmente
-- NO existe dataset de velocidades reales para el Puente Belgrano
-- El MAE real es desconocido — el target de "< 5 km/h" es un objetivo sin benchmark
-- La calibración fue estimada a partir de las dimensiones conocidas del puente (8.3m ancho, cámaras a 60m)
-
-### 2.2 MLP Entrenado con Datos Random
-
-- El componente `cnn_validator` (nombre incorrecto — es un `MLPRegressor`) se entrena con `np.random.rand()`
-- NO aporta aprendizaje real sobre patrones de velocidad
-- Actúa como regularizador estocástico hacia la media (~60 km/h)
-- Su contribución está acotada al 30% de la fusión, limitando el daño
-- Consultar [ADR-004](adr/ADR-004-mlp-como-suavizador.md) para más detalle
-
-### 2.3 Tracking sin Re-Identificación Visual
-
-- SORT usa matching por distancia euclidiana al centroide más cercano
-- Si un vehículo es ocluido por más de ~1 segundo, pierde su ID y recibe uno nuevo
-- En tráfico denso con vehículos del mismo tipo muy cercanos, puede haber asignaciones incorrectas
-- Consultar [ADR-003](adr/ADR-003-sort-sobre-deepsort.md)
-
-### 2.4 Detección de Estacionarios
-
-- Requiere 200 frames (~6.5s) de observación mínima — no hay detección temprana
-- Vehículos con micro-movimientos (vibración del motor, viento) pueden no ser detectados como estacionarios
-- Umbrales fijos en píxeles — no se adaptan a resolución ni zoom
-- Consultar [ADR-006](adr/ADR-006-deteccion-estacionarios-conservadora.md)
+- SISE cameras are dynamic (pan/tilt/zoom), introducing perspective variability
+- Perspective correction uses a simplified model (factor by Y zone), not a full homography
+- Vehicles at lateral frame extremes have less precise perspective correction
+- Variable zoom can alter the `pixels_per_meter` ratio during video
 
 ---
 
-## 3. Limitaciones de Infraestructura
+## 2. Technical Limitations
+
+### 2.1 Speed Without Ground Truth
+
+- Pixel-to-meter conversion depends on manually calibrated `pixels_per_meter`
+- NO real speed dataset exists for the Belgrano Bridge
+- Real MAE is unknown -- the "< 5 km/h" target is a goal without benchmark
+- Calibration was estimated from known bridge dimensions (8.3m width, cameras at 60m)
+
+### 2.2 Speed Smoother MLP Trained with Random Data
+
+- The `cnn_validator` component (misnomer -- it is an `MLPRegressor`) is trained with `np.random.rand()`
+- Does NOT provide real learning about speed patterns
+- Acts as a stochastic regularizer toward the mean (~60 km/h)
+- Its contribution is capped at 30% of the fusion, limiting damage
+- See [ADR-004](adr/ADR-004-mlp-como-suavizador.md) for details
+
+### 2.3 Tracking Without Visual Re-Identification
+
+- SORT uses Euclidean distance matching to nearest centroid
+- If a vehicle is occluded for >1 second, it loses its ID and receives a new one
+- In dense traffic with nearby same-type vehicles, incorrect assignments may occur
+- See [ADR-003](adr/ADR-003-sort-sobre-deepsort.md)
+
+### 2.4 Stationary Detection
+
+- Requires 200 frames (~6.5s) minimum observation -- no early detection
+- Vehicles with micro-movements (engine vibration, wind) may not be detected as stationary
+- Fixed pixel thresholds -- do not adapt to resolution or zoom
+- See [ADR-006](adr/ADR-006-deteccion-estacionarios-conservadora.md)
+
+---
+
+## 3. Infrastructure Limitations
 
 ### 3.1 Google Colab
 
-| Limitación | Impacto |
+| Limitation | Impact |
 |---|---|
-| Sesiones máximo ~12h (Free) | Videos muy largos pueden no completarse |
-| GPU no garantizada en horas pico | Puede caer a CPU (10x más lento) |
-| Desconexiones aleatorias | Se pierde el progreso — sin checkpointing |
-| Almacenamiento efímero | Videos de salida se pierden al cerrar sesión |
-| Sin ejecución programática | No se puede automatizar via API o cron |
+| Max ~12h sessions (Free) | Very long videos may not complete |
+| GPU not guaranteed at peak hours | May fall back to CPU (10x slower) |
+| Random disconnections | Progress lost -- no checkpointing |
+| Ephemeral storage | Output videos lost when session closes |
+| No programmatic execution | Cannot automate via API or cron |
 
 ### 3.2 AWS RDS
 
-| Limitación | Impacto |
+| Limitation | Impact |
 |---|---|
-| Requiere instancia aprovisionada externamente | Costo AWS recurrente |
-| Sin connection pooling | Cada escritura abre/cierra conexión |
-| Sin retry automático | Si falla la conexión, se pierde el registro del minuto |
-| Sin SSL por defecto | Conexión en texto plano (riesgo en redes no confiables) |
-| Sin migraciones de esquema | CREATE TABLE IF NOT EXISTS como único mecanismo |
+| Requires externally provisioned instance | Recurring AWS cost |
+| No connection pooling | Each write opens/closes connection |
+| No automatic retry | If connection fails, minute record is lost |
+| No SSL by default | Plaintext connection (risk on untrusted networks) |
+| No schema migrations | CREATE TABLE IF NOT EXISTS as only mechanism |
 
 ---
 
-## 4. Limitaciones del Código
+## 4. Code Limitations
 
-| Issue | Ubicación | Impacto |
+These issues exist in the archived Module 0 (`archive/00_bootstrap/01_legacy_collection.ipynb`):
+
+| Issue | Location | Impact |
 |---|---|---|
-| Código muerto en `is_stationary()` | Cell 3 | Segundo bloque de criterios inalcanzable después del primer `return` |
-| Método duplicado `get_smoothed_average()` | Cell 3 | Dos definiciones — la segunda sobreescribe la primera |
-| Inconsistencia `pixels_per_meter`: 12 vs 15 | Cell 3 vs Cell 5 | Posible error en conversión de velocidad |
-| Inconsistencia `speed_limits` | Cell 3 vs Cell 5 | Rangos diferentes para filtrado |
-| Inconsistencia `min_track_frames`: 10 vs 20 | Cell 5 vs Cell 3 | Umbral inconsistente |
-| `threading` importado pero no usado | Cell 2 | Dependencia innecesaria |
-| `scipy` en README pero no importado | README | Dependencia falsa |
-| `detection_zone` definido pero no usado | Cell 5 | Código muerto |
-| Nombre "CNN" para un MLP | Cell 3, docs | Terminología incorrecta |
+| Dead code in `is_stationary()` | VAAETHybrid class | Second criteria block unreachable after first `return` |
+| Duplicate `get_smoothed_average()` | VAAETHybrid class | Second definition overwrites first |
+| `pixels_per_meter` inconsistency: 12 vs 15 | Class init vs calibration | Possible speed conversion error |
+| `speed_limits` inconsistency | Class init vs calibration | Different filtering ranges |
+| `min_track_frames` inconsistency: 10 vs 20 | Different methods | Inconsistent threshold |
+| `threading` imported but unused | Imports | Unnecessary dependency |
+| `detection_zone` defined but unused | Calibration | Dead code |
+| Name "CNN" for an MLP | Class, docs | Incorrect terminology |
+
+**Note**: These issues are frozen in Module 0 and will not be fixed. The shared `src/` modules in Modules 1 and 2 use correct implementations.
 
 ---
 
-## 5. Recomendaciones de Mejora Priorizadas
+## 5. Prioritized Improvement Recommendations
 
-1. **Corregir inconsistencias de config** (Cells 3 y 5) — impacto directo en precisión
-2. **Eliminar código muerto y duplicados** — mejorar mantenibilidad
-3. **Agregar seed fijo al MLP** — reproducibilidad entre ejecuciones
-4. **Renombrar `cnn_validator` → `mlp_speed_smoother`** — claridad semántica
-5. **Evaluar con video real** — medir KPIs con ground truth
-6. **Fine-tuning de YOLO** con datos de tráfico argentino — mejorar detección de bicicletas
-7. **Agregar SSL** a la conexión PostgreSQL — seguridad
-8. **Implementar checkpointing** — resiliencia ante desconexiones de Colab
+1. **Evaluate with real video** -- measure KPIs with ground truth
+2. **Fine-tune YOLO** with Argentine traffic data -- improve bicycle detection
+3. **Add SSL** to PostgreSQL connection -- security
+4. **Implement checkpointing** -- resilience against Colab disconnections
+5. **Replace weather proxy** with real meteorological data API
+6. **Evolve MLP to LSTM** -- capture temporal patterns in traffic state classification
 
 ---
 
-## 6. Sesgos y Limitaciones del Clasificador de Tráfico (Etapa 2)
+## 6. Traffic Classifier Biases and Limitations (Modules 1 & 2)
 
-### 6.1 Sesgo de Auto-Labeling
+### 6.1 Auto-Labeling Bias
 
-Las etiquetas de entrenamiento NO son ground truth humano. Se generan con reglas de ingeniería de tránsito (umbrales de velocidad, volumen, persistencia). Esto introduce un sesgo circular: el modelo aprende los umbrales que lo etiquetaron, no necesariamente el estado real del tráfico.
+Training labels are NOT human ground truth. They are generated with traffic engineering rules (speed thresholds, volume, persistence). This introduces circular bias: the model learns the thresholds that labeled it, not necessarily the real traffic state.
 
-**Mitigación actual**: Los umbrales están calibrados con experiencia de dominio del Puente Belgrano.
+**Current mitigation**: Thresholds are calibrated with Belgrano Bridge domain expertise.
 
-**Mitigación futura**: HITL (campos `is_human_validated`, `human_override_state` en `traffic_classifications`) permitirá que operadores SISE refinen las etiquetas.
+**Future mitigation**: HITL (fields `is_human_validated`, `human_override_state` in `traffic_classifications`) will allow SISE operators to refine labels via the Module 2 feedback loop.
 
-### 6.2 Desbalance de Clases
+### 6.2 Class Imbalance
 
-| Clase | Frecuencia esperada | Riesgo |
+| Class | Expected Frequency | Risk |
 |---|---|---|
-| Normal | ~80% | Sobre-representada — modelo tiende a predecir Normal |
-| Reducido | ~15% | Baja representación |
-| Atascado | ~4% | Muy baja representación |
-| Accidente | ~0.1% | Extremadamente rara — posible recall 0 sin SMOTE |
+| Normal | ~80% | Over-represented -- model tends to predict Normal |
+| Reduced | ~15% | Low representation |
+| Congested | ~4% | Very low representation |
+| Accident | ~0.1% | Extremely rare -- possible recall 0 without SMOTE |
 
-**Mitigación**: SMOTE genera muestras sintéticas de clases minoritarias en el training set. Sin embargo, las muestras sintéticas de Accidente (interpolación en feature space) pueden no ser físicamente realistas.
+**Mitigation**: SMOTE generates synthetic minority samples in training set. However, synthetic Accident samples (feature space interpolation) may not be physically realistic.
 
-### 6.3 Supuestos Temporales
+### 6.3 Temporal Assumptions
 
-Los umbrales de persistencia en auto-labeling asumen que cada registro representa exactamente 1 minuto de observación. Si la frecuencia de escritura de Etapa 1 cambia (ej: cada 30s o cada 2min), los estados Reducido (>60s), Atascado (>120s) y Accidente (>180s) quedan invalidados.
+Persistence thresholds in auto-labeling assume each record represents exactly 1 minute of observation. If Module 0 write frequency changes (e.g., every 30s or 2min), the Reduced (>60s), Congested (>120s), and Accident (>180s) states become invalid.
 
-### 6.4 Weather Simulado
+### 6.4 Simulated Weather
 
-El feature `weather_condition` es un proxy basado en la hora del día (0=diurno 6-18h, 1=nocturno). NO es un dato meteorológico real. Esto limita la capacidad del modelo para aprender patrones climáticos.
+The `weather_condition` feature is a proxy based on hour of day (0=daytime 6-18h, 1=nighttime). It is NOT real meteorological data. This limits the model's ability to learn weather-related patterns.
 
-### 6.5 Sin Temporalidad en MLP (Fase 1)
+### 6.5 No Temporality in MLP
 
-El MLP procesa cada registro independientemente — no tiene memoria de registros anteriores. No puede aprender patrones secuenciales como "velocidad decreciente durante 5 minutos consecutivos". La evolución a LSTM en Fase 2 corregirá esta limitación.
+The MLP processes each record independently -- it has no memory of previous records. It cannot learn sequential patterns like "decreasing speed over 5 consecutive minutes". Evolution to LSTM in a future phase will address this limitation.
 
-### 6.6 Generalización
+### 6.6 Generalization
 
-El modelo está entrenado exclusivamente con datos del Puente General Manuel Belgrano. NO es transferible a otros puentes, rutas o contextos urbanos sin reentrenamiento con datos locales.
+The model is trained exclusively with data from the General Manuel Belgrano Bridge. It is NOT transferable to other bridges, highways, or urban contexts without retraining with local data.

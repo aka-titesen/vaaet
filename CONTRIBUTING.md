@@ -1,84 +1,103 @@
-# Contribuir a VAAET
+# Contributing to VAAET
 
-Gracias por tu interés en contribuir a VAAET. Este documento establece las convenciones y reglas para modificar el proyecto.
+Thank you for your interest in contributing to VAAET. This document establishes the conventions and rules for modifying the project.
 
-## Arquitectura — Reglas Fundamentales
+## Architecture — Fundamental Rules
 
-1. **Todo el código vive en `vaaet.ipynb`** — no crear módulos `.py` separados
-2. **Ejecutar en Google Colab** — toda modificación debe ser compatible con Colab Free Tier
-3. **Leer `AGENTS.md`** antes de empezar — contiene los límites arquitectónicos y el sistema Always/Ask/Never
+1. **Shared code lives in `src/`** — reusable modules (config, db, features, labeling, perception) shared by all notebooks
+2. **Notebooks are orchestrators** — they call `src/` functions and provide the Colab UI wrapper
+3. **Module 0 (`archive/00_bootstrap/`) is FROZEN** — never modify it
+4. **Run on Google Colab** — all changes must be compatible with Colab Free Tier
+5. **Read `AGENTS.md`** before starting — contains architectural boundaries and the Always/Ask/Never governance system
 
-## Convenciones de Código
+## Code Conventions
 
-### Estilo General
+### General Style
 
 - Python 3.8+ compatible
-- PEP 8 para formato (excepto longitud de línea, que puede extenderse en notebooks)
-- Type hints en funciones públicas de `VAAETHybrid`
-- Docstrings en español para todas las funciones
+- PEP 8 formatting (except line length, which may extend in notebooks)
+- Type hints on all public functions in `src/` modules
+- Docstrings in English for all functions
 
-### Prints con Emoji
+### Prints with Emoji
 
-El sistema usa `print()` con prefijos emoji en lugar de `logging`:
+The system uses `print()` with emoji prefixes instead of `logging`:
 
 ```python
-print("✅ Operación exitosa")
-print("⚠️ Advertencia: parámetro fuera de rango")
-print("🔴 Error: no se pudo conectar a la BD")
-print("📊 Resultado: 42 vehículos detectados")
+print("✅ Operation successful")
+print("⚠️ Warning: parameter out of range")
+print("🔴 Error: could not connect to DB")
+print("📊 Result: 42 vehicles detected")
 ```
 
-### Configuración
+### Configuration
 
-- **Parámetros del puente**: Solo en Cell 5 (`BRIDGE_CONFIG`)
-- **Parámetros de BD**: Solo en Cell 1
-- **Credenciales**: NUNCA hardcodeadas. Usar variables de entorno o `getpass`
+- **All constants and thresholds**: `src/config.py` (single source of truth)
+- **DB credentials**: `src/db.py` via environment variables only
+- **Credentials**: NEVER hardcoded. Use environment variables or `getpass`
 
-## Flujo de Contribución
+## Contribution Workflow
 
-1. Leer el ADR relevante en `Docs/adr/` si tu cambio afecta una decisión arquitectónica
-2. Si no hay ADR y tu cambio es significativo, redactar uno antes de implementar
-3. Verificar que `test_sistema()` (Cell 7) pasa después de tus cambios
-4. Generar un video demo sintético (Cells 8-9) para validar end-to-end
-5. Actualizar la documentación correspondiente si tu cambio altera comportamiento observable
+1. Read the relevant ADR in `docs/adr/` if your change affects an architectural decision
+2. If no ADR exists and your change is significant, draft one before implementing
+3. Verify all active notebooks run without errors after your changes
+4. Module 1: Verify F1-macro ≥ 0.85 after retraining
+5. Module 2: Verify the perception + classification pipeline produces valid output
+6. Update corresponding documentation if your change alters observable behavior
 
-## Estructura de Documentación
+## Documentation Structure
 
-| Archivo | Propósito | Cuándo actualizar |
+| File | Purpose | When to update |
 |---|---|---|
-| `README.md` | Visión general y uso | Cambios en features o dependencias |
-| `AGENTS.md` | Contexto para agentes IA | Cambios en arquitectura o reglas |
-| `Docs/PRD.md` | Requisitos del producto | Nuevos requisitos o cambios funcionales |
-| `Docs/DDS.md` | Diseño técnico | Cambios en algoritmos o componentes |
-| `Docs/GUIA_USUARIO.md` | Guía de usuario | Cambios en UX o flujo de ejecución |
-| `Docs/KPIs/KPIs.md` | Métricas | Nuevas métricas o benchmarks |
-| `Docs/adr/` | Decisiones arquitectónicas | Decisiones nuevas o revocadas |
-| `CHANGELOG.md` | Historial de cambios | Cada PR o cambio significativo |
+| `README.md` | Overview and usage | Changes in features or dependencies |
+| `AGENTS.md` | Context for AI agents | Changes in architecture or rules |
+| `docs/PRD.md` | Product requirements | New requirements or functional changes |
+| `docs/DDS.md` | Technical design | Changes in algorithms or components |
+| `docs/USER_GUIDE.md` | User guide | Changes in UX or execution flow |
+| `docs/KPIs/KPIs.md` | Metrics | New metrics or benchmarks |
+| `docs/adr/` | Architecture decisions | New or revoked decisions |
+| `CHANGELOG.md` | Change history | Every PR or significant change |
 
 ## ADRs (Architecture Decision Records)
 
-Si quieres proponer un cambio que contradiga una decisión existente:
+If you want to propose a change that contradicts an existing decision:
 
-1. Lee el ADR original en `Docs/adr/`
-2. Crea un nuevo ADR con el siguiente ADR-XXX disponible
-3. Usa el estado "Propuesto" hasta que sea aprobado
-4. Referencia el ADR que se está superando
+1. Read the original ADR in `docs/adr/`
+2. Create a new ADR with the next available ADR-XXX number
+3. Use status "Proposed" until approved
+4. Reference the ADR being superseded
 
-Formato: ver cualquier ADR existente en `Docs/adr/` como plantilla.
+Format: see any existing ADR in `docs/adr/` as a template.
 
-## Lo que NO se debe hacer
+## What NOT to Do
 
-- Hardcodear credenciales de AWS RDS
-- Crear archivos `.py` fuera del notebook
-- Hacer commit de archivos `.pt` (modelos YOLO)
-- Eliminar `test_sistema()` o el generador de demos
-- Romper compatibilidad con Colab Free Tier
+- Hardcode AWS RDS credentials
+- Modify `archive/00_bootstrap/01_legacy_collection.ipynb`
+- Commit `.pt` files (YOLO models) or `.keras`/`.joblib` artifacts
+- Delete `test_sistema()` or the synthetic demo generator from Module 0
+- Break compatibility with Colab Free Tier
+- Modify DB table schemas without a new ADR
+- Remove HITL fields from `traffic_classifications`
 
-## Phase 2 — Contribuciones al Clasificador
+## Module-Specific Guidelines
 
-- Ejecutar `02_traffic_state_classifier.ipynb` completo después de cambios
-- Verificar F1-macro ≥ 0.85 en test set
-- Leer [ADR-008](Docs/adr/ADR-008-tensorflow-keras-traffic-classifier.md) antes de modificar umbrales de auto-labeling o arquitectura MLP
-- No modificar `telemetry_raw` ni `traffic_classifications` sin nuevo ADR
-- No hacer commit de `*.keras`, `*.joblib` ni `data/processed/*.csv`
-- Los campos HITL (`is_human_validated`, `human_override_state`, `validated_at`) son intocables
+### Module 1 (Data Preparation)
+
+- Run `data_preparation.ipynb` fully after changes
+- Verify F1-macro ≥ 0.85 on test set
+- Read [ADR-008](docs/adr/ADR-008-tensorflow-keras-traffic-classifier.md) before modifying auto-labeling thresholds or MLP architecture
+- Do not commit `*.keras`, `*.joblib`, or `data/processed/*.csv`
+
+### Module 2 (Production)
+
+- Verify perception pipeline produces valid telemetry DataFrame
+- Verify classification assigns one of 4 valid states
+- Verify persistence writes to both `telemetry_raw` and `traffic_classifications`
+- Read [ADR-009](docs/adr/ADR-009-modular-three-stage-architecture.md) for the full architecture specification
+
+### Shared `src/` Modules
+
+- All modules must remain notebook-importable (no CLI entrypoints, no `if __name__` blocks)
+- `config.py` is the single source of truth — do not duplicate constants elsewhere
+- `db.py` is the single point of DB configuration — do not create alternative connection methods
+- 14 features in `FEATURE_COLS` are canonical — do not add/remove without updating all modules

@@ -1,56 +1,56 @@
-<!-- context: VAAET/Docs/diagrams/erd-phase2.md — Diagrama ERD completo con las 3 tablas.
-Referenciado por DDS.md §8, ADR-008, DATA_LINEAGE.md §6. -->
+<!-- context: VAAET/docs/diagrams/erd-phase2.md — Complete ERD with all 3 tables.
+Referenced by DDS.md, ADR-008, DATA_LINEAGE.md. -->
 
-# Esquema de Base de Datos — Etapa 1 + Etapa 2
+# Database Schema — Module 0 + Module 1
 
-Tres tablas con FK chain: `traffic_data` → `telemetry_raw` → `traffic_classifications`.
+Three tables with FK chain: `traffic_data` → `telemetry_raw` → `traffic_classifications`.
 
 ```mermaid
 erDiagram
     TRAFFIC_DATA {
-        serial id PK "Auto-incremento"
-        text clip_id "Identificador del video procesado"
-        timestamp record_time "Timestamp del minuto registrado"
-        numeric avg_speed "Velocidad promedio km/h (5,2)"
-        integer count_car "Conteo de autos"
-        integer count_truck "Conteo de camiones"
-        integer count_bus "Conteo de buses"
-        integer count_motorcycle "Conteo de motos"
-        integer count_bicycle "Conteo de bicicletas"
-        integer total_vehicles "Total de vehículos"
+        serial id PK "Auto-increment"
+        text clip_id "Processed video identifier"
+        timestamp record_time "Timestamp of recorded minute"
+        numeric avg_speed "Average speed km/h (5,2)"
+        integer count_car "Car count"
+        integer count_truck "Truck count"
+        integer count_bus "Bus count"
+        integer count_motorcycle "Motorcycle count"
+        integer count_bicycle "Bicycle count"
+        integer total_vehicles "Total vehicles"
     }
 
     TELEMETRY_RAW {
-        serial id PK "Auto-incremento"
-        integer source_record_id FK "FK a traffic_data.id"
-        timestamp record_time "Timestamp del registro"
-        numeric avg_speed "Velocidad promedio (5,2)"
-        integer total_vehicles "Total vehículos"
-        integer count_car "Conteo de autos"
-        integer count_truck "Conteo de camiones"
-        integer count_bus "Conteo de buses"
-        integer count_motorcycle "Conteo de motos"
-        integer count_bicycle "Conteo de bicicletas"
-        numeric heavy_vehicle_ratio "Ratio pesados (5,4)"
-        numeric delta_speed "Cambio de velocidad (6,2)"
-        integer delta_count "Cambio de volumen"
-        smallint transition_flag "Flag de transicion 0/1"
-        numeric speed_variance "Var velocidad (6,2)"
-        smallint hour_of_day "Hora del dia 0-23"
-        smallint weather_condition "Condicion meteorologica 0/1"
+        serial id PK "Auto-increment"
+        integer source_record_id FK "FK to traffic_data.id"
+        timestamp record_time "Record timestamp"
+        numeric avg_speed "Average speed (5,2)"
+        integer total_vehicles "Total vehicles"
+        integer count_car "Car count"
+        integer count_truck "Truck count"
+        integer count_bus "Bus count"
+        integer count_motorcycle "Motorcycle count"
+        integer count_bicycle "Bicycle count"
+        numeric heavy_vehicle_ratio "Heavy ratio (5,4)"
+        numeric delta_speed "Speed delta (6,2)"
+        integer delta_count "Volume delta"
+        smallint transition_flag "Transition flag 0/1"
+        numeric speed_variance "Speed variance (6,2)"
+        smallint hour_of_day "Hour of day 0-23"
+        smallint weather_condition "Weather condition 0/1"
     }
 
     TRAFFIC_CLASSIFICATIONS {
-        serial id PK "Auto-incremento"
-        integer telemetry_id FK "FK a telemetry_raw.id"
-        timestamp classified_at "Timestamp de clasificacion"
-        smallint traffic_state "Codigo de estado 0-3"
-        text state_label "Nombre del estado"
-        numeric confidence "Confianza del modelo (5,4)"
-        text model_version "Version del modelo"
-        boolean is_human_validated "Validado por operador HITL"
-        smallint human_override_state "Estado corregido por humano"
-        timestamp validated_at "Timestamp de validacion HITL"
+        serial id PK "Auto-increment"
+        integer telemetry_id FK "FK to telemetry_raw.id"
+        timestamp classified_at "Classification timestamp"
+        smallint traffic_state "State code 0-3"
+        text state_label "State name"
+        numeric confidence "Model confidence (5,4)"
+        text model_version "Model version"
+        boolean is_human_validated "Validated by HITL operator"
+        smallint human_override_state "Human-corrected state"
+        timestamp validated_at "HITL validation timestamp"
     }
 
     TRAFFIC_DATA ||--o{ TELEMETRY_RAW : "source_record_id"
@@ -62,18 +62,18 @@ erDiagram
 ### telemetry_raw
 - **PK**: `id` (auto-increment)
 - **FK**: `source_record_id` → `traffic_data(id)`
-- **Unique**: `(source_record_id)` — un feature set por registro de telemetría
+- **Unique**: `(source_record_id)` — one feature set per telemetry record
 
 ### traffic_classifications
 - **PK**: `id` (auto-increment)
 - **FK**: `telemetry_id` → `telemetry_raw(id)`
-- **Unique**: `(telemetry_id, model_version)` — una clasificación por modelo por registro
+- **Unique**: `(telemetry_id, model_version)` — one classification per model per record
 
-## Campos HITL (Human-in-the-Loop)
+## HITL (Human-in-the-Loop) Fields
 
-Diseñados para Fase 2 futura. En Fase 1 todos los registros tienen:
+Designed for Module 2 feedback loop. Initially all records have:
 - `is_human_validated = FALSE`
 - `human_override_state = NULL`
 - `validated_at = NULL`
 
-Cuando un operador SISE valide una clasificación, se actualizarán estos campos.
+When a SISE operator validates a classification, these fields will be updated.

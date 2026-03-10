@@ -1,62 +1,62 @@
-<!-- context: VAAET/Docs/diagrams/intelligence-pipeline.md — Pipeline de la Etapa 2 (Inteligencia).
-Referenciado por DDS.md §8, ADR-008, notebook 02_traffic_state_classifier.ipynb. -->
+<!-- context: VAAET/docs/diagrams/intelligence-pipeline.md — Module 1 Intelligence Pipeline.
+Referenced by DDS.md, ADR-008, notebook 01_data_prep/data_preparation.ipynb. -->
 
-# Pipeline de Inteligencia — Etapa 2
+# Intelligence Pipeline — Module 1
 
-Flujo completo desde la telemetría de Etapa 1 hasta la clasificación de estado de tráfico y persistencia.
+Complete flow from Module 0 telemetry to traffic state classification and persistence.
 
 ```mermaid
 flowchart TD
-    A[(traffic_data<br/>PostgreSQL)] -->|SQL query| B[DataFrame<br/>~2000 registros × 9 campos]
+    A[(traffic_data<br/>PostgreSQL)] -->|SQL query| B[DataFrame<br/>~2000 records x 9 fields]
 
-    B --> C[Ingeniería de Features]
+    B --> C[Feature Engineering]
     C --> C1[heavy_vehicle_ratio<br/>delta_speed / delta_count<br/>transition_flag<br/>speed_variance<br/>hour_of_day / weather_condition]
     C1 --> D[DataFrame<br/>14 features]
 
     D --> E[Auto-Labeling]
-    E --> E1{Reglas de ingeniería}
+    E --> E1{Engineering rules}
     E1 -->|avg_speed > 40| F0[Normal — 0]
-    E1 -->|5-40 km/h + 15-25 veh| F1[Reducido — 1]
-    E1 -->|< 5 km/h + >25 veh| F2[Atascado — 2]
-    E1 -->|~0 km/h + desaceleración| F3[Accidente — 3]
+    E1 -->|5-40 km/h + 15-25 veh| F1[Reduced — 1]
+    E1 -->|< 5 km/h + >25 veh| F2[Congested — 2]
+    E1 -->|~0 km/h + deceleration| F3[Accident — 3]
 
-    F0 & F1 & F2 & F3 --> G[Dataset etiquetado]
+    F0 & F1 & F2 & F3 --> G[Labeled dataset]
 
-    G --> H[Train/Test Split<br/>80/20 estratificado]
+    G --> H[Train/Test Split<br/>80/20 stratified]
     H --> H1[Training Set]
-    H --> H2[Test Set<br/>sin modificar]
+    H --> H2[Test Set<br/>unmodified]
 
-    H1 --> I[SMOTE<br/>Balanceo de clases]
+    H1 --> I[SMOTE<br/>Class balancing]
     I --> J[StandardScaler]
 
-    J --> K[MLP Training<br/>Input 13 → Dense 64 → Dense 32 → Softmax 4]
+    J --> K[MLP Training<br/>Input 14 → Dense 64 → Dense 32 → Softmax 4]
     K --> K1[EarlyStopping<br/>patience=15]
     K --> K2[ReduceLROnPlateau<br/>patience=5]
 
-    K1 & K2 --> L[Modelo entrenado]
+    K1 & K2 --> L[Trained model]
 
-    L --> M[Evaluación]
+    L --> M[Evaluation]
     H2 --> M
-    M --> M1[F1-macro ≥ 0.85]
+    M --> M1[F1-macro >= 0.85]
     M --> M2[Confusion Matrix]
-    M --> M3[Recall por clase]
+    M --> M3[Per-class Recall]
 
-    L --> N[Exportar artefactos]
+    L --> N[Export artifacts]
     N --> N1[traffic_classifier.keras]
     N --> N2[feature_scaler.joblib]
     N --> N3[label_mapping.joblib]
 
-    L --> O[Persistencia]
+    L --> O[Persistence]
     D --> O
     O --> P[(telemetry_raw<br/>14 features + FK)]
-    O --> Q[(traffic_classifications<br/>predicción + HITL)]
+    O --> Q[(traffic_classifications<br/>prediction + HITL)]
 ```
 
-## Artefactos Generados
+## Generated Artifacts
 
-| Artefacto | Ruta | Propósito |
+| Artifact | Path | Purpose |
 |---|---|---|
-| Modelo Keras | `models/intelligence/traffic_classifier.keras` | Clasificador entrenado |
-| Scaler | `models/intelligence/feature_scaler.joblib` | Normalización para inferencia |
-| Label mapping | `models/intelligence/label_mapping.joblib` | Mapeo código→nombre de estado |
-| CSV features | `data/processed/traffic_telemetry.csv` | Dataset con features para reproducibilidad |
+| Keras model | `models/intelligence/traffic_classifier.keras` | Trained classifier |
+| Scaler | `models/intelligence/feature_scaler.joblib` | Normalization for inference |
+| Label mapping | `models/intelligence/label_mapping.joblib` | Code-to-state-name mapping |
+| Features CSV | `data/processed/traffic_telemetry.csv` | Feature dataset for reproducibility |

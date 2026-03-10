@@ -3,7 +3,9 @@ Referenciado por AGENTS.md, DDS.md §2.2, BIAS_AND_LIMITATIONS.md. -->
 
 # ADR-004: MLP como Suavizador (No Estimador Primario)
 
-**Estado:** Aceptado  
+**Status:** Superseded by [ADR-009](ADR-009-modular-three-stage-architecture.md)  
+> This ADR applies to the archived bootstrap module (`archive/00_bootstrap/`) only.
+> The speed-smoothing MLP is part of the perception pipeline. See ADR-009.  
 **Fecha:** 2026-03-06  
 **Decisores:** Equipo VAAET
 

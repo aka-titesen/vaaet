@@ -1,98 +1,104 @@
-<!-- context: VAAET/Docs/PRD.md — Requisitos del producto del sistema VAAET.
-Complementa DDS.md (diseño técnico) y KPIs.md (métricas de rendimiento). -->
+<!-- context: VAAET/docs/PRD.md — Product requirements for the VAAET system.
+Complements DDS.md (technical design) and KPIs.md (performance metrics). -->
 
-# 📋 PRD - VAAET: Sistema Avanzado de Análisis de Tráfico Vehicular
+# PRD — VAAET: Advanced Vehicular Traffic Analysis System
 
-## ✅ Validación de Cumplimiento de Requisitos
+## Executive Summary
 
-El sistema VAAET cumple con todos los requisitos funcionales y de calidad definidos para el análisis de tránsito en el Puente General Manuel Belgrano, integrando visión artificial avanzada, persistencia segura, outputs claros y modularidad robusta. La solución está alineada con el contexto dinámico del problema y las necesidades de los stakeholders.
+VAAET is a hybrid artificial intelligence system for vehicular traffic analysis on the General Manuel Belgrano Bridge, integrating YOLO 11 detection, Optical Flow, MLP smoothing, and secure PostgreSQL persistence. It resolves historical issues of prior systems such as erroneous speed assignment to stationary vehicles, inconsistent classification, and lack of robustness against dynamic SISE camera conditions.
 
-### Resumen de Cumplimiento (actualizado)
-
-1. Carga y validación de video: Solo acepta archivos con formato `bridge_YYYY-MM-DD_HH-MM-SS_to_HH-MM-SS.mp4`. Si no cumple, aborta e informa.
-2. Selección automática de modelo YOLO 11: Elige entre yolo11x/l/m/s/n según duración (<1h, 1-3h, 3-6h, 6-12h, >12h).
-3. Persistencia opcional: El usuario decide si persiste en PostgreSQL AWS RDS, con datos válidos cada minuto y sin credenciales hardcodeadas.
-4. Cálculo híbrido de velocidad: Combina método real, Optical Flow Farneback y CNN, con exclusión de estacionados y límites por tipo.
-5. Multi-cámara y perspectiva: Detección automática de layout (1, 2, 4 vistas), homografía calibrable, y adaptación a cambios de cámara y zoom.
-6. Seguimiento robusto: Tracking persistente (SORT), IDs únicos, y exclusión de vehículos fuera de toma.
-7. Históricos y outputs: Panel informativo y persistencia usan promedios recientes cuando no hay lecturas; video procesado con overlays, métricas y descarga automática. No se generan JSON/CSV; la persistencia per-minute es opcional en PostgreSQL.
-8. Optimización Colab: Frame skipping, limpieza de memoria, soporte para entornos gratuitos/pro.
-9. Modularidad y robustez: Código desacoplado, funciones auxiliares, logging y gestión de errores.
-10. Notebook compacto: ~8–10 celdas, outputs concisos, mensajes claros de éxito/error.
-11. Gestión segura de credenciales: Uso de variables de entorno, nunca expone datos sensibles.
-12. Base de datos alineada: Persistencia en tabla `traffic_data` según el esquema requerido.
-13. Contexto dinámico: Adaptación a cámaras móviles, zoom, ángulos variables y condiciones reales del puente.
-
-### Notas de implementación actual
-
-- Autodiagnóstico: Hay una celda que verifica Ultralytics y descarga pesos yolo11\*.pt si faltan.
-- Selección de modelo: Si el nombre local es "yolov11*.pt", el sistema lo normaliza a "yolo11*.pt" automáticamente.
-- Persistencia: Se pregunta una sola vez y prioriza variables de entorno (DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD).
-- Ejecución: Hay una celda final que ejecuta `process_bridge_video()` y muestra un resumen conciso.
+The system is optimized for Google Colab, is modular, scalable, secure, and fulfills all functional and quality requirements defined by stakeholders.
 
 ---
 
-## 🎯 Resumen Ejecutivo (Actualizado)
+## Unique Value Proposition
 
-VAAET es un sistema híbrido de inteligencia artificial para el análisis de tráfico vehicular en el Puente General Manuel Belgrano, que integra detección YOLO 11, Optical Flow, CNN y persistencia segura en PostgreSQL. Resuelve los problemas históricos de los sistemas previos, como la asignación errónea de velocidades a vehículos estacionados, la clasificación inconsistente y la falta de robustez ante el contexto dinámico de cámaras SISE.
-
-El sistema está optimizado para Google Colab, es modular, escalable, seguro y cumple con todos los requisitos funcionales y de calidad definidos por el usuario y los stakeholders.
-
----
-
-### 🔐 Propuesta de Valor Única (Validada)
-
-- Sistema híbrido robusto: Combina detección YOLO 11, Optical Flow y CNN para máxima precisión y exclusión de estacionados.
-- Selección dinámica de modelo: Elige automáticamente el modelo YOLO 11 óptimo según la duración del video.
-- Persistencia segura: Integración con PostgreSQL AWS RDS, sin exponer credenciales.
-- Outputs claros y concisos: Video procesado con overlays, métricas y panel informativo minimalista.
-- Optimización Colab: Adaptado a recursos y limitaciones de Google Colab Free/Pro.
-- Gestión de contexto dinámico: Soporta cambios de cámara, zoom, multi-vista y condiciones reales del puente.
-- Modularidad y escalabilidad: Código desacoplado, funciones auxiliares, notebook compacto y outputs claros.
+- **Robust hybrid system**: Combines YOLO 11 detection, Optical Flow, and MLP for maximum precision and stationary exclusion
+- **Dynamic model selection**: Automatically selects the optimal YOLO 11 model by video duration
+- **Secure persistence**: Integration with PostgreSQL AWS RDS without exposing credentials
+- **Clear outputs**: Processed video with overlays, metrics, and minimalist informational panel
+- **Colab optimization**: Adapted to Google Colab Free/Pro resources and limitations
+- **Dynamic context handling**: Supports camera changes, zoom, multi-view, and real bridge conditions
+- **Modularity and scalability**: Shared `src/` modules, compact notebooks, clear outputs
 
 ---
 
-## 🧩 Arquitectura de Solución y Metodología Técnica (resumen actualizado)
+## Three-Module Architecture
 
-- Entorno y autodiagnóstico (celdas 1-2): Detecta Colab/local y verifica/descarga pesos yolo11.
-- Carga/validación del video y selección de modelo (celda 3): Valida nombre, extrae duración y elige yolo11\*.
-- Inicialización del motor híbrido (celda 4): Clases y utilidades (detección estacionados, límites por tipo, perspectiva).
-- Procesamiento híbrido y celda final (celdas 5-6): Detección + tracking + Optical Flow + CNN; ejecución con `process_bridge_video()`.
-- Mejoras opcionales (celda avanzada): SORT ligero, Farneback y homografías externas.
+### Module 0 — Bootstrap (ARCHIVED)
 
-### 🧪 YOLO 11: Modelo de Detección de Vanguardia
+Historical YOLO 11 + OpenCV + SORT pipeline (`archive/00_bootstrap/01_legacy_collection.ipynb`) that generated the original `traffic_data` table. **Never runs again.**
 
-- Modelos: yolo11n, yolo11s, yolo11m, yolo11l, yolo11x.
-- Selección por duración: ≤1h→x, 1–3h→l, 3–6h→m, 6–12h→s, >12h→n.
-- Autodiagnóstico: descarga automática de pesos faltantes.
+### Module 1 — Data Preparation (one-time)
 
-### 🔧 Dependencias y Librerías (actualizadas)
+`notebooks/01_data_prep/data_preparation.ipynb` — Feature engineering from `traffic_data` (9 → 14 columns), auto-labeling of 4 traffic states, SMOTE balancing, MLP training, model export.
 
-- Principales: ultralytics, opencv-python, numpy, scikit-learn, scipy, torch/torchvision.
-- Opcional BD: psycopg2-binary.
+### Module 2 — Production (ongoing)
 
-### 🗄️ Persistencia en PostgreSQL (opcional)
-
-- Frecuencia: Un registro por minuto (avg_speed, conteos por tipo, total).
-- Esquema: Tabla `traffic_data` con UNIQUE(clip_id, record_time).
-- Seguridad: Variables de entorno; no se exponen credenciales; prompt único si faltan.
+`notebooks/02_production/traffic_analyzer.ipynb` — YOLO 11 + SORT + speed estimation + trained MLP classifier + DB persistence + self-improving HITL feedback loop.
 
 ---
 
-## 🧭 Casos de Uso (resumen)
+## Requirements Compliance Summary
 
-- Monitoreo operacional SISE, ingeniería de tráfico, planificación urbana, investigación académica, gestión de emergencias.
+1. **Video upload**: Only accepts files with format `bridge_YYYY-MM-DD_HH-MM-SS_to_HH-MM-SS.mp4`
+2. **Automatic YOLO 11 selection**: Chooses between yolo11x/l/m/s/n by duration (<1h, 1-3h, 3-6h, 6-12h, >12h)
+3. **Optional persistence**: User decides whether to persist to PostgreSQL AWS RDS; valid data each minute; no hardcoded credentials
+4. **Hybrid speed calculation**: Combines physics, Optical Flow Farneback, and MLP smoothing; stationary exclusion; limits by type
+5. **Multi-camera and perspective**: Automatic layout detection (1, 2, 4 views); calibrable homography; adapts to camera and zoom changes
+6. **Robust tracking**: Persistent tracking (SORT), unique IDs, exclusion of out-of-frame vehicles
+7. **Historical and outputs**: Informational panel and persistence use recent averages when no readings; processed video with overlays and automatic download
+8. **Colab optimization**: Frame skipping, memory cleanup, support for free/pro environments
+9. **Modularity and robustness**: Shared `src/` modules, auxiliary functions, error handling
+10. **Clear outputs**: Concise outputs, success/error messages with emoji prefixes
+11. **Secure credential management**: Environment variables only; never exposes sensitive data
+12. **Aligned database**: Persistence in 3 tables per required schema
+13. **Dynamic context**: Adapts to mobile cameras, zoom, variable angles, and real bridge conditions
+14. **Traffic state classification**: TF/Keras MLP classifies each minute into 4 states from 14 engineered features
 
 ---
 
-## 📈 KPIs (sin cambios sustanciales)
+## YOLO 11 Detection Model
 
-- Precisión de detección, precisión de velocidades, estacionados, eficiencia de procesamiento, disponibilidad, usabilidad, escalabilidad.
+- **Models**: yolo11n, yolo11s, yolo11m, yolo11l, yolo11x
+- **Selection by duration**: ≤1h→x, 1-3h→l, 3-6h→m, 6-12h→s, >12h→n
+- **Auto-diagnosis**: Automatic download of missing weights
+
+## Dependencies
+
+- **Core**: numpy, pandas, sqlalchemy, psycopg2-binary, joblib
+- **Data Preparation**: tensorflow, scikit-learn, imbalanced-learn, matplotlib, seaborn
+- **Production**: ultralytics, opencv-python, tensorflow, scikit-learn
+
+## PostgreSQL Persistence (optional)
+
+- **Frequency**: One record per minute (avg_speed, counts by type, total)
+- **Schema**: 3 tables — `traffic_data` (legacy), `telemetry_raw`, `traffic_classifications`
+- **Security**: Environment variables; no credentials exposed; prompt if missing
 
 ---
 
-## 🖥️ Entornos compatibles (resumen)
+## Use Cases
 
-- Google Colab Free/Pro: configuraciones y límites típicos.
-- Local con GPU: CUDA opcional; CPU soportado (más lento).
-- Cloud alternativo: AWS/Azure/GCP con GPU.
+- SISE operational monitoring
+- Traffic engineering
+- Urban planning
+- Academic research
+- Emergency management
+
+---
+
+## KPIs
+
+See [KPIs/KPIs.md](KPIs/KPIs.md) for detailed metrics and validation guide.
+
+- Detection precision, speed accuracy, stationary detection, processing efficiency
+- Traffic classification: F1-macro ≥ 0.85, recall per class
+
+---
+
+## Compatible Environments
+
+- **Google Colab Free/Pro**: Primary runtime with GPU
+- **Local with GPU**: CUDA optional; CPU supported (slower)
+- **Cloud alternative**: AWS/Azure/GCP with GPU

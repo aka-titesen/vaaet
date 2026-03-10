@@ -1,27 +1,27 @@
-<!-- context: VAAET/Docs/diagrams/model-selection.md — Lógica de selección de modelo YOLO.
-Referenciado por DDS.md, ADR-002, PRD.md. -->
+<!-- context: VAAET/docs/diagrams/model-selection.md — YOLO model selection logic.
+Referenced by DDS.md, ADR-002, PRD.md. -->
 
-# Selección Automática de Modelo YOLO 11
+# Automatic YOLO 11 Model Selection
 
-Diagrama de decisión de `select_optimal_model()` en Cell 4.
+Decision diagram for `select_optimal_model()` in `src/perception/detector.py`.
 
 ```mermaid
 flowchart TD
-    A[Video cargado<br/>Duración extraída del nombre] --> B{duration_hours}
+    A[Video loaded<br/>Duration extracted from filename] --> B{duration_hours}
     
-    B -->|< 1 hora| C[yolo11x.pt<br/>📊 Máxima precisión<br/>~140MB, ~30 FPS en T4]
-    B -->|1 - 3 horas| D[yolo11l.pt<br/>📊 Alta precisión<br/>~100MB, ~45 FPS en T4]
-    B -->|3 - 6 horas| E[yolo11m.pt<br/>⚖️ Balance<br/>~40MB, ~65 FPS en T4]
-    B -->|6 - 12 horas| F[yolo11s.pt<br/>⚡ Alta velocidad<br/>~20MB, ~90 FPS en T4]
-    B -->|> 12 horas| G[yolo11n.pt<br/>⚡ Mínimo consumo<br/>~6MB, ~120 FPS en T4]
+    B -->|< 1 hour| C[yolo11x.pt<br/>Maximum accuracy<br/>~140MB, ~30 FPS on T4]
+    B -->|1 - 3 hours| D[yolo11l.pt<br/>High accuracy<br/>~100MB, ~45 FPS on T4]
+    B -->|3 - 6 hours| E[yolo11m.pt<br/>Balanced<br/>~40MB, ~65 FPS on T4]
+    B -->|6 - 12 hours| F[yolo11s.pt<br/>High speed<br/>~20MB, ~90 FPS on T4]
+    B -->|> 12 hours| G[yolo11n.pt<br/>Minimum resource usage<br/>~6MB, ~120 FPS on T4]
     
-    C & D & E & F & G --> H{¿Modelo disponible<br/>localmente?}
+    C & D & E & F & G --> H{Model available<br/>locally?}
     
-    H -->|Sí| I[Cargar modelo local]
-    H -->|No| J[Descargar de<br/>Ultralytics Hub]
+    H -->|Yes| I[Load local model]
+    H -->|No| J[Download from<br/>Ultralytics Hub]
     
     J --> I
-    I --> K[✅ Modelo listo<br/>para inferencia]
+    I --> K[Model ready<br/>for inference]
 
     style C fill:#4CAF50,color:#fff
     style D fill:#8BC34A,color:#fff
@@ -30,10 +30,10 @@ flowchart TD
     style G fill:#F44336,color:#fff
 ```
 
-## Lógica (Cell 4)
+## Selection Logic
 
 ```python
-def select_optimal_model(duration_hours):
+def select_optimal_model(duration_hours: float) -> str:
     if duration_hours < 1:     return "yolo11x.pt"
     elif duration_hours <= 3:  return "yolo11l.pt"
     elif duration_hours <= 6:  return "yolo11m.pt"
@@ -41,8 +41,8 @@ def select_optimal_model(duration_hours):
     else:                      return "yolo11n.pt"
 ```
 
-## Consideraciones
+## Notes
 
-- La duración se extrae del **nombre del archivo**, no de los metadatos del video
-- Si el nombre del modelo contiene "yolov11" (con 'v'), se normaliza automáticamente a "yolo11"
-- FPS estimados en GPU T4 (Colab Free) — varían según resolución de video y carga del servidor
+- Duration is extracted from the **filename**, not from video metadata
+- If the model name contains "yolov11" (with 'v'), it is automatically normalized to "yolo11"
+- Estimated FPS on T4 GPU (Colab Free) — varies by video resolution and server load

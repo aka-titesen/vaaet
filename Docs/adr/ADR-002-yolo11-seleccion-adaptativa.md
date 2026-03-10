@@ -3,7 +3,9 @@ Referenciado por AGENTS.md, DDS.md §2.1, PRD.md. -->
 
 # ADR-002: YOLO 11 con Selección Adaptativa por Duración
 
-**Estado:** Aceptado  
+**Status:** Superseded by [ADR-009](ADR-009-modular-three-stage-architecture.md)  
+> This ADR applies to the archived bootstrap module (`archive/00_bootstrap/`) only.
+> YOLO 11 is still used in the production module. See ADR-009 for current architecture.  
 **Fecha:** 2026-03-06  
 **Decisores:** Equipo VAAET
 

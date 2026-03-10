@@ -1,73 +1,87 @@
-# AGENTS.md — Contexto Agéntico para VAAET
+# AGENTS.md — Agentic Context for VAAET
 
-> Este archivo es la memoria a largo plazo para agentes de IA que operen sobre este repositorio.
-> Léelo completo antes de realizar cualquier modificación al proyecto.
+> This file is the long-term memory for AI agents operating on this repository.
+> Read it in full before making any modifications to the project.
 
 ---
 
-## Identidad del Proyecto
+## Project Identity
 
-**VAAET** (Video Análisis Avanzado de Tráfico) es un sistema de visión por computadora para analizar tráfico vehicular en el **Puente General Manuel Belgrano** (Corrientes, Argentina). Detecta, clasifica, rastrea y estima la velocidad de vehículos usando video de cámaras de vigilancia SISE.
+**VAAET** (Video Advanced Analysis of Traffic) is a computer vision system for analyzing vehicular traffic on the **General Manuel Belgrano Bridge** (Corrientes, Argentina). It detects, classifies, tracks, and estimates the speed of vehicles using SISE surveillance camera footage.
 
-### Arquitectura Fundamental
+### Fundamental Architecture (ADR-009)
 
-- **Pipeline de dos etapas en notebooks separados**:
-  - **Etapa 1 — Percepción**: `01_legacy_collection.ipynb` — YOLO 11 + OpenCV + SORT → telemetría cruda cada minuto
-  - **Etapa 2 — Inteligencia**: `02_traffic_state_classifier.ipynb` — TF/Keras MLP → clasificación de estado de tráfico
-- **Entorno de ejecución**: Google Colab (acceso a GPU gratuita). NO hay servidor, API REST, microservicios ni contenedores
-- **Persistencia**: PostgreSQL en AWS RDS (opcional). 3 tablas: `traffic_data` (Etapa 1), `telemetry_raw` + `traffic_classifications` (Etapa 2)
-- **No hay CI/CD clásico**: No hay pipeline de build, no hay deploy. El "deploy" es abrir los notebooks en Colab y ejecutar las celdas
+Three-module pipeline with shared `src/` modules:
 
-### Stack Tecnológico
+- **Module 0 — Bootstrap (archived)**: `archive/00_bootstrap/01_legacy_collection.ipynb` — Historical YOLO 11 + OpenCV + SORT pipeline that generated the original `traffic_data` table. **Never runs again.**
+- **Module 1 — Data Preparation**: `notebooks/01_data_prep/data_preparation.ipynb` — One-time feature engineering + auto-labeling + SMOTE + MLP training → exports `.keras` and `.joblib` artifacts
+- **Module 2 — Production**: `notebooks/02_production/traffic_analyzer.ipynb` — YOLO 11 + SORT + speed estimation + trained MLP classifier + DB persistence + self-improving feedback loop
+- **Shared code**: `src/` — Reusable Python modules (config, db, features, labeling, perception) imported by Modules 1 and 2
+- **Runtime**: Google Colab (free GPU). NO servers, REST APIs, microservices, or containers
+- **Persistence**: PostgreSQL on AWS RDS (optional). 3 tables: `traffic_data` (legacy), `telemetry_raw` + `traffic_classifications` (active)
+- **No classic CI/CD**: No build pipeline, no deploy. "Deployment" means opening notebooks in Colab and running cells
 
-| Capa | Tecnología |
+### Technology Stack
+
+| Layer | Technology |
 |---|---|
-| Detección de objetos | YOLO 11 (Ultralytics) — 5 variantes por duración |
-| Visión por computadora | OpenCV — video I/O, optical flow, anotaciones |
-| Cómputo numérico | NumPy — operaciones vectoriales, estadísticas |
-| ML (suavizado) | scikit-learn `MLPRegressor` — NO es una CNN real |
-| Clasificación de tráfico | TensorFlow/Keras — MLP Sequential (evolucionable a LSTM) |
-| Análisis de datos | Pandas + SQLAlchemy — feature engineering y persistencia |
-| Balanceo de clases | imbalanced-learn SMOTE — oversampling sintético |
-| Base de datos | PostgreSQL via `psycopg2-binary` / SQLAlchemy (AWS RDS) |
-| Runtime | Google Colab (primario) o Python 3.8+ local |
+| Object detection | YOLO 11 (Ultralytics) — 5 variants by video duration |
+| Computer vision | OpenCV — video I/O, optical flow, annotations |
+| Numerical computation | NumPy — vectorized operations, statistics |
+| ML (speed smoothing) | scikit-learn `MLPRegressor` — NOT a real CNN |
+| Traffic classification | TensorFlow/Keras — MLP Sequential (evolvable to LSTM) |
+| Data analysis | Pandas + SQLAlchemy — feature engineering and persistence |
+| Class balancing | imbalanced-learn SMOTE — synthetic oversampling |
+| Database | PostgreSQL via `psycopg2-binary` / SQLAlchemy (AWS RDS) |
+| Runtime | Google Colab (primary) or Python 3.8+ local |
 
 ---
 
-## Estructura del Proyecto
+## Project Structure
 
 ```
 vaaet/
+├── archive/
+│   └── 00_bootstrap/
+│       ├── 01_legacy_collection.ipynb   # Module 0: Historical YOLO pipeline (FROZEN)
+│       └── README.md                    # Explains deprecated status
 ├── notebooks/
-│   ├── phase_1_perception/
-│   │   └── 01_legacy_collection.ipynb   # Etapa 1: YOLO 11 + tracking + velocidad
-│   └── phase_2_intelligence/
-│       └── 02_traffic_state_classifier.ipynb  # Etapa 2: clasificación de estado
+│   ├── 01_data_prep/
+│   │   └── data_preparation.ipynb       # Module 1: Feature eng. + model training
+│   └── 02_production/
+│       └── traffic_analyzer.ipynb       # Module 2: YOLO + classifier + feedback
+├── src/
+│   ├── __init__.py
+│   ├── config.py                        # Single source of truth: constants, paths, thresholds
+│   ├── db.py                            # SQLAlchemy engine factory, credential handling
+│   ├── features.py                      # Feature engineering (9 → 14 columns)
+│   ├── labeling.py                      # Auto-labeling rules (4 traffic states)
+│   └── perception/
+│       ├── __init__.py
+│       ├── detector.py                  # YOLODetector wrapper
+│       ├── tracker.py                   # SORTTracker wrapper
+│       └── speed.py                     # Physics-based speed estimation
 ├── models/
-│   ├── perception/                      # Modelos YOLO (descargados en runtime)
-│   └── intelligence/                    # Artefactos Etapa 2 (.keras, .joblib)
+│   ├── perception/                      # YOLO weights (downloaded at runtime, gitignored)
+│   └── intelligence/                    # Module 1 artifacts (.keras, .joblib, gitignored)
 ├── data/
-│   ├── raw/                             # Backups de BD (gitignored)
-│   ├── processed/                       # CSVs de features (gitignored)
-│   └── samples/                         # Datos de ejemplo
-├── src/utils/                           # Utilidades compartidas (futuro)
+│   ├── raw/                             # DB backups (gitignored)
+│   ├── processed/                       # Feature CSVs (gitignored)
+│   └── samples/                         # Example data
 ├── docs/
-│   ├── PRD.md                           # Requisitos del producto
-│   ├── DDS.md                           # Diseño de software
-│   ├── GUIA_USUARIO.md                  # Guía de usuario
-│   ├── DATA_LINEAGE.md                  # Linaje de datos
-│   ├── BIAS_AND_LIMITATIONS.md          # Sesgos y limitaciones
-│   ├── KPIs/KPIs.md                     # Métricas y validación
-│   ├── adr/                             # Decisiones arquitectónicas (8 ADRs)
-│   │   ├── ADR-001 a ADR-007            # Etapa 1
-│   │   └── ADR-008-tensorflow-keras-traffic-classifier.md  # Etapa 2
-│   └── diagrams/                        # Diagramas Mermaid (8 diagramas)
-│       ├── pipeline-flow.md, speed-calculation.md, erd.md
-│       ├── colab-aws-architecture.md, model-selection.md, multi-camera-layout.md
-│       ├── intelligence-pipeline.md     # Pipeline Etapa 2
-│       └── erd-phase2.md                # ERD con 3 tablas
+│   ├── PRD.md                           # Product requirements
+│   ├── DDS.md                           # Software design
+│   ├── USER_GUIDE.md                    # User guide
+│   ├── DATA_LINEAGE.md                  # Data lineage
+│   ├── BIAS_AND_LIMITATIONS.md          # Biases and limitations
+│   ├── KPIs/KPIs.md                     # Metrics and validation
+│   ├── adr/                             # Architecture Decision Records (9 ADRs)
+│   │   ├── ADR-001 to ADR-007           # Legacy (superseded by ADR-009)
+│   │   ├── ADR-008-tensorflow-keras-traffic-classifier.md
+│   │   └── ADR-009-modular-three-stage-architecture.md
+│   └── diagrams/                        # Mermaid diagrams
 ├── README.md
-├── AGENTS.md                            # Este archivo
+├── AGENTS.md                            # This file
 ├── CONTRIBUTING.md
 ├── CHANGELOG.md
 ├── LICENSE
@@ -79,155 +93,171 @@ vaaet/
 
 ---
 
-## Orden de Ejecución de Celdas
+## Cell Execution Order
 
-### Etapa 1 — Percepción (`01_legacy_collection.ipynb`)
+### Module 0 — Bootstrap (ARCHIVED — DO NOT RUN)
 
-| Celda | Contenido | Dependencias |
+Located in `archive/00_bootstrap/01_legacy_collection.ipynb`. Historical-only reference.
+Contains 21 cells including `VAAETHybrid` class, video processing, and synthetic demo generator.
+
+### Module 1 — Data Preparation (`notebooks/01_data_prep/data_preparation.ipynb`)
+
+Run once to train the traffic classifier. Re-run only when retraining with new data.
+
+| Cell | Content | Dependencies |
 |---|---|---|
-| 1 | Configuración de BD PostgreSQL | Ninguna |
-| 2 | Instalación de dependencias + imports | Ninguna |
-| 3 | Clase `VAAETHybrid` (motor principal) | Celda 2 |
-| 4 | Utilidades: validación, selección de modelo, carga de video | Celdas 2, 3 |
-| 5 | Parámetros de calibración (`BRIDGE_CONFIG`, colores) | Celda 3 |
-| 6 | Visualización + función principal `process_bridge_video()` | Celdas 3, 4, 5 |
-| 7 | Interfaz de carga (Colab upload / local file picker) | Celdas 2-6 |
-| 8 | Generador de videos sintéticos para demos | Celdas 2, 3 |
-| 9 | Ejecutor de demos | Celda 8 |
+| 0 | Environment setup (Colab clone/cd, local no-op) | None |
+| 1 | Dependencies + imports (TF/Keras, pandas, etc.) | Cell 0 |
+| 2 | DB connection + telemetry extraction from `traffic_data` | Cell 1 |
+| 3 | Feature engineering (9 → 14 columns) via `src/features.py` | Cell 2 |
+| 4 | Auto-labeling (engineering rules → 4 states) via `src/labeling.py` | Cell 3 |
+| 5 | SMOTE + Train/Test split | Cells 3, 4 |
+| 6 | MLP model definition + training | Cell 5 |
+| 7 | Evaluation + model export (.keras, .joblib) | Cell 6 |
+| 8 | Create DB tables + persist results | Cells 2, 7 |
 
-### Etapa 2 — Inteligencia (`02_traffic_state_classifier.ipynb`)
+### Module 2 — Production (`notebooks/02_production/traffic_analyzer.ipynb`)
 
-| Celda | Contenido | Dependencias |
+Run for ongoing traffic analysis. Processes new video clips and classifies traffic state.
+
+| Cell | Content | Dependencies |
 |---|---|---|
-| 0 | Setup de entorno (Colab clone/cd, local no-op) | Ninguna |
-| 1 | Dependencias + imports (TF/Keras, pandas, etc.) | Celda 0 |
-| 2 | Conexión BD + extracción de telemetría | Celda 1 |
-| 3 | Ingeniería de features (9 → 14 columnas) | Celda 2 |
-| 4 | Auto-labeling (reglas de ingeniería → 4 estados) | Celda 3 |
-| 5 | SMOTE + Train/Test split | Celdas 3, 4 |
-| 6 | Definición del modelo MLP + entrenamiento | Celda 5 |
-| 7 | Evaluación + exportación del modelo | Celda 6 |
-| 8 | Crear tablas BD + persistir resultados | Celdas 2, 7 |
+| 0 | Environment setup (Colab clone/cd) | None |
+| 1 | Dependencies + load trained model + scalers | Cell 0 |
+| 2 | Video input + perception pipeline (`process_clip()`) | Cell 1 |
+| 3 | Feature engineering + classification (`classify_telemetry()`) | Cells 1, 2 |
+| 4 | Persist results to DB (`persist_classifications()`) | Cells 1, 3 |
+| 5 | Re-training with HITL feedback (`retrain_with_feedback()`) | Cells 1, 4 |
+| 6 | Visualization dashboard (`show_dashboard()`) | Cells 3, 4 |
 
 ---
 
-## Contrato de Validación
+## Validation Contract
 
-No hay build ni CI/CD. El equivalente funcional es:
+No build or CI/CD. The functional equivalent is:
 
-### Etapa 1
-1. **Smoke test**: Ejecutar Cell 2 sin errores de importación
-2. **Test funcional**: Ejecutar `test_sistema()` en Cell 7 — verifica que todos los componentes se inicializan correctamente
-3. **Test end-to-end**: Generar un video sintético (Cells 8-9) y verificar que produce un video de salida anotado
-4. **Test de BD**: Si hay acceso a AWS RDS, verificar que `save_to_database()` persiste un registro y no expone credenciales
+### Module 0 (Bootstrap — archived)
+1. **DO NOT RUN** — This notebook is frozen. Reference only.
 
-### Etapa 2
-5. **Smoke test**: Ejecutar Cell 1 sin errores de importación (TF/Keras)
-6. **Data**: Cell 2 carga DataFrame con >0 filas desde `traffic_data`
-7. **Features**: Cell 3 produce DataFrame con 14 columnas, sin NaN
-8. **Clasificación**: Cell 7 muestra F1-macro ≥ 0.85
-9. **Artefactos**: Existen `traffic_classifier.keras`, `feature_scaler.joblib`, `label_mapping.joblib` en `models/intelligence/`
+### Module 1 (Data Preparation)
+2. **Smoke test**: Run Cell 1 without import errors (TF/Keras)
+3. **Data**: Cell 2 loads DataFrame with >0 rows from `traffic_data`
+4. **Features**: Cell 3 produces DataFrame with 14 columns, no NaN
+5. **Classification**: Cell 7 shows F1-macro ≥ 0.85
+6. **Artifacts**: `traffic_classifier.keras`, `feature_scaler.joblib`, `label_mapping.joblib` exist in `models/intelligence/`
 
----
-
-## Límites Arquitectónicos (NO MODIFICAR sin ADR)
-
-1. **Todo el código de Etapa 1 vive en `01_legacy_collection.ipynb`** — NO crear módulos `.py` separados
-2. **`VAAETHybrid` es la única clase de Etapa 1** — NO subdividir en múltiples clases
-3. **Cell 5 (`BRIDGE_CONFIG`) es el ÚNICO punto de configuración** para parámetros del puente
-4. **Cell 1 es el ÚNICO punto de configuración** de base de datos en Etapa 1
-5. **La fusión de velocidad es 70% física + 30% MLP** — no alterar sin evidencia experimental
-6. **Los criterios de `is_stationary()` usan AND-conjunction** — no relajar a OR sin ADR
-7. **El formato de nombre de archivo es estricto**: `bridge_YYYY-MM-DD_HH-MM-SS_to_HH-MM-SS.mp4`
-8. **`01_legacy_collection.ipynb` es INTOCABLE** — no modificar el notebook de Etapa 1
-9. **Las tablas `telemetry_raw` y `traffic_classifications` requieren ADR-008** — no modificar esquema sin nuevo ADR
+### Module 2 (Production)
+7. **Smoke test**: Run Cell 1 without errors; model loads successfully
+8. **Perception**: Cell 2 processes a video clip and produces a telemetry DataFrame
+9. **Classification**: Cell 3 classifies telemetry into one of 4 states
+10. **Persistence**: Cell 4 persists to `telemetry_raw` and `traffic_classifications` (if DB available)
 
 ---
 
-## Patrones de Manejo de Errores
+## Architectural Boundaries (DO NOT MODIFY without ADR)
 
-- **Degradación silenciosa**: Si la BD falla, el sistema continúa sin persistencia. Si optical flow falla, usa solo el cálculo físico
-- **Try/except con emoji**: Todas las excepciones se capturan y se imprimen con prefijo emoji (🔴 error, ✅ éxito, ⚠️ warning). NO se propagan excepciones
-- **Sin logging formal**: Se usa `print()` con emojis, no el módulo `logging` de Python
-- **Filtros de plausibilidad**: Velocidades fuera de rango [2, 120] km/h se descartan silenciosamente
-
----
-
-## Sistema de Gobernanza: Always / Ask / Never
-
-### ✅ Always (hacer sin supervisión)
-
-- Corregir errores de sintaxis Python
-- Actualizar docstrings y comentarios
-- Agregar type hints a funciones existentes
-- Agregar markdown cells narrativas al notebook
-- Formatear código (PEP 8)
-- Actualizar documentación que esté desactualizada respecto al código
-- Corregir inconsistencias entre `BRIDGE_CONFIG` y `VAAETHybrid.__init__`
-
-### 🟡 Ask (requiere aprobación humana)
-
-- Cambiar parámetros de calibración (`BRIDGE_CONFIG`, `bridge_calibration`, `perspective_zones`)
-- Modificar la lógica de `calculate_enhanced_speed()` o `is_stationary()`
-- Agregar nuevas dependencias al proyecto
-- Cambiar el esquema de la tabla `traffic_data`
-- Modificar la lógica de selección de modelo YOLO (`select_optimal_model()`)
-- Refactorizaciones que afecten más del 20% de una celda
-- Cambiar umbrales de confianza o NMS
-- Cambiar umbrales de auto-labeling de estados de tráfico (Etapa 2)
-- Modificar arquitectura del MLP/LSTM clasificador (Etapa 2)
-
-### 🔴 Never (restricciones absolutas)
-
-- Hardcodear credenciales de AWS RDS (host, password, etc.)
-- Crear archivos `.py` fuera del notebook
-- Eliminar `test_sistema()` o el generador de demos sintéticas
-- Modificar la tabla `traffic_data` sin redactar un ADR previo
-- Romper compatibilidad con Google Colab Free Tier
-- Eliminar la validación estricta de nombre de archivo
-- Hacer commit de archivos `.pt` (modelos YOLO) al repositorio
-- Imprimir credenciales en outputs de celdas
-- Modificar `telemetry_raw` o `traffic_classifications` sin ADR
-- Eliminar campos HITL de `traffic_classifications`
-- Hacer commit de archivos `.keras`, `.joblib` o CSVs de `data/processed/`
+1. **Module 0 is FROZEN** — never modify `archive/00_bootstrap/01_legacy_collection.ipynb`
+2. **`src/config.py` is the SINGLE source of truth** for constants, thresholds, and paths
+3. **`src/db.py` is the SINGLE point of DB configuration** — credentials via environment variables only
+4. **Speed fusion is 70% physics + 30% MLP** — do not alter without experimental evidence
+5. **`is_stationary()` criteria use AND-conjunction** — do not relax to OR without ADR
+6. **Video filename format is strict**: `bridge_YYYY-MM-DD_HH-MM-SS_to_HH-MM-SS.mp4`
+7. **Tables `telemetry_raw` and `traffic_classifications` require ADR-008** — do not modify schema without new ADR
+8. **14 features are canonical** — defined in `src/config.py:FEATURE_COLS`. Do not add/remove without updating all modules
+9. **4 traffic states**: Normal (0), Reduced (1), Congested (2), Accident (3) — defined in `src/config.py:STATE_LABELS`
+10. **Shared `src/` modules must remain notebook-importable** — no CLI entrypoints, no `if __name__` blocks
 
 ---
 
-## Criterios de Parada y Handoff
+## Error Handling Patterns
 
-El agente DEBE detenerse y solicitar intervención humana cuando:
-
-1. **Quiere cambiar el modelo de detección** (ej: reemplazar YOLO 11 por RT-DETR)
-2. **Quiere modificar la fórmula de fusión 70/30** de velocidad
-3. **Quiere alterar los criterios ultra-conservadores** de `is_stationary()`
-4. **Quiere cambiar la estructura de la tabla** de PostgreSQL
-5. **Detecta inconsistencias entre la documentación y el código** que no puede resolver con certeza
-6. **Un cambio requiere acceso a AWS RDS** o credenciales reales
-7. **Un cambio afecta el rendimiento en Colab Free** (ej: aumentar resolución de inferencia)
+- **Silent degradation**: If DB fails, the system continues without persistence. If optical flow fails, uses physics-only speed calculation
+- **Try/except with emoji**: All exceptions are caught and printed with emoji prefixes (🔴 error, ✅ success, ⚠️ warning). Exceptions are NOT propagated
+- **No formal logging**: Uses `print()` with emojis, not Python's `logging` module
+- **Plausibility filters**: Speeds outside [2, 120] km/h are silently discarded
 
 ---
 
-## Decisiones Arquitectónicas Clave
+## Governance System: Always / Ask / Never
 
-Consultar los ADRs en `Docs/adr/` antes de proponer cambios que contradigan estas decisiones:
+### ✅ Always (do without supervision)
 
-| ADR | Decisión |
-|---|---|
-| ADR-001 | Notebook monolítico sobre módulos Python |
-| ADR-002 | YOLO 11 con selección adaptativa por duración |
-| ADR-003 | SORT sobre DeepSORT/ByteTrack |
-| ADR-004 | MLP como suavizador (no estimador primario) |
-| ADR-005 | PostgreSQL (AWS RDS) sobre SQLite/local |
-| ADR-006 | Detección de estacionarios ultra-conservadora |
-| ADR-007 | Google Colab como entorno de ejecución principal |
-| ADR-008 | TF/Keras para clasificación de tráfico + dos tablas + auto-labeling |
+- Fix Python syntax errors
+- Update docstrings and comments
+- Add type hints to existing functions
+- Add narrative markdown cells to notebooks
+- Format code (PEP 8)
+- Update documentation that is outdated relative to code
+- Fix inconsistencies between `src/config.py` and module implementations
+- Update `AGENTS.md` when project structure changes
+
+### 🟡 Ask (requires human approval)
+
+- Change calibration parameters (`BRIDGE_CONFIG`, `bridge_calibration`, `perspective_zones`)
+- Modify speed calculation logic (`estimate_speed()` or `is_stationary()`)
+- Add new dependencies to the project
+- Change the schema of any database table
+- Modify YOLO model selection logic
+- Refactorings affecting >20% of a notebook cell or `src/` module
+- Change confidence or NMS thresholds
+- Change auto-labeling thresholds for traffic states
+- Modify MLP/LSTM classifier architecture
+- Add or remove features from `FEATURE_COLS`
+
+### 🔴 Never (absolute restrictions)
+
+- Hardcode AWS RDS credentials (host, password, etc.)
+- Modify `archive/00_bootstrap/01_legacy_collection.ipynb`
+- Delete `test_sistema()` or the synthetic demo generator from Module 0
+- Modify the `traffic_data` table without drafting an ADR first
+- Break compatibility with Google Colab Free Tier
+- Remove strict video filename validation
+- Commit `.pt` files (YOLO models) to the repository
+- Print credentials in cell outputs
+- Modify `telemetry_raw` or `traffic_classifications` without ADR
+- Remove HITL fields from `traffic_classifications`
+- Commit `.keras`, `.joblib`, or CSVs from `data/processed/`
 
 ---
 
-## Contexto del Dominio
+## Stop Criteria and Handoff
 
-- **Puente**: General Manuel Belgrano, 1700m longitud, 8.3m calzada
-- **Cámaras**: SISE dinámicas a 60m altura, con zoom, paneo, visión nocturna
-- **Tipos de vehículo**: car, truck, bus, motorcycle, bicycle
-- **Velocidades típicas**: 40-80 km/h flujo normal, 0-20 km/h congestión
-- **Persistencia**: Un registro por minuto con velocidad promedio y conteos por tipo
+The agent MUST stop and request human intervention when:
+
+1. **Wants to change the detection model** (e.g., replace YOLO 11 with RT-DETR)
+2. **Wants to modify the 70/30 fusion formula** for speed estimation
+3. **Wants to alter the ultra-conservative criteria** of `is_stationary()`
+4. **Wants to change any database table schema**
+5. **Detects documentation-code inconsistencies** that cannot be resolved with certainty
+6. **A change requires access to AWS RDS** or real credentials
+7. **A change affects Colab Free Tier performance** (e.g., increasing inference resolution)
+
+---
+
+## Key Architecture Decision Records
+
+Consult ADRs in `docs/adr/` before proposing changes that contradict these decisions:
+
+| ADR | Decision | Status |
+|---|---|---|
+| ADR-001 | Monolithic notebook over Python modules | Superseded by ADR-009 |
+| ADR-002 | YOLO 11 with adaptive selection by duration | Superseded by ADR-009 |
+| ADR-003 | SORT over DeepSORT/ByteTrack | Superseded by ADR-009 |
+| ADR-004 | MLP as smoother (not primary estimator) | Superseded by ADR-009 |
+| ADR-005 | PostgreSQL (AWS RDS) over SQLite/local | Superseded by ADR-009 |
+| ADR-006 | Ultra-conservative stationary detection | Superseded by ADR-009 |
+| ADR-007 | Google Colab as primary runtime | Superseded by ADR-009 |
+| ADR-008 | TF/Keras traffic classifier + two tables + auto-labeling | Active |
+| ADR-009 | Modular three-stage architecture with shared src/ | **Active** |
+
+---
+
+## Domain Context
+
+- **Bridge**: General Manuel Belgrano, 1700m length, 8.3m roadway width
+- **Cameras**: SISE dynamic cameras at 60m height, with zoom, pan, night vision
+- **Vehicle types**: car, truck, bus, motorcycle, bicycle
+- **Typical speeds**: 40-80 km/h normal flow, 0-20 km/h congestion
+- **Persistence**: One record per minute with average speed and counts by type
+- **Traffic states**: Normal, Reduced, Congested, Accident
+- **Features**: 14 engineered columns from 9 raw telemetry fields

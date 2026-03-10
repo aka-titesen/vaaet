@@ -1,47 +1,82 @@
 # Changelog
 
-Todos los cambios notables del proyecto VAAET se documentan en este archivo.
+All notable changes to the VAAET project are documented in this file.
 
-El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [2.0.0] - 2026-03-07
+## [3.0.0] - 2025-07-14
 
-### Agregado
+### Added
 
-- Etapa 2: Clasificador de estado de tráfico con TensorFlow/Keras MLP
-- 4 estados de tráfico: Normal, Reducido, Atascado, Accidente
-- Ingeniería de features: 9 campos crudos → 14 features
-- Auto-labeling con reglas de ingeniería de tránsito
-- Balanceo de clases con SMOTE (imbalanced-learn)
-- Dos tablas nuevas: `telemetry_raw` (14 features + FK), `traffic_classifications` (predicción + HITL)
-- Diagrama de pipeline de inteligencia (Mermaid)
-- Diagrama ERD ampliado con 3 tablas y FK chain
-- ADR-008: TensorFlow/Keras para clasificación de tráfico
+- Three-module architecture with shared `src/` code (ADR-009)
+- `src/config.py` — single source of truth for constants, paths, thresholds
+- `src/db.py` — SQLAlchemy engine factory with environment variable credentials
+- `src/features.py` — shared feature engineering (9 → 14 columns)
+- `src/labeling.py` — shared auto-labeling rules (4 traffic states)
+- `src/perception/detector.py` — YOLODetector wrapper class
+- `src/perception/tracker.py` — SORTTracker wrapper class
+- `src/perception/speed.py` — physics-based speed estimation
+- Module 2 production notebook: `notebooks/02_production/traffic_analyzer.ipynb`
+- Self-improving feedback loop with HITL corrections
+- ADR-009: Modular three-stage architecture with shared src/
+- AGENTS.md rewritten in English with full architecture documentation
 
-### Cambiado
+### Changed
 
-- Proyecto reestructurado: notebooks/, models/, data/, src/, docs/
-- Documentación actualizada: README, DDS, DATA_LINEAGE, KPIs, BIAS_AND_LIMITATIONS, AGENTS, CONTRIBUTING
-- requirements.txt ampliado con 7 nuevas dependencias (tensorflow, pandas, sqlalchemy, etc.)
-- .gitignore actualizado para *.keras, *.joblib, data/processed/*.csv
+- Module 0 (bootstrap) archived to `archive/00_bootstrap/`
+- Module 1 renamed and moved to `notebooks/01_data_prep/data_preparation.ipynb`
+- ADR-001 through ADR-007 superseded by ADR-009
+- ADR-008 fixed: Input(13,) corrected to Input(14,) to match 14 canonical features
+- All documentation translated to English
+- README.md rewritten with three-module architecture diagram
+- CONTRIBUTING.md updated for modular workflow
+- Project structure reorganized following SOLID, YAGNI, KISS principles
 
-## [1.0.0] - 2026-03-06
+### Removed
 
-### Agregado
+- `vaaet.ipynb` (duplicate of bootstrap notebook)
+- Old directory structure: `notebooks/phase_1_perception/`, `notebooks/phase_2_intelligence/`
+- `src/utils/` placeholder directory
+- Spanish-language documentation (replaced with English)
 
-- Pipeline completo de análisis de tráfico vehicular para el Puente Gral. Manuel Belgrano
-- Detección y clasificación con YOLO 11 (5 variantes: n/s/m/l/x)
-- Selección automática de modelo según duración del video
-- Tracking persistente con SORT ligero
-- Cálculo híbrido de velocidad: 70% física + 30% MLP suavizador
-- Compensación de movimiento de cámara via Optical Flow (Lucas-Kanade)
-- Corrección de perspectiva adaptativa por coordenada Y
-- Detección ultra-conservadora de vehículos estacionarios (AND-conjunction)
-- Soporte multi-cámara: detección automática de layout (1, 2, 4 vistas)
-- Persistencia opcional en PostgreSQL (AWS RDS) cada minuto
-- Video de salida con anotaciones, overlays y HUD informativo
-- Generador de videos sintéticos para demos de portfolio
-- Interfaz universal de carga (Colab + local)
-- Optimización para Google Colab Free/Pro (frame skipping, limpieza de memoria)
-- Documentación: PRD, DDS, Guía de Usuario, KPIs, ADRs
-- Infraestructura documental: AGENTS.md, llms.txt, diagramas Mermaid, data lineage
+## [2.0.0] - 2025-03-07
+
+### Added
+
+- Module 1: Traffic state classifier with TensorFlow/Keras MLP
+- 4 traffic states: Normal, Reduced, Congested, Accident
+- Feature engineering: 9 raw fields → 14 engineered features
+- Auto-labeling with traffic engineering rules
+- Class balancing with SMOTE (imbalanced-learn)
+- Two new tables: `telemetry_raw` (14 features + FK), `traffic_classifications` (prediction + HITL)
+- Intelligence pipeline diagram (Mermaid)
+- Extended ERD diagram with 3 tables and FK chain
+- ADR-008: TensorFlow/Keras for traffic classification
+
+### Changed
+
+- Project restructured: notebooks/, models/, data/, src/, docs/
+- Documentation updated: README, DDS, DATA_LINEAGE, KPIs, BIAS_AND_LIMITATIONS, AGENTS, CONTRIBUTING
+- requirements.txt expanded with 7 new dependencies (tensorflow, pandas, sqlalchemy, etc.)
+- .gitignore updated for *.keras, *.joblib, data/processed/*.csv
+
+## [1.0.0] - 2025-03-06
+
+### Added
+
+- Complete vehicular traffic analysis pipeline for Gral. Manuel Belgrano Bridge
+- Detection and classification with YOLO 11 (5 variants: n/s/m/l/x)
+- Automatic model selection based on video duration
+- Persistent tracking with lightweight SORT
+- Hybrid speed calculation: 70% physics + 30% MLP smoother
+- Camera motion compensation via Optical Flow (Lucas-Kanade)
+- Adaptive perspective correction by Y-coordinate
+- Ultra-conservative stationary vehicle detection (AND-conjunction)
+- Multi-camera support: automatic layout detection (1, 2, 4 views)
+- Optional PostgreSQL persistence (AWS RDS) per minute
+- Output video with annotations, overlays, and informational HUD
+- Synthetic video generator for portfolio demos
+- Universal upload interface (Colab + local)
+- Google Colab Free/Pro optimization (frame skipping, memory cleanup)
+- Documentation: PRD, DDS, User Guide, KPIs, ADRs
+- Documentation infrastructure: AGENTS.md, llms.txt, Mermaid diagrams, data lineage

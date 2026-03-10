@@ -1,48 +1,61 @@
-# VAAET - Video Análisis Avanzado de Tráfico
+# VAAET - Video Advanced Analysis of Traffic
 
-> Sistema de detección, clasificación, tracking y estimación de velocidad vehicular para el Puente General Manuel Belgrano (Corrientes, Argentina) usando YOLO 11. Notebook monolítico para Google Colab + AWS RDS PostgreSQL.
+> Computer vision system for detecting, classifying, tracking, and estimating vehicular speed on the General Manuel Belgrano Bridge (Corrientes, Argentina) using YOLO 11. Three-module architecture with shared src/ modules, running on Google Colab + AWS RDS PostgreSQL.
 
-## Documentación
+## Documentation
 
-- [README](README.md): Visión general, requisitos implementados, uso paso a paso, esquema de BD
-- [AGENTS](AGENTS.md): Contexto agéntico, reglas Always/Ask/Never, límites arquitectónicos
-- [CONTRIBUTING](CONTRIBUTING.md): Guía de contribución, convenciones de código
-- [CHANGELOG](CHANGELOG.md): Historial de cambios del proyecto
+- [README](README.md): Overview, architecture, quick start, database schema
+- [AGENTS](AGENTS.md): Agentic context, Always/Ask/Never rules, architectural boundaries
+- [CONTRIBUTING](CONTRIBUTING.md): Contribution guide, code conventions
+- [CHANGELOG](CHANGELOG.md): Project change history
 
-## Especificaciones
+## Specifications
 
-- [PRD](Docs/PRD.md): Requisitos del producto, arquitectura, casos de uso, KPIs
-- [DDS](Docs/DDS.md): Diseño de software, flujos de detección, velocidad, estacionarios
-- [Guía de Usuario](Docs/GUIA_USUARIO.md): Inicio rápido, troubleshooting, salida esperada
-- [KPIs](Docs/KPIs/KPIs.md): Métricas de rendimiento, guía de validación del 97% F1
+- [PRD](docs/PRD.md): Product requirements, architecture, use cases, KPIs
+- [DDS](docs/DDS.md): Software design, detection flows, speed estimation, stationary detection
+- [User Guide](docs/USER_GUIDE.md): Quick start, troubleshooting, expected output
+- [KPIs](docs/KPIs/KPIs.md): Performance metrics, validation guide
 
-## Gobernanza
+## Governance
 
-- [Data Lineage](Docs/DATA_LINEAGE.md): Linaje de datos, pipeline de transformación, privacidad
-- [Bias y Limitaciones](Docs/BIAS_AND_LIMITATIONS.md): Sesgos de detección, limitaciones conocidas
+- [Data Lineage](docs/DATA_LINEAGE.md): Data lineage, transformation pipeline, privacy
+- [Bias and Limitations](docs/BIAS_AND_LIMITATIONS.md): Detection biases, known limitations
 
-## Decisiones Arquitectónicas
+## Architecture Decision Records
 
-- [ADR-001](Docs/adr/ADR-001-notebook-monolitico.md): Notebook monolítico sobre módulos Python
-- [ADR-002](Docs/adr/ADR-002-yolo11-seleccion-adaptativa.md): YOLO 11 con selección adaptativa
-- [ADR-003](Docs/adr/ADR-003-sort-sobre-deepsort.md): SORT sobre DeepSORT/ByteTrack
-- [ADR-004](Docs/adr/ADR-004-mlp-como-suavizador.md): MLP como suavizador, no estimador
-- [ADR-005](Docs/adr/ADR-005-postgresql-aws-rds.md): PostgreSQL (AWS RDS) sobre SQLite
-- [ADR-006](Docs/adr/ADR-006-deteccion-estacionarios-conservadora.md): Detección ultra-conservadora de estacionarios
-- [ADR-007](Docs/adr/ADR-007-google-colab-como-runtime.md): Google Colab como runtime principal
+- [ADR-001](docs/adr/ADR-001-notebook-monolitico.md): Monolithic notebook (Superseded by ADR-009)
+- [ADR-002](docs/adr/ADR-002-yolo11-seleccion-adaptativa.md): YOLO 11 adaptive selection (Superseded by ADR-009)
+- [ADR-003](docs/adr/ADR-003-sort-sobre-deepsort.md): SORT over DeepSORT (Superseded by ADR-009)
+- [ADR-004](docs/adr/ADR-004-mlp-como-suavizador.md): MLP as smoother (Superseded by ADR-009)
+- [ADR-005](docs/adr/ADR-005-postgresql-aws-rds.md): PostgreSQL AWS RDS (Superseded by ADR-009)
+- [ADR-006](docs/adr/ADR-006-deteccion-estacionarios-conservadora.md): Ultra-conservative stationary detection (Superseded by ADR-009)
+- [ADR-007](docs/adr/ADR-007-google-colab-como-runtime.md): Google Colab as runtime (Superseded by ADR-009)
+- [ADR-008](docs/adr/ADR-008-tensorflow-keras-traffic-classifier.md): TF/Keras traffic classifier + auto-labeling + two tables (Active)
+- [ADR-009](docs/adr/ADR-009-modular-three-stage-architecture.md): Modular three-stage architecture with shared src/ (Active)
 
-## Diagramas
+## Diagrams
 
-- [Pipeline completo](Docs/diagrams/pipeline-flow.md): Flujo de procesamiento end-to-end
-- [Cálculo de velocidad](Docs/diagrams/speed-calculation.md): Pipeline híbrido 70/30
-- [Base de datos](Docs/diagrams/erd.md): Esquema de traffic_data
-- [Arquitectura Colab+AWS](Docs/diagrams/colab-aws-architecture.md): Infraestructura de ejecución
-- [Selección de modelo](Docs/diagrams/model-selection.md): Lógica adaptativa YOLO 11
-- [Multi-cámara](Docs/diagrams/multi-camera-layout.md): Layouts 1/2/4 cámaras
+- [Processing Pipeline](docs/diagrams/pipeline-flow.md): End-to-end processing flow
+- [Speed Calculation](docs/diagrams/speed-calculation.md): Hybrid 70/30 pipeline
+- [Database ERD](docs/diagrams/erd.md): traffic_data schema
+- [Full ERD](docs/diagrams/erd-phase2.md): 3-table schema with FK chain
+- [Colab+AWS Architecture](docs/diagrams/colab-aws-architecture.md): Runtime infrastructure
+- [Model Selection](docs/diagrams/model-selection.md): Adaptive YOLO 11 logic
+- [Multi-Camera](docs/diagrams/multi-camera-layout.md): 1/2/4 camera layouts
+- [Intelligence Pipeline](docs/diagrams/intelligence-pipeline.md): Classification flow (Module 1)
 
-## Etapa 2 — Inteligencia
+## Modules
 
-- [ADR-008](Docs/adr/ADR-008-tensorflow-keras-traffic-classifier.md): TF/Keras + auto-labeling + dos tablas
-- [Pipeline de inteligencia](Docs/diagrams/intelligence-pipeline.md): Flujo de clasificación completo
-- [ERD Phase 2](Docs/diagrams/erd-phase2.md): Esquema de 3 tablas con FK chain
-- [Notebook Phase 2](notebooks/phase_2_intelligence/02_traffic_state_classifier.ipynb): Clasificador de estado de tráfico
+- [Module 0 — Bootstrap (archived)](archive/00_bootstrap/01_legacy_collection.ipynb): Historical YOLO pipeline (FROZEN)
+- [Module 1 — Data Preparation](notebooks/01_data_prep/data_preparation.ipynb): Feature engineering + MLP training
+- [Module 2 — Production](notebooks/02_production/traffic_analyzer.ipynb): YOLO + classifier + feedback loop
+
+## Shared Code (src/)
+
+- [config.py](src/config.py): Constants, paths, thresholds (single source of truth)
+- [db.py](src/db.py): SQLAlchemy engine factory, credential handling
+- [features.py](src/features.py): Feature engineering (9 -> 14 columns)
+- [labeling.py](src/labeling.py): Auto-labeling rules (4 traffic states)
+- [perception/detector.py](src/perception/detector.py): YOLODetector wrapper
+- [perception/tracker.py](src/perception/tracker.py): SORTTracker wrapper
+- [perception/speed.py](src/perception/speed.py): Physics-based speed estimation

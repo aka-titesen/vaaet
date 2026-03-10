@@ -32,10 +32,10 @@ Se evaluaron las siguientes alternativas:
 
 Se adopta **TensorFlow/Keras** con un modelo `Sequential` MLP como clasificador de Fase 1, diseñado para evolucionar a LSTM en Fase 2.
 
-### Arquitectura del modelo (Fase 1 — MLP tabular)
+### Model Architecture (Phase 1 — Tabular MLP)
 
 ```
-Input(shape=(13,))
+Input(shape=(14,))
   → Dense(64, relu) → BatchNormalization → Dropout(0.3)
   → Dense(32, relu) → BatchNormalization → Dropout(0.2)
   → Dense(n_classes, softmax)

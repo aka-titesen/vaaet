@@ -3,7 +3,9 @@ Referenciado por AGENTS.md y DDS.md. -->
 
 # ADR-001: Notebook Monolítico sobre Módulos Python
 
-**Estado:** Aceptado  
+**Status:** Superseded by [ADR-009](ADR-009-modular-three-stage-architecture.md)  
+> This ADR applies to the archived bootstrap module (`archive/00_bootstrap/`) only.
+> The current architecture uses shared `src/` modules. See ADR-009 for details.  
 **Fecha:** 2026-03-06  
 **Decisores:** Equipo VAAET
 

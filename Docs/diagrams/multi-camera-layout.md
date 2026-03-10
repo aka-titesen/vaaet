@@ -1,33 +1,33 @@
-<!-- context: VAAET/Docs/diagrams/multi-camera-layout.md — Detección de layouts multi-cámara.
-Referenciado por DDS.md, PRD.md requisito 5. -->
+<!-- context: VAAET/docs/diagrams/multi-camera-layout.md — Multi-camera layout detection.
+Referenced by DDS.md, PRD.md. -->
 
-# Detección de Layout Multi-Cámara
+# Multi-Camera Layout Detection
 
-El sistema auto-detecta si el video contiene 1, 2 o 4 vistas de cámara y procesa cada ROI independientemente.
+The system auto-detects whether the video contains 1, 2, or 4 camera views and processes each ROI independently.
 
 ```mermaid
 flowchart TD
-    A[Frame del Video] --> B{Analizar layout}
+    A[Video Frame] --> B{Analyze layout}
     
-    B -->|1 vista| C[Single Camera]
-    B -->|2 vistas| D[Dual Camera]
-    B -->|4 vistas| E[Quad Camera]
+    B -->|1 view| C[Single Camera]
+    B -->|2 views| D[Dual Camera]
+    B -->|4 views| E[Quad Camera]
     
-    C --> F[ROI: Frame completo<br/>0,0 → W,H]
+    C --> F[ROI: Full frame<br/>0,0 -> W,H]
     
-    D --> G[ROI 1: Mitad izquierda<br/>0,0 → W/2,H]
-    D --> H[ROI 2: Mitad derecha<br/>W/2,0 → W,H]
+    D --> G[ROI 1: Left half<br/>0,0 -> W/2,H]
+    D --> H[ROI 2: Right half<br/>W/2,0 -> W,H]
     
-    E --> I[ROI 1: Superior izq<br/>0,0 → W/2,H/2]
-    E --> J[ROI 2: Superior der<br/>W/2,0 → W,H/2]
-    E --> K[ROI 3: Inferior izq<br/>0,H/2 → W/2,H]
-    E --> L[ROI 4: Inferior der<br/>W/2,H/2 → W,H]
+    E --> I[ROI 1: Top-left<br/>0,0 -> W/2,H/2]
+    E --> J[ROI 2: Top-right<br/>W/2,0 -> W,H/2]
+    E --> K[ROI 3: Bottom-left<br/>0,H/2 -> W/2,H]
+    E --> L[ROI 4: Bottom-right<br/>W/2,H/2 -> W,H]
     
-    F & G & H & I & J & K & L --> M[Pipeline VAAET<br/>por cada ROI]
-    M --> N[Merge anotaciones<br/>en frame final]
+    F & G & H & I & J & K & L --> M[VAAET Pipeline<br/>per each ROI]
+    M --> N[Merge annotations<br/>in final frame]
 ```
 
-## Layouts Visuales
+## Visual Layouts
 
 ```mermaid
 block-beta
@@ -35,35 +35,35 @@ block-beta
     
     block:single:1
         columns 1
-        s1["1 Cámara"]
-        s2["┌─────────┐"]
-        s3["│  Full   │"]
-        s4["│  Frame  │"]
-        s5["└─────────┘"]
+        s1["1 Camera"]
+        s2["+---------+"]
+        s3["|  Full   |"]
+        s4["|  Frame  |"]
+        s5["+---------+"]
     end
     
     block:dual:1
         columns 1
-        d1["2 Cámaras"]
-        d2["┌────┬────┐"]
-        d3["│ L  │ R  │"]
-        d4["│    │    │"]
-        d5["└────┴────┘"]
+        d1["2 Cameras"]
+        d2["+----+----+"]
+        d3["| L  | R  |"]
+        d4["|    |    |"]
+        d5["+----+----+"]
     end
     
     block:quad:1
         columns 1
-        q1["4 Cámaras"]
-        q2["┌────┬────┐"]
-        q3["│ TL │ TR │"]
-        q4["├────┼────┤"]
-        q5["│ BL │ BR │"]
+        q1["4 Cameras"]
+        q2["+----+----+"]
+        q3["| TL | TR |"]
+        q4["+----+----+"]
+        q5["| BL | BR |"]
     end
 ```
 
-## Notas
+## Notes
 
-- La detección de layout se basa en análisis de bordes y áreas negras entre vistas
-- Cada ROI se procesa independientemente con su propia instancia de tracking
-- Las perspectivas pueden variar entre cámaras — las homografías se aplican por ROI
-- Las métricas agregadas (velocidad promedio, conteos) combinan datos de todas las ROIs
+- Layout detection is based on edge analysis and black areas between views
+- Each ROI is processed independently with its own tracking instance
+- Perspectives can vary between cameras — homographies are applied per ROI
+- Aggregated metrics (average speed, counts) combine data from all ROIs

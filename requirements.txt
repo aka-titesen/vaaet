@@ -1,25 +1,27 @@
-# VAAET - Dependencias
-# Instalar con: pip install -r requirements.txt
+# VAAET - Dependencies
+# Install with: pip install -r requirements.txt
 
-# Core - Detección y visión por computadora
-ultralytics>=8.0.0
-opencv-python>=4.8.0
-numpy>=1.24.0
+# ── Core — Perception (Module 0 legacy + Module 2 production) ──
+ultralytics>=8.0.0          # YOLO 11 object detection
+opencv-python>=4.8.0        # Video I/O, optical flow, annotations
+numpy>=1.24.0               # Vectorized operations, statistics
 
-# ML - Suavizado de velocidad (MLPRegressor)
-scikit-learn>=1.3.0
+# ── ML — Speed smoothing (MLPRegressor) ──
+scikit-learn>=1.3.0         # MLP speed smoother (70/30 fusion)
 
-# Base de datos - PostgreSQL (AWS RDS)
-psycopg2-binary>=2.9.0
+# ── Database — PostgreSQL (AWS RDS) ──
+psycopg2-binary>=2.9.0     # PostgreSQL driver
+sqlalchemy>=2.0.0           # ORM engine factory (src/db.py)
 
-# Intelligence Layer - Clasificación de estado de tráfico (Etapa 2)
-tensorflow>=2.15.0
-pandas>=2.0.0
-sqlalchemy>=2.0.0
-imbalanced-learn>=0.11.0
-joblib>=1.3.0
-matplotlib>=3.7.0
-seaborn>=0.12.0
+# ── Intelligence — Traffic state classification (Modules 1 & 2) ──
+tensorflow>=2.15.0          # Keras MLP classifier
+pandas>=2.0.0               # Feature engineering, DataFrames
+imbalanced-learn>=0.11.0    # SMOTE class balancing
+joblib>=1.3.0               # Model artifact serialization
 
-# Opcional - Widgets para interfaz en Colab
+# ── Visualization ──
+matplotlib>=3.7.0           # Plots, confusion matrix
+seaborn>=0.12.0             # Statistical visualization
+
+# ── Optional — Colab UI widgets ──
 # ipywidgets>=8.0.0

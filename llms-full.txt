@@ -1,97 +1,107 @@
-# VAAET - Documentación Completa para Consumo de Agentes de IA
+# VAAET - Complete Documentation for AI Agent Consumption
 
-Versión: 2.0.0 | Fecha: 2026-03-07 | Licencia: MIT
+Version: 3.0.0 | Date: 2026-03-08 | License: MIT
 
 ---
 
-# 1. CONTEXTO AGÉNTICO
+# 1. AGENTIC CONTEXT
 
-## Identidad del Proyecto
+## Project Identity
 
-VAAET (Video Análisis Avanzado de Tráfico) es un sistema de visión por computadora para analizar tráfico vehicular en el Puente General Manuel Belgrano (Corrientes, Argentina). Detecta, clasifica, rastrea y estima la velocidad de vehículos usando video de cámaras de vigilancia SISE.
+VAAET (Video Advanced Analysis of Traffic) is a computer vision system for analyzing vehicular traffic on the General Manuel Belgrano Bridge (Corrientes, Argentina). It detects, classifies, tracks, and estimates the speed of vehicles using SISE surveillance camera footage.
 
-### Pipeline de dos etapas
-- Etapa 1 — Percepción: 01_legacy_collection.ipynb — YOLO 11 + OpenCV + SORT → telemetría cruda cada minuto
-- Etapa 2 — Inteligencia: 02_traffic_state_classifier.ipynb — TF/Keras MLP → clasificación de estado de tráfico
-- Entorno: Google Colab (GPU gratuita). NO hay servidor, API, microservicios ni CI/CD
-- Persistencia: PostgreSQL en AWS RDS (opcional). 3 tablas: traffic_data (Etapa 1), telemetry_raw + traffic_classifications (Etapa 2)
-- Stack Etapa 1: YOLO 11 + OpenCV + NumPy + scikit-learn MLPRegressor + psycopg2
-- Stack Etapa 2: TensorFlow/Keras + pandas + SQLAlchemy + imbalanced-learn SMOTE + joblib
+### Three-Module Pipeline (ADR-009)
+- Module 0 — Bootstrap (archived): archive/00_bootstrap/01_legacy_collection.ipynb — Historical YOLO 11 + OpenCV + SORT pipeline that generated the original traffic_data table. NEVER runs again.
+- Module 1 — Data Preparation: notebooks/01_data_prep/data_preparation.ipynb — One-time feature engineering + auto-labeling + SMOTE + MLP training. Exports .keras and .joblib artifacts.
+- Module 2 — Production: notebooks/02_production/traffic_analyzer.ipynb — YOLO 11 + SORT + speed estimation + trained MLP classifier + DB persistence + self-improving feedback loop.
+- Shared code: src/ — Reusable Python modules (config, db, features, labeling, perception) imported by Modules 1 and 2.
+- Runtime: Google Colab (free GPU). NO servers, REST APIs, microservices, or containers.
+- Persistence: PostgreSQL on AWS RDS (optional). 3 tables: traffic_data (legacy), telemetry_raw + traffic_classifications (active).
 
-## Límites Arquitectónicos
+### Technology Stack
+- Object detection: YOLO 11 (Ultralytics) — 5 variants by video duration
+- Computer vision: OpenCV — video I/O, optical flow, annotations
+- Numerical: NumPy — vectorized operations, statistics
+- ML (speed smoothing): scikit-learn MLPRegressor — NOT a real CNN
+- Traffic classification: TensorFlow/Keras — MLP Sequential (evolvable to LSTM)
+- Data analysis: Pandas + SQLAlchemy — feature engineering and persistence
+- Class balancing: imbalanced-learn SMOTE — synthetic oversampling
+- Database: PostgreSQL via psycopg2-binary / SQLAlchemy (AWS RDS)
 
-1. Todo el código vive en vaaet.ipynb — NO crear módulos .py separados
-2. VAAETHybrid es la única clase del sistema
-3. Cell 5 (BRIDGE_CONFIG) es el ÚNICO punto de configuración para parámetros del puente
-4. Cell 1 es el ÚNICO punto de configuración de base de datos
-5. La fusión de velocidad es 70% física + 30% MLP
-6. Los criterios de is_stationary() usan AND-conjunction
-7. Formato de archivo estricto: bridge_YYYY-MM-DD_HH-MM-SS_to_HH-MM-SS.mp4
-8. 01_legacy_collection.ipynb es INTOCABLE — no modificar el notebook de Etapa 1
-9. Las tablas telemetry_raw y traffic_classifications requieren ADR-008 — no modificar esquema sin nuevo ADR
+## Architectural Boundaries
+
+1. Module 0 is FROZEN — never modify archive/00_bootstrap/01_legacy_collection.ipynb
+2. src/config.py is the SINGLE source of truth for constants, thresholds, and paths
+3. src/db.py is the SINGLE point of DB configuration — credentials via environment variables only
+4. Speed fusion is 70% physics + 30% MLP — do not alter without experimental evidence
+5. is_stationary() criteria use AND-conjunction — do not relax to OR without ADR
+6. Video filename format is strict: bridge_YYYY-MM-DD_HH-MM-SS_to_HH-MM-SS.mp4
+7. Tables telemetry_raw and traffic_classifications require ADR-008 — do not modify schema without new ADR
+8. 14 features are canonical — defined in src/config.py:FEATURE_COLS
+9. 4 traffic states: Normal (0), Reduced (1), Congested (2), Accident (3) — defined in src/config.py:STATE_LABELS
+10. Shared src/ modules must remain notebook-importable — no CLI entrypoints
 
 ## Always / Ask / Never
 
-Always: Corregir errores de sintaxis, actualizar docstrings, agregar type hints, agregar markdown cells, formatear código PEP 8, corregir inconsistencias config.
+Always: Fix syntax errors, update docstrings, add type hints, add markdown cells, format code PEP 8, fix config inconsistencies, update AGENTS.md when structure changes.
 
-Ask: Cambiar parámetros de calibración, modificar calculate_enhanced_speed() o is_stationary(), agregar dependencias, cambiar esquema de BD, modificar selección de modelo, cambiar umbrales de auto-labeling de estados de tráfico, modificar arquitectura del MLP/LSTM clasificador.
+Ask: Change calibration parameters, modify speed calculation or is_stationary(), add dependencies, change DB schema, modify YOLO model selection, refactorings >20% of a module, change auto-labeling thresholds, modify MLP/LSTM architecture.
 
-Never: Hardcodear credenciales AWS, crear archivos .py fuera del notebook, eliminar test_sistema() o demos sintéticas, modificar tabla traffic_data sin ADR, romper compatibilidad Colab Free, commit de archivos .pt, modificar telemetry_raw o traffic_classifications sin ADR, eliminar campos HITL de traffic_classifications, commit de archivos .keras/.joblib o CSVs de data/processed/.
-
----
-
-# 2. REQUISITOS DEL PRODUCTO (PRD)
-
-## Requisitos implementados
-
-1. Carga de video: Solo acepta bridge_YYYY-MM-DD_HH-MM-SS_to_HH-MM-SS.mp4
-2. Selección automática YOLO 11: <1h:x, 1-3h:l, 3-6h:m, 6-12h:s, >12h:n
-3. Persistencia opcional: PostgreSQL AWS RDS, datos cada minuto, sin credenciales hardcode
-4. Cálculo híbrido de velocidad: Física + Optical Flow + MLP, con límites y exclusión de estacionados
-5. Multi-cámara: Detección automática de layout (1, 2, 4 vistas)
-6. Perspectiva: Homografías calibrables, carga externa opcional
-7. Tracking persistente: SORT ligero con IDs robustos
-8. Históricos: Promedios recientes cuando no hay detecciones
-9. Descarga automática: Video procesado con overlays
-10. Optimización Colab: Frame skipping, limpieza de memoria
-11. Modularidad: Código desacoplado, funciones auxiliares, logging
-12. Notebook compacto: 9 celdas claras
-13. Outputs claros: Mensajes de éxito/error con emoji
-14. Clasificación de estado de tráfico: 4 estados (Normal, Reducido, Atascado, Accidente) con MLP TF/Keras
-
-## Casos de uso
-
-Monitoreo operacional SISE, ingeniería de tráfico, planificación urbana, investigación académica, gestión de emergencias.
+Never: Hardcode AWS credentials, modify Module 0 notebook, delete test_sistema() or synthetic demos, modify traffic_data without ADR, break Colab Free compatibility, commit .pt files, print credentials, modify telemetry_raw or traffic_classifications without ADR, remove HITL fields, commit .keras/.joblib or processed CSVs.
 
 ---
 
-# 3. DISEÑO DE SOFTWARE (DDS)
+# 2. PRODUCT REQUIREMENTS (PRD)
 
-## Arquitectura
+## Implemented Requirements
 
-Pipeline de procesamiento secuencial encapsulado en clase VAAETHybrid dentro de Jupyter Notebook.
+1. Video loading: Only accepts bridge_YYYY-MM-DD_HH-MM-SS_to_HH-MM-SS.mp4
+2. Automatic YOLO 11 selection: <1h:x, 1-3h:l, 3-6h:m, 6-12h:s, >12h:n
+3. Optional persistence: PostgreSQL AWS RDS, data every minute, no hardcoded credentials
+4. Hybrid speed calculation: Physics + Optical Flow + MLP, with limits and stationary exclusion
+5. Multi-camera: Automatic layout detection (1, 2, 4 views)
+6. Perspective: Calibratable homographies, optional external loading
+7. Persistent tracking: Lightweight SORT with robust IDs
+8. Historical values: Recent averages when no detections
+9. Auto-download: Processed video with overlays
+10. Colab optimization: Frame skipping, memory cleanup
+11. Modularity: Shared src/ modules with high cohesion, low coupling
+12. Clear outputs: Success/error messages with emoji prefixes
+13. Traffic state classification: 4 states (Normal, Reduced, Congested, Accident) with TF/Keras MLP
 
-## Componentes
+## Use Cases
 
-### 3.1 Detección y Reconocimiento
-Frame BGR -> Ultralytics YOLO 11 inference -> NMS (IoU=0.4, conf=0.5) -> Lista de (bbox, clase, confianza)
+SISE operational monitoring, traffic engineering, urban planning, academic research, emergency management.
 
-### 3.2 Cálculo de Velocidad
-Historial deque 30 frames -> Optical Flow Lucas-Kanade (compensación cámara) -> Desplazamiento euclidiano -> Corrección perspectiva (factor por Y: near=1.8, mid=1.0, far=0.6) -> Velocidad física (px->m->km/h) -> Fusión: 0.7*física + 0.3*MLP -> Filtro plausibilidad [2, 120] km/h -> Suavizado temporal
+---
 
-### 3.3 Detección de Estacionarios
-Requiere ALL (AND): >=200 frames, desplazamiento<5px, segmento<3px, std<2.5px, avg_frame<0.3px, max_frame<1.5px
+# 3. SOFTWARE DESIGN (DDS)
 
-### 3.4 Estrategias anti-error
-Compensación de cámara (optical flow), perspectiva adaptativa, filtro de plausibilidad, suavizado temporal
+## Architecture
 
-### 3.5 Clasificador de Estado de Tráfico (Etapa 2)
-Modelo: TF/Keras Sequential MLP — Input(14) → Dense(64,relu) → BatchNorm → Dropout(0.3) → Dense(32,relu) → BatchNorm → Dropout(0.2) → Dense(n_classes,softmax).
+Three-module pipeline with shared src/ modules. Module 0 (Bootstrap) generated historical data and is now archived. Module 1 (Data Preparation) trains the traffic classifier. Module 2 (Production) runs the full perception + classification pipeline.
+
+## Components
+
+### 3.1 Detection and Recognition (src/perception/detector.py)
+Frame BGR -> Ultralytics YOLO 11 inference -> NMS (IoU=0.4, conf=0.5) -> List of (bbox, class, confidence)
+
+### 3.2 Speed Calculation (src/perception/speed.py)
+History deque 30 frames -> Optical Flow Lucas-Kanade (camera compensation) -> Euclidean displacement -> Perspective correction (factor by Y: near=1.8, mid=1.0, far=0.6) -> Physics speed (px->m->km/h) -> Fusion: 0.7*physics + 0.3*MLP -> Plausibility filter [2, 120] km/h -> Temporal smoothing
+
+### 3.3 Stationary Detection
+Requires ALL (AND): >=200 frames, displacement<5px, segment<3px, std<2.5px, avg_frame<0.3px, max_frame<1.5px
+
+### 3.4 Feature Engineering (src/features.py)
+9 raw telemetry fields -> 14 features: avg_speed, total_vehicles, count_car, count_truck, count_bus, count_motorcycle, count_bicycle, heavy_vehicle_ratio, delta_speed, delta_count, transition_flag, speed_variance, hour_of_day, weather_condition
+
+### 3.5 Traffic State Classifier (Module 1)
+Model: TF/Keras Sequential MLP — Input(14) -> Dense(64,relu) -> BatchNorm -> Dropout(0.3) -> Dense(32,relu) -> BatchNorm -> Dropout(0.2) -> Dense(n_classes,softmax).
 Compile: optimizer=adam, loss=sparse_categorical_crossentropy, metrics=accuracy.
 Callbacks: EarlyStopping(patience=15, restore_best_weights), ReduceLROnPlateau(patience=5, factor=0.5).
-Auto-labeling: Normal (avg_speed>40, total_vehicles<15), Reducido (10≤speed≤40 y 15≤vehicles≤25), Atascado (speed<5, vehicles>25, 2+ consecutivos), Accidente (speed≈0, delta_speed<-20, 3+ consecutivos).
+Auto-labeling (src/labeling.py): Normal (avg_speed>40, total_vehicles<15), Reduced (10<=speed<=40 and 15<=vehicles<=25), Congested (speed<5, vehicles>25, 2+ consecutive), Accident (speed~0, delta_speed<-20, 3+ consecutive).
 
-## Esquema de BD
+## Database Schema
 
 ```sql
 CREATE TABLE traffic_data (
@@ -136,93 +146,101 @@ CREATE TABLE traffic_classifications (
 );
 ```
 
-FK chain: traffic_classifications → telemetry_raw → traffic_data.
-Campos HITL: human_override_state, human_override_by, human_override_at (diseñados, no implementados).
+FK chain: traffic_classifications -> telemetry_raw -> traffic_data.
+HITL fields: human_override_state, human_override_by, human_override_at (designed for Module 2 feedback loop).
 
 ---
 
-# 4. DECISIONES ARQUITECTÓNICAS (ADRs)
+# 4. ARCHITECTURE DECISION RECORDS (ADRs)
 
-## ADR-001: Notebook Monolítico
-Decisión: Todo en vaaet.ipynb para portabilidad en Colab. Consecuencia: testing difícil, celdas largas.
+## ADR-001: Monolithic Notebook (Superseded by ADR-009)
+Decision: All code in vaaet.ipynb for Colab portability. Now replaced by modular src/ architecture.
 
-## ADR-002: YOLO 11 Adaptativo
-Decisión: 5 variantes por duración (<1h:x, 1-3:l, 3-6:m, 6-12:s, >12:n). Consecuencia: dependencia Ultralytics, posible sesgo COCO.
+## ADR-002: Adaptive YOLO 11 (Superseded by ADR-009)
+Decision: 5 variants by duration (<1h:x, 1-3:l, 3-6:m, 6-12:s, >12:n). Logic now in src/perception/detector.py.
 
-## ADR-003: SORT sobre DeepSORT
-Decisión: Matching por distancia euclidiana (100px) sin ReID visual. Consecuencia: más ID switches, no resiste oclusiones >1s.
+## ADR-003: SORT over DeepSORT (Superseded by ADR-009)
+Decision: Matching by Euclidean distance (100px) without visual ReID. Logic now in src/perception/tracker.py.
 
-## ADR-004: MLP como Suavizador
-Decisión: MLPRegressor(64,32) entrenado con datos random, fusión 70/30. Consecuencia: no mejora precisión real, actúa como regularizador estocástico. Nombre "CNN" en código es incorrecto.
+## ADR-004: MLP as Smoother (Superseded by ADR-009)
+Decision: MLPRegressor(64,32) trained with random data, fusion 70/30. Does not improve real accuracy, acts as stochastic regularizer. The "CNN" name in legacy code is incorrect.
 
-## ADR-005: PostgreSQL (AWS RDS)
-Decisión: Persistencia remota para sobrevivir sesiones efímeras de Colab. Consecuencia: requiere infra AWS, conectividad, gestión de credenciales.
+## ADR-005: PostgreSQL AWS RDS (Superseded by ADR-009)
+Decision: Remote persistence to survive ephemeral Colab sessions. Logic now in src/db.py.
 
-## ADR-006: Estacionarios Ultra-Conservadores
-Decisión: AND-conjunction de 6 criterios estadísticos. Consecuencia: precision alta, recall limitado para vehículos con micro-movimientos.
+## ADR-006: Ultra-Conservative Stationary Detection (Superseded by ADR-009)
+Decision: AND-conjunction of 6 statistical criteria. High precision, limited recall for micro-moving vehicles.
 
-## ADR-007: Google Colab como Runtime
-Decisión: GPU gratuita, zero config, portabilidad. Consecuencia: sin CI/CD, sesiones efímeras, GPU no garantizada.
+## ADR-007: Google Colab as Runtime (Superseded by ADR-009)
+Decision: Free GPU, zero config, portability. No CI/CD, ephemeral sessions.
 
-## ADR-008: TensorFlow/Keras para Clasificación de Tráfico
-Decisión: MLP Sequential (Dense 64→32→n_classes) con auto-labeling + SMOTE. 2 tablas nuevas (telemetry_raw, traffic_classifications) con FK a traffic_data. 4 estados: Normal(0), Reducido(1), Atascado(2), Accidente(3). Campos HITL diseñados para corrección humana futura. Consecuencia: dependencia TF (~500MB), auto-labeling hereda sesgos Etapa 1, evolución futura a LSTM.
+## ADR-008: TensorFlow/Keras Traffic Classifier (Active)
+Decision: MLP Sequential (Dense 64->32->n_classes) with auto-labeling + SMOTE. 2 new tables (telemetry_raw, traffic_classifications) with FK to traffic_data. 4 states: Normal(0), Reduced(1), Congested(2), Accident(3). HITL fields for future human correction.
+
+## ADR-009: Modular Three-Stage Architecture (Active)
+Decision: Replace monolithic notebook with three-module pipeline + shared src/ code. Module 0 archived, Module 1 for data prep, Module 2 for production. Follows SOLID, KISS, YAGNI principles.
 
 ---
 
 # 5. KPIs
 
-| KPI | Métrica | Target | Estado |
+| KPI | Metric | Target | Status |
 |---|---|---|---|
-| Detección/Clasificación | F1-Score | 97% | Objetivo declarado, sin benchmark real medido |
-| Velocidad | MAE | < 5 km/h | Objetivo declarado, sin ground truth disponible |
-| Tracking | ID Switches | Minimizar | Sin medición formal |
-| Procesamiento | FPS | Variable por modelo | Sin benchmark publicado |
-| Estacionarios | Precisión clasificación | Alta | Sin evaluación cuantitativa |
-| Clasificación tráfico | F1-macro | ≥ 0.85 | Pendiente entrenamiento con datos reales |
-| Recall Accidente | Recall clase 3 | ≥ 0.90 | Pendiente entrenamiento con datos reales |
+| Detection/Classification | F1-Score | 97% | Declared target, no real benchmark measured |
+| Speed | MAE | < 5 km/h | Declared target, no ground truth available |
+| Tracking | ID Switches | Minimize | No formal measurement |
+| Processing | FPS | Variable by model | No published benchmark |
+| Stationary | Classification precision | High | No quantitative evaluation |
+| Traffic classification | F1-macro | >= 0.85 | Pending training with real data |
+| Accident recall | Recall class 3 | >= 0.90 | Pending training with real data |
 
-Guía de validación Etapa 1: Ground truth con CVAT/VIA -> Ejecución VAAET -> Comparación IoU>0.5 -> Cálculo F1.
-Guía de validación Etapa 2: Cell 7 genera classification_report + confusion matrix. F1-macro ≥ 0.85 requerido. Recall Accidente ≥ 0.90 crítico.
-
----
-
-# 6. LINAJE DE DATOS
-
-Fuente: Cámaras SISE Puente Belgrano, video MP4.
-
-## Etapa 1 — Percepción
-Pipeline: Video -> Frames 30fps -> YOLO detecciones -> SORT tracks -> Velocidad híbrida -> Agregación/minuto -> PostgreSQL.
-MLP: Entrenado con datos random (scaffold). No hay ground truth de velocidad.
-Salida: Video anotado .mp4 + registros en traffic_data.
-
-## Etapa 2 — Inteligencia
-Pipeline: traffic_data (SQL) → DataFrame → Feature Engineering (9→13 cols) → Auto-Labeling (4 estados) → SMOTE → StandardScaler → MLP Training → Evaluación → Export (.keras, .joblib) → Persistencia (telemetry_raw + traffic_classifications).
-14 features: avg_speed, total_vehicles, count_car, count_truck, count_bus, count_motorcycle, count_bicycle, heavy_vehicle_ratio (truck+bus/total), delta_speed (diff t-1), delta_count (diff t-1), transition_flag (delta_speed>10 & delta_count>5), speed_variance (rolling 5), hour_of_day (hora), weather_condition (nocturno=1).
-Artefactos: traffic_classifier.keras, feature_scaler.joblib, label_mapping.joblib en models/intelligence/.
-
-Privacidad: Videos pueden contener patentes. No se almacenan frames, solo agregados por minuto.
+Validation guide Module 1: Cell 7 generates classification_report + confusion matrix. F1-macro >= 0.85 required. Accident recall >= 0.90 critical.
 
 ---
 
-# 7. SESGOS Y LIMITACIONES
+# 6. DATA LINEAGE
 
-- Sesgo COCO: YOLO entrenado en COCO, posible sub-representación de bicicletas y motos
-- Sin evaluación en condiciones adversas: lluvia, niebla, noche, contraluz
-- Velocidad sin ground truth: conversión pixel->metro calibrada manualmente
-- MLP con datos random: no mejora precisión, nombre "CNN" es incorrecto
-- Tracking sin ReID: pierde identidad en oclusiones >1 segundo
-- Colab efímero: sesiones max 12h, GPU no garantizada, sin retry automático
-- Auto-labeling hereda sesgos de Etapa 1: si YOLO falla, las etiquetas de estado son incorrectas
-- Clase Accidente infrarrepresentada (~2%): SMOTE mitiga parcialmente, puede generar artefactos sintéticos
-- Sin temporalidad: MLP no captura secuencias, evolución futura a LSTM
-- Weather simulado: weather_condition=0 constante hasta integrar API meteorológica
+Source: SISE cameras on Belgrano Bridge, MP4 video.
+
+## Module 0 — Bootstrap (archived)
+Pipeline: Video -> Frames 30fps -> YOLO detections -> SORT tracks -> Hybrid speed -> Aggregation/minute -> PostgreSQL.
+MLP speed smoother: Trained with random data (scaffold). No speed ground truth.
+Output: Annotated .mp4 video + records in traffic_data.
+
+## Module 1 — Data Preparation
+Pipeline: traffic_data (SQL) -> DataFrame -> Feature Engineering (9->14 cols) -> Auto-Labeling (4 states) -> SMOTE -> StandardScaler -> MLP Training -> Evaluation -> Export (.keras, .joblib) -> Persistence (telemetry_raw + traffic_classifications).
+14 features: avg_speed, total_vehicles, count_car, count_truck, count_bus, count_motorcycle, count_bicycle, heavy_vehicle_ratio (truck+bus/total), delta_speed (diff t-1), delta_count (diff t-1), transition_flag (delta_speed>10 and delta_count>5), speed_variance (rolling 5), hour_of_day, weather_condition (nocturnal=1).
+Artifacts: traffic_classifier.keras, feature_scaler.joblib, label_mapping.joblib in models/intelligence/.
+
+## Module 2 — Production
+Pipeline: Video -> YOLO + SORT + speed estimation -> Telemetry per minute -> Feature Engineering -> MLP Classifier inference -> Classification persistence -> Optional HITL feedback -> Retraining.
+Uses trained artifacts from Module 1. Persists to telemetry_raw and traffic_classifications.
+
+Privacy: Videos may contain license plates. No frames are stored, only per-minute aggregates.
 
 ---
 
-# 8. CONTEXTO DEL DOMINIO
+# 7. BIASES AND LIMITATIONS
 
-- Puente: General Manuel Belgrano, 1700m longitud, 8.3m calzada
-- Cámaras: SISE dinámicas a 60m altura, zoom, paneo, visión nocturna
-- Tipos: car, truck, bus, motorcycle, bicycle
-- Velocidades típicas: 40-80 km/h normal, 0-20 km/h congestión
-- Persistencia: 1 registro/minuto con promedio y conteos
+- COCO bias: YOLO trained on COCO, possible under-representation of bicycles and motorcycles
+- No adverse condition evaluation: rain, fog, night, backlight
+- Speed without ground truth: pixel->meter conversion manually calibrated
+- MLP speed smoother trained with random data: does not improve real accuracy
+- Tracking without ReID: loses identity in occlusions >1 second
+- Ephemeral Colab: max 12h sessions, GPU not guaranteed, no automatic retry
+- Auto-labeling inherits Module 0 biases: if YOLO fails, state labels are incorrect
+- Accident class under-represented (~2%): SMOTE partially mitigates, may generate synthetic artifacts
+- No temporality: MLP does not capture sequences, future evolution to LSTM
+- Simulated weather: weather_condition=0 constant until meteorological API integration
+
+---
+
+# 8. DOMAIN CONTEXT
+
+- Bridge: General Manuel Belgrano, 1700m length, 8.3m roadway width
+- Cameras: SISE dynamic cameras at 60m height, zoom, pan, night vision
+- Vehicle types: car, truck, bus, motorcycle, bicycle
+- Typical speeds: 40-80 km/h normal flow, 0-20 km/h congestion
+- Persistence: 1 record/minute with average speed and counts by type
+- Traffic states: Normal (0), Reduced (1), Congested (2), Accident (3)
+- Features: 14 engineered columns from 9 raw telemetry fields

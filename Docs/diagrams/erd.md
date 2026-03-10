@@ -1,49 +1,49 @@
-<!-- context: VAAET/Docs/diagrams/erd.md — Diagrama entidad-relación de la BD.
-Referenciado por DDS.md, ADR-005, README.md. -->
+<!-- context: VAAET/docs/diagrams/erd.md — Entity-Relationship diagram.
+Referenced by DDS.md, ADR-005, README.md. -->
 
-# Esquema de Base de Datos (ERD)
+# Database Schema (ERD)
 
-Tabla `traffic_data` (Etapa 1) con extensión Phase 2: `telemetry_raw` y `traffic_classifications`.
+Table `traffic_data` (Module 0 — legacy) with Module 1 extensions: `telemetry_raw` and `traffic_classifications`.
 
-Para el ERD completo con las 3 tablas, ver [erd-phase2.md](erd-phase2.md).
+For the complete ERD with all 3 tables, see [erd-phase2.md](erd-phase2.md).
 
 ```mermaid
 erDiagram
     TRAFFIC_DATA {
-        serial id PK "Auto-incremento"
-        text clip_id "Identificador del video procesado"
-        timestamp record_time "Timestamp del minuto registrado"
-        numeric avg_speed "Velocidad promedio km/h (5,2)"
-        integer count_car "Conteo de autos"
-        integer count_truck "Conteo de camiones"
-        integer count_bus "Conteo de buses"
-        integer count_motorcycle "Conteo de motos"
-        integer count_bicycle "Conteo de bicicletas"
-        integer total_vehicles "Total de vehículos"
+        serial id PK "Auto-increment"
+        text clip_id "Processed video identifier"
+        timestamp record_time "Timestamp of recorded minute"
+        numeric avg_speed "Average speed km/h (5,2)"
+        integer count_car "Car count"
+        integer count_truck "Truck count"
+        integer count_bus "Bus count"
+        integer count_motorcycle "Motorcycle count"
+        integer count_bicycle "Bicycle count"
+        integer total_vehicles "Total vehicles"
     }
 
     TELEMETRY_RAW {
-        serial id PK "Auto-incremento"
-        integer source_record_id FK "FK a traffic_data.id"
-        timestamp record_time "Timestamp del registro"
-        numeric heavy_vehicle_ratio "Ratio pesados"
-        numeric delta_speed "Cambio de velocidad"
-        integer delta_count "Cambio de volumen"
-        smallint transition_flag "Flag de transicion"
-        numeric speed_variance "Variabilidad velocidad"
-        smallint hour_of_day "Hora del dia"
-        smallint weather_condition "Condicion meteorologica"
+        serial id PK "Auto-increment"
+        integer source_record_id FK "FK to traffic_data.id"
+        timestamp record_time "Record timestamp"
+        numeric heavy_vehicle_ratio "Heavy vehicle ratio"
+        numeric delta_speed "Speed delta"
+        integer delta_count "Volume delta"
+        smallint transition_flag "Transition flag"
+        numeric speed_variance "Speed variance"
+        smallint hour_of_day "Hour of day"
+        smallint weather_condition "Weather condition"
     }
 
     TRAFFIC_CLASSIFICATIONS {
-        serial id PK "Auto-incremento"
-        integer telemetry_id FK "FK a telemetry_raw.id"
-        timestamp classified_at "Timestamp clasificacion"
-        smallint traffic_state "Codigo estado 0-3"
-        text state_label "Nombre del estado"
-        numeric confidence "Confianza del modelo"
-        text model_version "Version del modelo"
-        boolean is_human_validated "Validado HITL"
+        serial id PK "Auto-increment"
+        integer telemetry_id FK "FK to telemetry_raw.id"
+        timestamp classified_at "Classification timestamp"
+        smallint traffic_state "State code 0-3"
+        text state_label "State name"
+        numeric confidence "Model confidence"
+        text model_version "Model version"
+        boolean is_human_validated "HITL validated"
     }
 
     TRAFFIC_DATA ||--o{ TELEMETRY_RAW : "source_record_id"
@@ -53,18 +53,18 @@ erDiagram
 ## Constraints
 
 - **Primary Key**: `id` (auto-increment)
-- **Unique**: `(clip_id, record_time)` — previene duplicados si se re-procesa el mismo video
-- **Not Null**: `clip_id`, `record_time`, `avg_speed`, todos los conteos
+- **Unique**: `(clip_id, record_time)` — prevents duplicates if the same video is re-processed
+- **Not Null**: `clip_id`, `record_time`, `avg_speed`, all counts
 
-## Patrón de Escritura
+## Write Pattern
 
-- **Frecuencia**: Un INSERT cada 60 segundos de video procesado
-- **Conexión**: Abre y cierra por cada escritura (sin connection pooling)
-- **Fallo**: Si la conexión falla, el sistema continúa sin persistencia (degradación silenciosa)
+- **Frequency**: One INSERT every 60 seconds of processed video
+- **Connection**: Opens and closes per write (no connection pooling)
+- **Failure**: If the connection fails, the system continues without persistence (silent degradation)
 
-## Formato de `clip_id`
+## `clip_id` Format
 
-Derivado del nombre del archivo de video:
+Derived from the video filename:
 ```
 bridge_2026-03-06_08-00-00_to_09-00-00
 ```

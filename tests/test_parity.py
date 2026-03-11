@@ -101,3 +101,41 @@ class TestModule2Parity:
 
     def test_sys_path_insert(self) -> None:
         assert "sys.path.insert" in self.code
+
+    def test_imports_yolo_detector(self) -> None:
+        assert "from src.perception.detector import" in self.code
+
+    def test_imports_sort_tracker(self) -> None:
+        assert "from src.perception.tracker import SORTTracker" in self.code
+
+    def test_imports_speed_estimation(self) -> None:
+        assert "from src.perception.speed import" in self.code
+
+    def test_imports_optical_flow(self) -> None:
+        assert (
+            "from src.perception.optical_flow import OpticalFlowEstimator" in self.code
+        )
+
+    def test_imports_video_utils(self) -> None:
+        assert "from src.video import" in self.code
+
+    def test_imports_select_model_variant(self) -> None:
+        assert "select_model_variant" in self.code
+
+    def test_imports_is_stationary(self) -> None:
+        assert "is_stationary" in self.code
+
+    def test_imports_smoothed_speed_tracker(self) -> None:
+        assert "SmoothedSpeedTracker" in self.code
+
+    def test_no_inline_engineer_features(self) -> None:
+        assert "def engineer_features(" not in self.code
+
+    def test_no_inline_assign_traffic_state(self) -> None:
+        assert "def assign_traffic_state(" not in self.code
+
+    def test_no_inline_estimate_speed(self) -> None:
+        assert "def estimate_speed(" not in self.code
+
+    def test_no_inline_get_perspective_factor(self) -> None:
+        assert "def get_perspective_factor(" not in self.code

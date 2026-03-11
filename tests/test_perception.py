@@ -12,12 +12,15 @@ from collections import deque
 import numpy as np
 import pytest
 
-from src.perception.detector import Detection
+from src.perception.detector import Detection, select_model_variant
 from src.perception.tracker import SORTTracker, Track
 from src.perception.speed import (
+    SmoothedSpeedTracker,
     compensate_camera_motion,
     estimate_speed,
+    fuse_speed,
     get_perspective_factor,
+    is_stationary,
 )
 
 
@@ -59,9 +62,9 @@ class TestTrack:
 
     def test_history_maxlen(self) -> None:
         t = Track(track_id=1, vehicle_type="car", centroid=(0, 0))
-        for i in range(50):
+        for i in range(60):
             t.update((i, i))
-        assert len(t.history) == 30  # default maxlen
+        assert len(t.history) == 50  # TRACKER_HISTORY_MAXLEN
 
 
 # ── SORTTracker ──
@@ -165,9 +168,9 @@ class TestEstimateSpeed:
 
     def test_plausible_speed(self) -> None:
         """Moving vehicle with known displacement should produce valid speed."""
-        # 10 frames at 30fps = 0.333s
-        # displacement ~50px → 50/12 = 4.17m → 4.17/0.333 = 12.5 m/s → 45 km/h
-        history = deque([(100, 540)] + [(100 + i * 5, 540) for i in range(1, 11)])
+        # 25 frames at 30fps (>= SPEED_MIN_TRACK_LENGTH=20)
+        # displacement ~120px → 120/12 = 10m → 10/0.8 = 12.5m/s → 45 km/h
+        history = deque([(100 + i * 5, 540) for i in range(25)])
         speed = estimate_speed(history, fps=30.0, frame_height=1080)
         assert speed is not None
         assert 2.0 <= speed <= 120.0
@@ -192,3 +195,169 @@ class TestEstimateSpeed:
         )
         if speed_no_comp is not None and speed_comp is not None:
             assert speed_comp < speed_no_comp
+
+
+# ── Track.mark_counted ──
+
+
+class TestTrackCounted:
+    def test_initial_not_counted(self) -> None:
+        t = Track(track_id=1, vehicle_type="car", centroid=(50, 50))
+        assert t.counted is False
+
+    def test_mark_counted_returns_true_first_call(self) -> None:
+        t = Track(track_id=1, vehicle_type="car", centroid=(50, 50))
+        assert t.mark_counted() is True
+        assert t.counted is True
+
+    def test_mark_counted_returns_false_second_call(self) -> None:
+        t = Track(track_id=1, vehicle_type="car", centroid=(50, 50))
+        t.mark_counted()
+        assert t.mark_counted() is False
+
+
+# ── SORTTracker extras ──
+
+
+class TestSORTTrackerExtras:
+    def test_reset_clears_all_tracks(self) -> None:
+        tracker = SORTTracker()
+        tracker.update([((100, 100), "car")])
+        assert len(tracker.all_tracks) == 1
+        tracker.reset()
+        assert len(tracker.all_tracks) == 0
+        assert tracker._next_id == 1
+
+    def test_all_tracks_includes_lost(self) -> None:
+        tracker = SORTTracker(max_distance=50, max_lost=5)
+        tracker.update([((100, 100), "car")])
+        tracker.update([])  # car is now lost
+        assert len(tracker.active_tracks) == 0
+        assert len(tracker.all_tracks) == 1
+
+
+# ── is_stationary ──
+
+
+class TestIsStationary:
+    def test_single_point_is_stationary(self) -> None:
+        assert is_stationary(deque([(100, 100)])) is True
+
+    def test_identical_positions_is_stationary(self) -> None:
+        history = deque([(100, 100)] * 20)
+        assert is_stationary(history) is True
+
+    def test_small_jitter_is_stationary(self) -> None:
+        """Tiny sub-pixel jitter should still be stationary."""
+        history = deque([(100 + (i % 2) * 0.1, 100) for i in range(20)])
+        assert is_stationary(history) is True
+
+    def test_moving_vehicle_is_not_stationary(self) -> None:
+        """Clear movement should not be stationary."""
+        history = deque([(100 + i * 10, 100) for i in range(20)])
+        assert is_stationary(history) is False
+
+
+# ── fuse_speed ──
+
+
+class TestFuseSpeed:
+    def test_physics_only_when_mlp_none(self) -> None:
+        assert fuse_speed(50.0, None) == 50.0
+
+    def test_fusion_70_30(self) -> None:
+        result = fuse_speed(50.0, 60.0)
+        expected = round(0.7 * 50.0 + 0.3 * 60.0, 2)
+        assert result == expected
+
+    def test_physics_only_when_mlp_out_of_range(self) -> None:
+        """MLP prediction outside [5, 100] → physics only."""
+        assert fuse_speed(50.0, 200.0) == 50.0
+        assert fuse_speed(50.0, 1.0) == 50.0
+
+    def test_boundary_valid_mlp(self) -> None:
+        """MLP at exact boundaries should be accepted."""
+        assert fuse_speed(50.0, 5.0) == round(0.7 * 50.0 + 0.3 * 5.0, 2)
+        assert fuse_speed(50.0, 100.0) == round(0.7 * 50.0 + 0.3 * 100.0, 2)
+
+
+# ── SmoothedSpeedTracker ──
+
+
+class TestSmoothedSpeedTracker:
+    def test_none_input_returns_none(self) -> None:
+        sst = SmoothedSpeedTracker()
+        assert sst.update(1, None) is None
+
+    def test_single_speed_returns_itself(self) -> None:
+        sst = SmoothedSpeedTracker()
+        result = sst.update(1, 50.0)
+        assert result == 50.0
+
+    def test_smoothing_averages(self) -> None:
+        sst = SmoothedSpeedTracker(window_size=3)
+        sst.update(1, 40.0)
+        sst.update(1, 50.0)
+        result = sst.update(1, 60.0)
+        assert result == pytest.approx(50.0)  # mean of [40, 50, 60]
+
+    def test_separate_tracks(self) -> None:
+        sst = SmoothedSpeedTracker()
+        sst.update(1, 40.0)
+        sst.update(2, 80.0)
+        assert sst.update(1, 40.0) == 40.0
+        assert sst.update(2, 80.0) == 80.0
+
+    def test_remove_track(self) -> None:
+        sst = SmoothedSpeedTracker()
+        sst.update(1, 50.0)
+        sst.remove_track(1)
+        assert 1 not in sst._speeds
+
+
+# ── select_model_variant ──
+
+
+class TestSelectModelVariant:
+    def test_short_clip_returns_nano(self) -> None:
+        assert select_model_variant(30) == "yolo11n"
+
+    def test_medium_clip_returns_medium(self) -> None:
+        assert select_model_variant(500) == "yolo11m"
+
+    def test_long_clip_returns_xlarge(self) -> None:
+        assert select_model_variant(5000) == "yolo11x"
+
+    def test_boundary_values(self) -> None:
+        assert select_model_variant(60) == "yolo11n"
+        assert select_model_variant(61) == "yolo11s"
+        assert select_model_variant(180) == "yolo11s"
+        assert select_model_variant(181) == "yolo11m"
+
+
+# ── Per-vehicle-type speed limits ──
+
+
+class TestPerTypeSpeedLimits:
+    def test_bicycle_over_40_returns_none(self) -> None:
+        """Bicycle at implausible speed → filtered out."""
+        # Create history that would produce ~60 km/h
+        history = deque([(100 + i * 15, 540) for i in range(25)])
+        result = estimate_speed(
+            history,
+            fps=30.0,
+            frame_height=1080,
+            vehicle_type="bicycle",
+        )
+        assert result is None
+
+    def test_car_plausible_speed(self) -> None:
+        """Car within [2, 120] km/h → accepted."""
+        history = deque([(100 + i * 5, 540) for i in range(25)])
+        result = estimate_speed(
+            history,
+            fps=30.0,
+            frame_height=1080,
+            vehicle_type="car",
+        )
+        assert result is not None

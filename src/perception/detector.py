@@ -4,8 +4,12 @@ Provides a thin, testable interface around Ultralytics YOLO for vehicle
 detection.  The wrapper handles model loading, inference, and post-processing
 (NMS filtering, class filtering to vehicles only).
 
-NOTE: This is a skeleton — full implementation is tracked for Module 2
-(production notebook).  See ADR-009.
+Also includes adaptive model variant selection based on video duration,
+mirroring the legacy ``VAAETHybrid.select_optimal_model()`` logic.
+
+References:
+    - Legacy: ``VAAETHybrid.select_optimal_model()`` in ``archive/00_bootstrap/``
+    - ADR-002, ADR-009 §Perception
 """
 
 from __future__ import annotations
@@ -15,11 +19,12 @@ from typing import Any
 
 import numpy as np
 
-from src.config import VEHICLE_TYPES
+from src.config import VEHICLE_TYPES, YOLO_CONFIDENCE, YOLO_MODEL_VARIANTS, YOLO_NMS_IOU
 
 __all__ = [
     "Detection",
     "YOLODetector",
+    "select_model_variant",
 ]
 
 # COCO class indices for vehicle types
@@ -59,8 +64,8 @@ class YOLODetector:
     def __init__(
         self,
         model_variant: str = "yolo11m",
-        confidence_threshold: float = 0.5,
-        nms_threshold: float = 0.4,
+        confidence_threshold: float = YOLO_CONFIDENCE,
+        nms_threshold: float = YOLO_NMS_IOU,
     ) -> None:
         self.model_variant = model_variant
         self.confidence_threshold = confidence_threshold
@@ -109,3 +114,23 @@ class YOLODetector:
                 )
 
         return detections
+
+
+def select_model_variant(duration_seconds: float) -> str:
+    """Choose the optimal YOLO model variant based on video duration.
+
+    Shorter clips use lighter models (faster inference); longer clips use
+    heavier models (higher accuracy).  Thresholds are defined in
+    ``config.YOLO_MODEL_VARIANTS``.
+
+    Args:
+        duration_seconds: Clip duration in seconds.
+
+    Returns:
+        Model variant name string (e.g. ``"yolo11m"``).
+    """
+    for variant, meta in YOLO_MODEL_VARIANTS.items():
+        if duration_seconds <= meta["max_duration"]:
+            return variant
+    # Fallback to the largest variant
+    return list(YOLO_MODEL_VARIANTS.keys())[-1]

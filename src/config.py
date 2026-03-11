@@ -114,3 +114,86 @@ VEHICLE_TYPES: tuple[str, ...] = ("car", "truck", "bus", "motorcycle", "bicycle"
 
 # Speed plausibility filter [min, max] in km/h
 SPEED_RANGE: tuple[float, float] = (2.0, 120.0)
+
+
+# ── Perception Pipeline Constants ──────────────────────────────────────────
+
+# YOLO model variant selection by video duration (seconds)
+YOLO_MODEL_VARIANTS: dict[str, dict[str, int | str]] = MappingProxyType(
+    {  # type: ignore[assignment]
+        "yolo11n": {"max_duration": 60, "label": "nano — clips < 1 min"},
+        "yolo11s": {"max_duration": 180, "label": "small — clips 1-3 min"},
+        "yolo11m": {"max_duration": 600, "label": "medium — clips 3-10 min"},
+        "yolo11l": {"max_duration": 1800, "label": "large — clips 10-30 min"},
+        "yolo11x": {"max_duration": 99999, "label": "xlarge — clips > 30 min"},
+    }
+)
+
+# Default YOLO inference parameters
+YOLO_CONFIDENCE: float = 0.5
+YOLO_NMS_IOU: float = 0.4
+
+
+# ── Tracker Constants ──────────────────────────────────────────────────────
+
+TRACKER_MAX_DISTANCE: float = 100.0  # Maximum Euclidean px for matching
+TRACKER_MAX_LOST: int = 60  # Frames before track removal
+TRACKER_HISTORY_MAXLEN: int = 50  # Centroid history deque length
+
+
+# ── Optical Flow Constants ─────────────────────────────────────────────────
+
+OPTICAL_FLOW_GRID_STEP: int = 40  # Pixel grid spacing for feature points
+OPTICAL_FLOW_WIN_SIZE: tuple[int, int] = (21, 21)  # Lucas-Kanade window
+OPTICAL_FLOW_MAX_LEVEL: int = 3  # Pyramid levels
+OPTICAL_FLOW_RUNNING_MEAN: int = 30  # Frames for motion smoothing
+
+
+# ── Speed Estimation Constants ─────────────────────────────────────────────
+
+PIXELS_PER_METER: float = 12.0  # Bridge-camera calibration factor
+
+# Perspective correction zones (fraction of frame height)
+PERSPECTIVE_ZONES: dict[str, dict[str, float]] = MappingProxyType(
+    {  # type: ignore[assignment]
+        "near": {"threshold": 0.66, "factor": 1.8},
+        "mid": {"threshold": 0.33, "factor": 1.0},
+        "far": {"threshold": 0.0, "factor": 0.6},
+    }
+)
+
+# MLP smoother fusion weight: final = PHYSICS_WEIGHT * physics + MLP_WEIGHT * mlp
+SPEED_PHYSICS_WEIGHT: float = 0.70
+SPEED_MLP_WEIGHT: float = 0.30
+SPEED_MLP_VALID_RANGE: tuple[float, float] = (5.0, 100.0)  # MLP plausibility
+
+# Minimum track length (frames) before speed estimation is reliable
+SPEED_MIN_TRACK_LENGTH: int = 20
+
+# Per-vehicle-type speed limits (km/h) for plausibility filtering
+SPEED_LIMITS_PER_TYPE: dict[str, tuple[float, float]] = MappingProxyType(
+    {  # type: ignore[assignment]
+        "car": (2.0, 120.0),
+        "truck": (2.0, 90.0),
+        "bus": (2.0, 80.0),
+        "motorcycle": (2.0, 130.0),
+        "bicycle": (2.0, 40.0),
+    }
+)
+
+
+# ── Stationary Detection (AND-conjunction — see AGENTS.md) ────────────────
+
+STATIONARY_TOTAL_DISP_MAX: float = 5.0  # Total displacement in pixels
+STATIONARY_MAX_SEGMENT_MAX: float = 3.0  # Max single-frame displacement
+STATIONARY_STD_MAX: float = 2.5  # Std-dev of displacements
+STATIONARY_AVG_FRAME_MAX: float = 0.3  # Average per-frame displacement
+STATIONARY_MAX_FRAME_MAX: float = 1.5  # Max per-frame displacement
+
+
+# ── Video I/O ──────────────────────────────────────────────────────────────
+
+# Strict filename format: bridge_YYYY-MM-DD_HH-MM-SS_to_HH-MM-SS.mp4
+VIDEO_FILENAME_PATTERN: str = (
+    r"^bridge_\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}_to_\d{2}-\d{2}-\d{2}\.mp4$"
+)

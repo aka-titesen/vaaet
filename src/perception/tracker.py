@@ -5,8 +5,10 @@ based on Euclidean distance matching between centroids.  This mirrors the
 tracking approach used in the archived bootstrap module but is extracted into
 a clean, testable class.
 
-NOTE: This is a skeleton — full implementation is tracked for Module 2
-(production notebook).  See ADR-009.
+References:
+    - Legacy: ``VAAETHybrid._find_or_create_track()`` and
+      ``VAAETHybrid.update_tracking()`` in ``archive/00_bootstrap/``
+    - ADR-003, ADR-009 §Perception
 """
 
 from __future__ import annotations
@@ -17,6 +19,12 @@ from typing import Any
 
 import numpy as np
 
+from src.config import (
+    TRACKER_HISTORY_MAXLEN,
+    TRACKER_MAX_DISTANCE,
+    TRACKER_MAX_LOST,
+)
+
 __all__ = [
     "Track",
     "SORTTracker",
@@ -25,14 +33,17 @@ __all__ = [
 
 @dataclass
 class Track:
-    """A tracked vehicle with position history."""
+    """A tracked vehicle with position history and a count-once flag."""
 
     track_id: int
     vehicle_type: str
     centroid: tuple[int, int]
-    history: deque = field(default_factory=lambda: deque(maxlen=30))
+    history: deque = field(
+        default_factory=lambda: deque(maxlen=TRACKER_HISTORY_MAXLEN),
+    )
     frames_since_seen: int = 0
     total_frames: int = 0
+    counted: bool = False  # True after the vehicle has been tallied once
 
     def update(self, centroid: tuple[int, int]) -> None:
         """Update the track with a new centroid position."""
@@ -41,19 +52,26 @@ class Track:
         self.frames_since_seen = 0
         self.total_frames += 1
 
+    def mark_counted(self) -> bool:
+        """Mark this track as counted. Returns True on first call only."""
+        if self.counted:
+            return False
+        self.counted = True
+        return True
+
 
 class SORTTracker:
     """Euclidean-distance SORT tracker for vehicle centroids.
 
     Args:
-        max_distance: Maximum pixel distance for matching (default: 100).
-        max_lost: Frames before a track is removed (default: 30).
+        max_distance: Maximum pixel distance for matching.
+        max_lost: Frames before a track is removed.
     """
 
     def __init__(
         self,
-        max_distance: float = 100.0,
-        max_lost: int = 30,
+        max_distance: float = TRACKER_MAX_DISTANCE,
+        max_lost: int = TRACKER_MAX_LOST,
     ) -> None:
         self.max_distance = max_distance
         self.max_lost = max_lost
@@ -64,6 +82,16 @@ class SORTTracker:
     def active_tracks(self) -> list[Track]:
         """Return currently active (non-lost) tracks."""
         return [t for t in self._tracks if t.frames_since_seen == 0]
+
+    @property
+    def all_tracks(self) -> list[Track]:
+        """Return all tracks (including lost but not yet pruned)."""
+        return list(self._tracks)
+
+    def reset(self) -> None:
+        """Clear all tracks (call between clips or minutes)."""
+        self._tracks.clear()
+        self._next_id = 1
 
     def update(
         self,

@@ -14,12 +14,14 @@ La Etapa 1 (Percepción) de VAAET produce telemetría cruda cada minuto — 9 ca
 
 Se necesita una capa de inteligencia que transforme la telemetría en una clasificación de 4 estados operacionales:
 
-| Estado | Código | Semántica |
+| Estado | Código | Semántica (calibrada al puente Belgrano) |
 |---|---|---|
-| Normal | 0 | Flujo libre, >40 km/h, <15 veh/min |
-| Reducido | 1 | Flujo degradado, 10-40 km/h, 15-25 veh/min |
-| Atascado | 2 | Congestión, <5 km/h, >25 veh/min |
-| Accidente | 3 | Evento disruptivo, 0 km/h, desaceleración brusca |
+| Normal | 0 | Flujo libre, >25 km/h o volumen <5 veh/min |
+| Reducido | 1 | Flujo degradado, 7–25 km/h, 5–12 veh/min |
+| Atascado | 2 | Congestión, <7 km/h, >8 veh/min, persistencia ≥2 min |
+| Accidente | 3 | Evento disruptivo, <2 km/h, delta_speed < −15, persistencia ≥2 min |
+
+> **Nota (2026-03-11)**: Los umbrales fueron recalibrados desde valores genéricos de ingeniería de tránsito a percentiles del dataset real del puente (P25 speed ≈ 7.78 km/h, mediana vehicles ≈ 3, P75 ≈ 6). El dataset real solo contenía estados Normal y Reducido; secuencias sintéticas de Congestión y Accidente se generan en `src/synthetic.py` para completar las 4 clases.
 
 Se evaluaron las siguientes alternativas:
 

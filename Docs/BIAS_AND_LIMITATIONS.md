@@ -140,20 +140,27 @@ These issues exist in the archived Module 0 (`archive/00_bootstrap/01_legacy_col
 
 Training labels are NOT human ground truth. They are generated with traffic engineering rules (speed thresholds, volume, persistence). This introduces circular bias: the model learns the thresholds that labeled it, not necessarily the real traffic state.
 
-**Current mitigation**: Thresholds are calibrated with Belgrano Bridge domain expertise.
+**Current mitigation**: Thresholds are calibrated to Belgrano Bridge data-distribution percentiles (recalibrated 2026-03-11 from generic textbook values). See `src/config.py` `LABELING_THRESHOLDS`.
 
 **Future mitigation**: HITL (fields `is_human_validated`, `human_override_state` in `traffic_classifications`) will allow SISE operators to refine labels via the Module 2 feedback loop.
 
-### 6.2 Class Imbalance
+### 6.2 Class Imbalance and Synthetic Data
 
-| Class | Expected Frequency | Risk |
-|---|---|---|
-| Normal | ~80% | Over-represented -- model tends to predict Normal |
-| Reduced | ~15% | Low representation |
-| Congested | ~4% | Very low representation |
-| Accident | ~0.1% | Extremely rare -- possible recall 0 without SMOTE |
+The real Belgrano Bridge dataset (Apr–Jul 2025, ~2 000 records) only exhibits Normal and Reduced traffic. Congested and Accident events never occurred during the observation period (min recorded speed: 5.4 km/h, max vehicle count: 28/min).
 
-**Mitigation**: SMOTE generates synthetic minority samples in training set. However, synthetic Accident samples (feature space interpolation) may not be physically realistic.
+| Class | Real Data | Synthetic | Combined Frequency | Risk |
+|---|---|---|---|---|
+| Normal | ~2 004 | 0 | ~75% | Over-represented -- model tends to predict Normal |
+| Reduced | ~63 | 0 | ~3% | Low representation -- SMOTE compensates |
+| Congested | 0 | ~50 (5 sequences × 10 records) | ~2% | Fully synthetic -- may not capture all real patterns |
+| Accident | 0 | ~50 (5 sequences × 10 records) | ~2% | Fully synthetic -- physically plausible but unvalidated |
+
+**Mitigations**:
+1. **Synthetic sequences** (`src/synthetic.py`): Physically plausible edge-case telemetry injected before feature engineering. Accident sequences model approach→impact→standstill. Congestion sequences model sustained low-speed high-volume conditions. All synthetic IDs ≥ 50 001 for traceability.
+2. **SMOTE**: Applied on training set after synthetic injection to further balance minority classes.
+3. **Threshold recalibration**: Reduced and Congested thresholds were lowered to match bridge-specific data distribution (speed P25, vehicle count percentiles) so the auto-labeling rules activate on real data patterns, not only on textbook extremes.
+
+**Limitation**: Synthetic Accident and Congestion samples are engineering approximations, not observed events. Model performance on real incidents is unknown until HITL validation provides ground-truth corrections.
 
 ### 6.3 Temporal Assumptions
 

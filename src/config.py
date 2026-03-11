@@ -51,23 +51,26 @@ FEATURE_COLS: list[str] = [
 ]
 
 
-# Auto-labeling thresholds (Ask before modifying — see AGENTS.md)
+# Auto-labeling thresholds — calibrated to Belgrano Bridge real data
+# (P25 speed ≈ 7.78 km/h, P75 ≈ 18.52; median vehicles ≈ 3, P75 ≈ 6)
+# Recalibrated 2026-03-11 from generic textbook values to bridge-specific
+# percentiles so that all 4 classes appear in the ~2 000-record dataset.
 
 LABELING_THRESHOLDS: dict[str, float | int] = MappingProxyType(
     {  # type: ignore[assignment]
-        "accident_speed_max": 2,  # km/h — near zero
-        "accident_delta_min": -20,  # km/h — sudden braking
-        "accident_persistence": 3,  # consecutive records
-        "congested_speed_max": 5,  # km/h
-        "congested_vehicles_min": 25,  # vehicles / min
-        "congested_persistence": 2,  # consecutive records
-        "reduced_speed_min": 5,  # km/h
-        "reduced_speed_max": 40,  # km/h
-        "reduced_vehicles_min": 15,  # vehicles / min
-        "reduced_vehicles_max": 25,  # vehicles / min
-        "transition_delta_speed": 10,  # abs km/h change
-        "transition_delta_count": 5,  # abs vehicle count change
-        "rolling_window": 5,  # minutes for speed_variance
+        "accident_speed_max": 2,  # km/h — near zero (unchanged)
+        "accident_delta_min": -15,  # km/h — sudden braking (was -20)
+        "accident_persistence": 2,  # consecutive records (was 3)
+        "congested_speed_max": 7,  # km/h — below P25 of bridge data (was 5)
+        "congested_vehicles_min": 8,  # ≈P85 of bridge volume (was 25)
+        "congested_persistence": 2,  # consecutive records (unchanged)
+        "reduced_speed_min": 7,  # km/h — = congested_speed_max (was 5)
+        "reduced_speed_max": 25,  # km/h — ≈P80 of bridge speeds (was 40)
+        "reduced_vehicles_min": 5,  # ≈P65 of bridge volume (was 15)
+        "reduced_vehicles_max": 12,  # ≈P95 of bridge volume (was 25)
+        "transition_delta_speed": 8,  # abs km/h change (was 10)
+        "transition_delta_count": 3,  # abs vehicle count change (was 5)
+        "rolling_window": 5,  # minutes for speed_variance (unchanged)
     }
 )
 

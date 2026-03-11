@@ -23,6 +23,9 @@ def raw_telemetry_df() -> pd.DataFrame:
     base_time = pd.Timestamp("2024-06-15 08:00:00")
     times = pd.date_range(base_time, periods=n, freq="1min")
 
+    # Vehicle counts are tuned to the recalibrated bridge thresholds:
+    #   Reduced: speed 7-25 km/h, vehicles 5-12
+    #   Congested: speed <7 km/h, vehicles >8
     df = pd.DataFrame(
         {
             "id": range(1, n + 1),
@@ -30,17 +33,77 @@ def raw_telemetry_df() -> pd.DataFrame:
             "record_time": times,
             "avg_speed": np.concatenate(
                 [
-                    np.random.uniform(50, 70, 10),  # Normal
-                    np.random.uniform(15, 35, 5),  # Reduced
-                    np.random.uniform(1, 4, 3),  # Congested / Accident
+                    np.random.uniform(50, 70, 10),  # Normal (above 25 km/h)
+                    np.random.uniform(10, 20, 5),  # Reduced (7-25 km/h)
+                    np.random.uniform(3, 6, 3),  # Congested (< 7 km/h)
                     np.random.uniform(40, 60, 2),  # Normal again
                 ]
             ),
-            "count_car": np.random.randint(5, 20, n),
-            "count_truck": np.random.randint(0, 5, n),
-            "count_bus": np.random.randint(0, 3, n),
-            "count_motorcycle": np.random.randint(0, 4, n),
-            "count_bicycle": np.random.randint(0, 2, n),
+            # Normal rows (0-9, 18-19): low vehicle counts (1-4)
+            # Reduced rows (10-14): moderate counts (5-12)
+            # Congested rows (15-17): high counts (>8)
+            "count_car": np.array(
+                [
+                    3,
+                    2,
+                    3,
+                    2,
+                    3,
+                    2,
+                    3,
+                    2,
+                    3,
+                    2,  # Normal
+                    3,
+                    4,
+                    3,
+                    4,
+                    3,  # Reduced
+                    7,
+                    8,
+                    7,  # Congested
+                    3,
+                    2,
+                ],  # Normal
+                dtype=int,
+            ),
+            "count_truck": np.array(
+                [
+                    0,
+                    1,
+                    0,
+                    1,
+                    0,
+                    1,
+                    0,
+                    1,
+                    0,
+                    1,  # Normal
+                    1,
+                    1,
+                    2,
+                    1,
+                    1,  # Reduced
+                    2,
+                    3,
+                    2,  # Congested
+                    0,
+                    1,
+                ],  # Normal
+                dtype=int,
+            ),
+            "count_bus": np.array(
+                [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 1, 1, 1, 0, 0],
+                dtype=int,
+            ),
+            "count_motorcycle": np.array(
+                [0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0, 0, 1, 1, 1, 0, 0],
+                dtype=int,
+            ),
+            "count_bicycle": np.array(
+                [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0],
+                dtype=int,
+            ),
         }
     )
     df["total_vehicles"] = (

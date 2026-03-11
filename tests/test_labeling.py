@@ -36,21 +36,21 @@ class TestAssignTrafficState:
         assert (states == 0).all()
 
     def test_reduced_flow(self) -> None:
-        """Speed 5-40, density 15-25 ⟹ Reduced (1)."""
+        """Speed 7-25, density 5-12 ⟹ Reduced (1)."""
         df = _make_features_df(
-            avg_speed=np.full(10, 20.0),
-            total_vehicles=np.full(10, 20, dtype=int),
+            avg_speed=np.full(10, 15.0),
+            total_vehicles=np.full(10, 8, dtype=int),
         )
         states = assign_traffic_state(df)
         assert (states == 1).all()
 
     def test_congested(self) -> None:
-        """Speed <5, density >25, sustained ≥2 ⟹ Congested (2)."""
+        """Speed <7, density >8, sustained ≥2 ⟹ Congested (2)."""
         n = 5
         df = _make_features_df(
             n=n,
-            avg_speed=np.full(n, 3.0),
-            total_vehicles=np.full(n, 30, dtype=int),
+            avg_speed=np.full(n, 5.0),
+            total_vehicles=np.full(n, 15, dtype=int),
         )
         states = assign_traffic_state(df)
         # At least some records should be Congested

@@ -85,6 +85,32 @@ class TestGetDbConfig:
         config = get_db_config()
         assert config["port"] == DEFAULT_DB_PORT
 
+    def test_non_interactive_raises_without_env(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """interactive=False must raise RuntimeError when env vars are missing."""
+        from src.db import get_db_config
+
+        for var in ("DB_HOST", "DB_PORT", "DB_NAME", "DB_USER", "DB_PASSWORD"):
+            monkeypatch.delenv(var, raising=False)
+
+        with pytest.raises(RuntimeError, match="DB credentials not found"):
+            get_db_config(interactive=False)
+
+    def test_non_interactive_succeeds_with_env(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """interactive=False must succeed when env vars are set."""
+        from src.db import get_db_config
+
+        monkeypatch.setenv("DB_HOST", "h")
+        monkeypatch.setenv("DB_NAME", "d")
+        monkeypatch.setenv("DB_USER", "u")
+        monkeypatch.setenv("DB_PASSWORD", "p")
+
+        config = get_db_config(interactive=False)
+        assert config["host"] == "h"
+
 
 # Backup restoration tests
 

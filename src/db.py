@@ -36,11 +36,20 @@ __all__ = [
 # Credential helpers
 
 
-def get_db_config() -> dict[str, str]:
+def get_db_config(*, interactive: bool = True) -> dict[str, str]:
     """Obtain database configuration from env vars or interactive input.
+
+    Args:
+        interactive: If *False*, raise :class:`RuntimeError` when required
+            env vars are missing instead of prompting via ``input()``.
+            Use this in automated / notebook contexts where blocking on
+            ``input()`` would stall execution.
 
     Returns:
         Dictionary with keys: host, port, dbname, user, password.
+
+    Raises:
+        RuntimeError: If *interactive* is False and DB env vars are not set.
     """
     config: dict[str, str] = {
         "host": os.environ.get("DB_HOST", ""),
@@ -51,6 +60,12 @@ def get_db_config() -> dict[str, str]:
     }
 
     if not config["host"]:
+        if not interactive:
+            raise RuntimeError(
+                "DB credentials not found in environment variables "
+                "(DB_HOST, DB_NAME, DB_USER, DB_PASSWORD). "
+                "Set them or use interactive=True to prompt for input."
+            )
         print("📋 PostgreSQL configuration (env vars not found)")
         config["host"] = input("   Host: ").strip()
         config["port"] = (

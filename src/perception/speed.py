@@ -169,7 +169,7 @@ def estimate_speed(
     return round(speed_kmh, 2)
 
 
-# ── Stationary detection ──────────────────────────────────────────────
+# Stationary detection
 
 
 def is_stationary(history: deque) -> bool:
@@ -211,7 +211,7 @@ def is_stationary(history: deque) -> bool:
     )
 
 
-# ── MLP 70/30 speed fusion ───────────────────────────────────────────
+# MLP 70/30 speed fusion
 
 
 def fuse_speed(
@@ -245,7 +245,7 @@ def fuse_speed(
     return physics_speed
 
 
-# ── SmoothedSpeedTracker ──────────────────────────────────────────────
+# SmoothedSpeedTracker
 
 
 class SmoothedSpeedTracker:

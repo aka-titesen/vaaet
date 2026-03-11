@@ -116,7 +116,7 @@ VEHICLE_TYPES: tuple[str, ...] = ("car", "truck", "bus", "motorcycle", "bicycle"
 SPEED_RANGE: tuple[float, float] = (2.0, 120.0)
 
 
-# ── Perception Pipeline Constants ──────────────────────────────────────────
+# Perception Pipeline Constants
 
 # YOLO model variant selection by video duration (seconds)
 YOLO_MODEL_VARIANTS: dict[str, dict[str, int | str]] = MappingProxyType(
@@ -134,14 +134,14 @@ YOLO_CONFIDENCE: float = 0.5
 YOLO_NMS_IOU: float = 0.4
 
 
-# ── Tracker Constants ──────────────────────────────────────────────────────
+# Tracker Constants
 
 TRACKER_MAX_DISTANCE: float = 100.0  # Maximum Euclidean px for matching
 TRACKER_MAX_LOST: int = 60  # Frames before track removal
 TRACKER_HISTORY_MAXLEN: int = 50  # Centroid history deque length
 
 
-# ── Optical Flow Constants ─────────────────────────────────────────────────
+# Optical Flow Constants
 
 OPTICAL_FLOW_GRID_STEP: int = 40  # Pixel grid spacing for feature points
 OPTICAL_FLOW_WIN_SIZE: tuple[int, int] = (21, 21)  # Lucas-Kanade window
@@ -149,7 +149,7 @@ OPTICAL_FLOW_MAX_LEVEL: int = 3  # Pyramid levels
 OPTICAL_FLOW_RUNNING_MEAN: int = 30  # Frames for motion smoothing
 
 
-# ── Speed Estimation Constants ─────────────────────────────────────────────
+# Speed Estimation Constants
 
 PIXELS_PER_METER: float = 12.0  # Bridge-camera calibration factor
 
@@ -182,7 +182,7 @@ SPEED_LIMITS_PER_TYPE: dict[str, tuple[float, float]] = MappingProxyType(
 )
 
 
-# ── Stationary Detection (AND-conjunction — see AGENTS.md) ────────────────
+# Stationary Detection (AND-conjunction — see AGENTS.md)
 
 STATIONARY_TOTAL_DISP_MAX: float = 5.0  # Total displacement in pixels
 STATIONARY_MAX_SEGMENT_MAX: float = 3.0  # Max single-frame displacement
@@ -191,7 +191,7 @@ STATIONARY_AVG_FRAME_MAX: float = 0.3  # Average per-frame displacement
 STATIONARY_MAX_FRAME_MAX: float = 1.5  # Max per-frame displacement
 
 
-# ── Video I/O ──────────────────────────────────────────────────────────────
+# Video I/O
 
 # Strict filename format: bridge_YYYY-MM-DD_HH-MM-SS_to_HH-MM-SS.mp4
 VIDEO_FILENAME_PATTERN: str = (

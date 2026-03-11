@@ -118,7 +118,7 @@ def open_video(path: str) -> cv2.VideoCapture:
     return cap
 
 
-# ── Private helpers ────────────────────────────────────────────────────
+# Private helpers
 
 
 def _duration_from_metadata(path: str) -> float:

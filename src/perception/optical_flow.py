@@ -71,8 +71,7 @@ class OpticalFlowEstimator:
             ),
         )
 
-    # ── Public API ─────────────────────────────────────────────────────
-
+    # Public API
     def update(self, frame: np.ndarray) -> np.ndarray:
         """Compute the smoothed global motion vector for *frame*.
 
@@ -105,7 +104,7 @@ class OpticalFlowEstimator:
         self._prev_gray = None
         self._motion_history.clear()
 
-    # ── Private helpers ────────────────────────────────────────────────
+    # Private helpers
 
     def _build_grid_points(self, h: int, w: int) -> np.ndarray:
         """Generate feature points on a regular grid.

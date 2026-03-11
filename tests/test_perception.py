@@ -24,7 +24,7 @@ from src.perception.speed import (
 )
 
 
-# ── Detection dataclass ──
+# Detection dataclass
 
 
 class TestDetection:
@@ -42,7 +42,7 @@ class TestDetection:
         assert d.confidence == 0.75
 
 
-# ── Track dataclass ──
+# Track dataclass
 
 
 class TestTrack:
@@ -67,7 +67,7 @@ class TestTrack:
         assert len(t.history) == 50  # TRACKER_HISTORY_MAXLEN
 
 
-# ── SORTTracker ──
+# SORTTracker
 
 
 class TestSORTTracker:
@@ -121,7 +121,7 @@ class TestSORTTracker:
         assert any(t.vehicle_type == "truck" for t in active)
 
 
-# ── Speed estimation ──
+# Speed estimation
 
 
 class TestGetPerspectiveFactor:
@@ -197,7 +197,7 @@ class TestEstimateSpeed:
             assert speed_comp < speed_no_comp
 
 
-# ── Track.mark_counted ──
+# Track.mark_counted
 
 
 class TestTrackCounted:
@@ -216,7 +216,7 @@ class TestTrackCounted:
         assert t.mark_counted() is False
 
 
-# ── SORTTracker extras ──
+# SORTTracker extras
 
 
 class TestSORTTrackerExtras:
@@ -236,7 +236,7 @@ class TestSORTTrackerExtras:
         assert len(tracker.all_tracks) == 1
 
 
-# ── is_stationary ──
+# is_stationary
 
 
 class TestIsStationary:
@@ -258,7 +258,7 @@ class TestIsStationary:
         assert is_stationary(history) is False
 
 
-# ── fuse_speed ──
+# fuse_speed
 
 
 class TestFuseSpeed:
@@ -281,7 +281,7 @@ class TestFuseSpeed:
         assert fuse_speed(50.0, 100.0) == round(0.7 * 50.0 + 0.3 * 100.0, 2)
 
 
-# ── SmoothedSpeedTracker ──
+# SmoothedSpeedTracker
 
 
 class TestSmoothedSpeedTracker:
@@ -315,7 +315,7 @@ class TestSmoothedSpeedTracker:
         assert 1 not in sst._speeds
 
 
-# ── select_model_variant ──
+# select_model_variant
 
 
 class TestSelectModelVariant:
@@ -335,7 +335,7 @@ class TestSelectModelVariant:
         assert select_model_variant(181) == "yolo11m"
 
 
-# ── Per-vehicle-type speed limits ──
+# Per-vehicle-type speed limits 
 
 
 class TestPerTypeSpeedLimits:

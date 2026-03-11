@@ -127,13 +127,16 @@ SPEED_RANGE: tuple[float, float] = (2.0, 120.0)
 # Perception Pipeline Constants
 
 # YOLO model variant selection by video duration (seconds)
+# Logic: shorter clips can afford heavier models (higher accuracy, fewer frames).
+# Longer clips require lighter models to finish in reasonable time.
+# Matches ADR-002 adaptive selection strategy from legacy pipeline.
 YOLO_MODEL_VARIANTS: dict[str, dict[str, int | str]] = MappingProxyType(
     {  # type: ignore[assignment]
-        "yolo11n": {"max_duration": 60, "label": "nano — clips < 1 min"},
-        "yolo11s": {"max_duration": 180, "label": "small — clips 1-3 min"},
-        "yolo11m": {"max_duration": 600, "label": "medium — clips 3-10 min"},
-        "yolo11l": {"max_duration": 1800, "label": "large — clips 10-30 min"},
-        "yolo11x": {"max_duration": 99999, "label": "xlarge — clips > 30 min"},
+        "yolo11x": {"max_duration": 300, "label": "xlarge — clips < 5 min"},
+        "yolo11l": {"max_duration": 1800, "label": "large — clips 5-30 min"},
+        "yolo11m": {"max_duration": 10800, "label": "medium — clips 30 min-3 h"},
+        "yolo11s": {"max_duration": 43200, "label": "small — clips 3-12 h"},
+        "yolo11n": {"max_duration": 99999, "label": "nano — clips > 12 h"},
     }
 )
 

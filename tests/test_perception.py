@@ -319,23 +319,25 @@ class TestSmoothedSpeedTracker:
 
 
 class TestSelectModelVariant:
-    def test_short_clip_returns_nano(self) -> None:
-        assert select_model_variant(30) == "yolo11n"
+    def test_short_clip_returns_xlarge(self) -> None:
+        """Short clips (<5 min) use the heaviest model for max accuracy."""
+        assert select_model_variant(30) == "yolo11x"
 
-    def test_medium_clip_returns_medium(self) -> None:
-        assert select_model_variant(500) == "yolo11m"
+    def test_medium_clip_returns_large(self) -> None:
+        assert select_model_variant(500) == "yolo11l"
 
-    def test_long_clip_returns_xlarge(self) -> None:
-        assert select_model_variant(5000) == "yolo11x"
+    def test_long_clip_returns_nano(self) -> None:
+        """Very long clips (>12 h) use the lightest model for speed."""
+        assert select_model_variant(50000) == "yolo11n"
 
     def test_boundary_values(self) -> None:
-        assert select_model_variant(60) == "yolo11n"
-        assert select_model_variant(61) == "yolo11s"
-        assert select_model_variant(180) == "yolo11s"
-        assert select_model_variant(181) == "yolo11m"
+        assert select_model_variant(300) == "yolo11x"  # exactly 5 min → xlarge
+        assert select_model_variant(301) == "yolo11l"  # just over → large
+        assert select_model_variant(1800) == "yolo11l"  # exactly 30 min → large
+        assert select_model_variant(1801) == "yolo11m"  # just over → medium
 
 
-# Per-vehicle-type speed limits 
+# Per-vehicle-type speed limits
 
 
 class TestPerTypeSpeedLimits:

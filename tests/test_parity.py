@@ -82,6 +82,16 @@ class TestModule1Parity:
         """Cell 0 must add the repo root to sys.path."""
         assert "sys.path.insert" in self.code
 
+    def test_imports_load_from_backup(self) -> None:
+        """Module 1 must import load_from_backup for Tier 3 fallback."""
+        assert "load_from_backup" in self.code
+
+    def test_three_tier_fallback(self) -> None:
+        """Cell 2 must reference all three tiers of data loading."""
+        assert "Tier 1" in self.code
+        assert "Tier 2" in self.code
+        assert "Tier 3" in self.code
+
 
 class TestModule2Parity:
     """Module 2 (traffic_analyzer) must use shared src/ modules."""
@@ -139,3 +149,7 @@ class TestModule2Parity:
 
     def test_no_inline_get_perspective_factor(self) -> None:
         assert "def get_perspective_factor(" not in self.code
+
+    def test_model_existence_guard(self) -> None:
+        """Module 2 Cell 1 must guard against missing .keras file."""
+        assert "Missing trained artifacts" in self.code or "os.path.isfile" in self.code

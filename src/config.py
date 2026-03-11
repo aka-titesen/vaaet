@@ -85,6 +85,11 @@ MODEL_PATH: str = os.path.join(MODEL_DIR, "traffic_classifier.keras")
 SCALER_PATH: str = os.path.join(MODEL_DIR, "feature_scaler.joblib")
 LABEL_MAP_PATH: str = os.path.join(MODEL_DIR, "label_mapping.joblib")
 
+# Google Drive artifact bridge (Colab persistence across sessions)
+# Mount point: /content/drive/ — artefacts copied here after M1 training
+# so M2 can load them even after a runtime reset.
+DRIVE_ARTIFACT_DIR: str = os.path.join("MyDrive", "vaaet", "models", "intelligence")
+
 
 # Database
 

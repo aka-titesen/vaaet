@@ -47,7 +47,7 @@ Se adopta **Google Colab** como entorno de ejecución principal, con soporte sec
 - **Sin CI/CD clásico**: No hay pipeline de build/test automatizado
 - **Sesiones efímeras**: Máximo ~12h (Free) o ~24h (Pro). Se pierde estado al desconectar
 - **GPU no garantizada**: En horas pico, Colab Free puede no asignar GPU
-- **Almacenamiento efímero**: Archivos locales se pierden — requiere AWS RDS para persistencia (ver ADR-005)
+- **Almacenamiento efímero**: Archivos locales se pierden — requiere AWS RDS para persistencia (ver ADR-005). Los artefactos del modelo (~100 KB: `.keras` + `.joblib`) se copian a Google Drive al final de M1 y se cargan automáticamente en M2 via un fallback de 3 niveles (local → Drive → upload manual)
 - **Sin ejecución programática**: No se puede triggear procesamiento via API o cron
 - **Dependencia de Google**: Si Colab cambia su política de Free Tier, el proyecto se ve afectado
 

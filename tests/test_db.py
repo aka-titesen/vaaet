@@ -139,6 +139,39 @@ class TestRestoreBackupToSql:
         with pytest.raises(FileNotFoundError, match="pg_restore not found"):
             restore_backup_to_sql(backup)
 
+    def test_version_mismatch_detected(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """pg_restore stderr with 'unsupported version' must raise RuntimeError."""
+        from unittest.mock import patch, MagicMock
+        from src.db import restore_backup_to_sql
+
+        backup = tmp_path / "test.backup"
+        backup.write_bytes(b"\x00" * 100)
+
+        # Mock shutil.which to return a fake pg_restore path
+        monkeypatch.setattr("src.db.shutil.which", lambda _: "/usr/bin/pg_restore")
+
+        # Mock subprocess.run to simulate version mismatch
+        ver_result = MagicMock(returncode=0, stdout="pg_restore (PostgreSQL) 14.0")
+        run_result = MagicMock(
+            returncode=1,
+            stderr="pg_restore: error: unsupported version (1.16) in file header",
+        )
+
+        call_count = 0
+
+        def fake_run(*args, **kwargs):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:  # --version call
+                return ver_result
+            return run_result  # actual pg_restore call
+
+        with patch("src.db.subprocess.run", side_effect=fake_run):
+            with pytest.raises(RuntimeError, match="version mismatch"):
+                restore_backup_to_sql(backup)
+
 
 class TestParseSqlDump:
     """Test parse_sql_dump() with synthetic SQL text."""

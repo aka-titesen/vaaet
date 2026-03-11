@@ -168,13 +168,15 @@ def restore_backup_to_sql(
 
     Raises:
         FileNotFoundError: If the backup file or ``pg_restore`` is missing.
-        RuntimeError: If ``pg_restore`` exits with an error.
+        RuntimeError: If ``pg_restore`` exits with an error or produces
+            incompatible-version diagnostics.
     """
     backup_path = Path(backup_path)
     if not backup_path.is_file():
         raise FileNotFoundError(f"Backup file not found: {backup_path}")
 
-    if shutil.which("pg_restore") is None:
+    pg_restore_path = shutil.which("pg_restore")
+    if pg_restore_path is None:
         raise FileNotFoundError(
             "pg_restore not found. Install postgresql-client:\n"
             "  Colab/Ubuntu: !apt-get install -y postgresql-client\n"
@@ -182,13 +184,20 @@ def restore_backup_to_sql(
             "  Windows:      install PostgreSQL or add bin/ to PATH"
         )
 
+    # Log version for diagnostics
+    ver_result = subprocess.run(
+        [pg_restore_path, "--version"], capture_output=True, text=True
+    )
+    pg_version = ver_result.stdout.strip() if ver_result.returncode == 0 else "unknown"
+    print(f"🔧 Using: {pg_version}")
+
     if output_path is None:
         output_path = backup_path.with_suffix(".sql")
     output_path = Path(output_path)
 
     result = subprocess.run(
         [
-            "pg_restore",
+            pg_restore_path,
             "--no-owner",
             "--no-acl",
             "--no-comments",
@@ -199,16 +208,35 @@ def restore_backup_to_sql(
         capture_output=True,
         text=True,
     )
-    # pg_restore returns 1 for warnings (e.g. missing role), which is fine
-    if result.returncode not in (0, 1):
+
+    stderr = result.stderr.strip()
+
+    # Detect version mismatch (returncode=1 but with "unsupported version")
+    _VERSION_ERROR_PATTERNS = [
+        "unsupported version",
+        "unsupported archive",
+        "unrecognized archive format",
+    ]
+    if any(pat in stderr.lower() for pat in _VERSION_ERROR_PATTERNS):
         raise RuntimeError(
-            f"pg_restore failed (exit {result.returncode}):\n{result.stderr}"
+            f"pg_restore version mismatch ({pg_version}).\n"
+            f"The backup was created with a newer PostgreSQL version.\n"
+            f"Install a newer postgresql-client (e.g. postgresql-client-17).\n"
+            f"stderr: {stderr}"
         )
+
+    # Hard failures (returncode >= 2)
+    if result.returncode not in (0, 1):
+        raise RuntimeError(f"pg_restore failed (exit {result.returncode}):\n{stderr}")
+
+    # Returncode 1 with other warnings is OK (e.g. missing roles)
+    if stderr and result.returncode == 1:
+        print(f"⚠️ pg_restore warnings: {stderr[:200]}")
 
     if not output_path.is_file() or output_path.stat().st_size == 0:
         raise RuntimeError(
             f"pg_restore produced an empty or missing file: {output_path}\n"
-            f"stderr: {result.stderr}"
+            f"stderr: {stderr}"
         )
 
     print(

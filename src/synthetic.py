@@ -199,8 +199,8 @@ def generate_congestion_sequences(
 def augment_with_synthetic(
     df_raw: pd.DataFrame,
     *,
-    n_accident_seq: int = 5,
-    n_congestion_seq: int = 5,
+    n_accident_seq: int = 10,
+    n_congestion_seq: int = 10,
     records_per_seq: int = 10,
     seed: int = RANDOM_SEED,
 ) -> pd.DataFrame:

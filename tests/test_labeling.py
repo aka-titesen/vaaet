@@ -72,6 +72,19 @@ class TestAssignTrafficState:
         # Later rows (after persistence window) should be Accident
         assert (states == 3).any()
 
+    def test_gradual_multi_step_braking_can_still_be_accident(self) -> None:
+        """Cumulative braking over several records should still detect accident."""
+        speeds = np.array([20.0, 15.0, 9.0, 1.5, 1.0, 0.5])
+        delta_speeds = np.array([0.0, -5.0, -6.0, -7.5, -0.5, -0.5])
+        df = _make_features_df(
+            n=len(speeds),
+            avg_speed=speeds,
+            delta_speed=delta_speeds,
+            total_vehicles=np.full(len(speeds), 6, dtype=int),
+        )
+        states = assign_traffic_state(df)
+        assert states.iloc[-1] == 3
+
     def test_severity_ordering(self) -> None:
         """Accident takes priority over Congested."""
         n = 10

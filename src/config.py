@@ -60,6 +60,7 @@ LABELING_THRESHOLDS: dict[str, float | int] = MappingProxyType(
     {  # type: ignore[assignment]
         "accident_speed_max": 2,  # km/h — near zero (unchanged)
         "accident_delta_min": -15,  # km/h — sudden braking (was -20)
+        "accident_cumulative_delta_min": -18,  # km/h — multi-step braking window
         "accident_persistence": 2,  # consecutive records (was 3)
         "congested_speed_max": 7,  # km/h — below P25 of bridge data (was 5)
         "congested_vehicles_min": 8,  # ≈P85 of bridge volume (was 25)
@@ -155,9 +156,11 @@ TRACKER_HISTORY_MAXLEN: int = 50  # Centroid history deque length
 # Optical Flow Constants
 
 OPTICAL_FLOW_GRID_STEP: int = 40  # Pixel grid spacing for feature points
+OPTICAL_FLOW_BORDER_MARGIN: int = 20  # Skip low-quality border points
 OPTICAL_FLOW_WIN_SIZE: tuple[int, int] = (21, 21)  # Lucas-Kanade window
 OPTICAL_FLOW_MAX_LEVEL: int = 3  # Pyramid levels
 OPTICAL_FLOW_RUNNING_MEAN: int = 30  # Frames for motion smoothing
+OPTICAL_FLOW_MIN_TRACKING_RATIO: float = 0.35  # Reject low-confidence flow
 
 
 # Speed Estimation Constants
@@ -173,10 +176,17 @@ PERSPECTIVE_ZONES: dict[str, dict[str, float]] = MappingProxyType(
     }
 )
 
+# Linear blend band around perspective thresholds (fraction of frame height).
+# Prevents abrupt speed changes when a vehicle crosses near/mid/far zone borders.
+PERSPECTIVE_BLEND_BAND: float = 0.05
+
 # MLP smoother fusion weight: final = PHYSICS_WEIGHT * physics + MLP_WEIGHT * mlp
 SPEED_PHYSICS_WEIGHT: float = 0.70
 SPEED_MLP_WEIGHT: float = 0.30
 SPEED_MLP_VALID_RANGE: tuple[float, float] = (5.0, 100.0)  # MLP plausibility
+SPEED_RECOVERY_SKIP_GAP: int = 1  # Skip speed on the first frame after recovery
+SPEED_ROBUST_TRIM_RATIO: float = 0.15  # Trim minute-level outliers when possible
+SPEED_ROBUST_OUTLIER_SIGMA: float = 3.5  # Modified-z threshold for outliers
 
 # Minimum track length (frames) before speed estimation is reliable
 SPEED_MIN_TRACK_LENGTH: int = 8
@@ -207,6 +217,9 @@ STATIONARY_MAX_SEGMENT_MAX: float = 3.0  # Max single-frame displacement
 STATIONARY_STD_MAX: float = 2.5  # Std-dev of displacements
 STATIONARY_AVG_FRAME_MAX: float = 0.3  # Average per-frame displacement
 STATIONARY_MAX_FRAME_MAX: float = 1.5  # Max per-frame displacement
+STATIONARY_ENTRY_FRAMES: int = 2  # Hysteresis: consecutive stationary votes to enter
+STATIONARY_EXIT_FRAMES: int = 3  # Hysteresis: consecutive moving votes to exit
+STATIONARY_EXIT_SPEED_MIN: float = 6.0  # Speed threshold to leave stationary state
 
 
 # Video I/O

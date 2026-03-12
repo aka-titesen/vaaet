@@ -41,8 +41,9 @@ class TestConstants:
 
         assert isinstance(LABELING_THRESHOLDS, MappingProxyType)
         assert "accident_speed_max" in LABELING_THRESHOLDS
+        assert "accident_cumulative_delta_min" in LABELING_THRESHOLDS
         assert "rolling_window" in LABELING_THRESHOLDS
-        assert len(LABELING_THRESHOLDS) == 13
+        assert len(LABELING_THRESHOLDS) == 14
 
     def test_model_version_format(self) -> None:
         from src.config import MODEL_VERSION

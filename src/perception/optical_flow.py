@@ -20,8 +20,10 @@ import cv2
 import numpy as np
 
 from src.config import (
+    OPTICAL_FLOW_BORDER_MARGIN,
     OPTICAL_FLOW_GRID_STEP,
     OPTICAL_FLOW_MAX_LEVEL,
+    OPTICAL_FLOW_MIN_TRACKING_RATIO,
     OPTICAL_FLOW_RUNNING_MEAN,
     OPTICAL_FLOW_WIN_SIZE,
 )
@@ -48,18 +50,25 @@ class OpticalFlowEstimator:
     def __init__(
         self,
         grid_step: int = OPTICAL_FLOW_GRID_STEP,
+        border_margin: int = OPTICAL_FLOW_BORDER_MARGIN,
         win_size: tuple[int, int] = OPTICAL_FLOW_WIN_SIZE,
         max_level: int = OPTICAL_FLOW_MAX_LEVEL,
         running_mean_window: int = OPTICAL_FLOW_RUNNING_MEAN,
+        min_tracking_ratio: float = OPTICAL_FLOW_MIN_TRACKING_RATIO,
     ) -> None:
         self.grid_step = grid_step
+        self.border_margin = border_margin
         self.win_size = win_size
         self.max_level = max_level
+        self.min_tracking_ratio = min_tracking_ratio
 
         self._prev_gray: np.ndarray | None = None
         self._motion_history: deque[np.ndarray] = deque(
             maxlen=running_mean_window,
         )
+        self.last_tracking_ratio: float = 0.0
+        self.last_good_points: int = 0
+        self.last_total_points: int = 0
         # LK parameters dict (passed directly to cv2.calcOpticalFlowPyrLK)
         self._lk_params: dict[str, Any] = dict(
             winSize=self.win_size,
@@ -90,6 +99,9 @@ class OpticalFlowEstimator:
 
         if self._prev_gray is None:
             self._prev_gray = gray
+            self.last_tracking_ratio = 0.0
+            self.last_good_points = 0
+            self.last_total_points = 0
             return np.zeros(2, dtype=float)
 
         raw_motion = self._compute_raw_motion(gray)
@@ -103,6 +115,9 @@ class OpticalFlowEstimator:
         """Clear internal state (call between clips)."""
         self._prev_gray = None
         self._motion_history.clear()
+        self.last_tracking_ratio = 0.0
+        self.last_good_points = 0
+        self.last_total_points = 0
 
     # Private helpers
 
@@ -116,8 +131,17 @@ class OpticalFlowEstimator:
         Returns:
             Array of shape ``(N, 1, 2)`` with ``float32`` grid coordinates.
         """
-        ys = np.arange(0, h, self.grid_step)
-        xs = np.arange(0, w, self.grid_step)
+        y0 = max(self.border_margin, 0)
+        x0 = max(self.border_margin, 0)
+        y1 = h - self.border_margin
+        x1 = w - self.border_margin
+
+        if x0 >= x1 or y0 >= y1:
+            ys = np.arange(0, h, self.grid_step)
+            xs = np.arange(0, w, self.grid_step)
+        else:
+            ys = np.arange(y0, y1, self.grid_step)
+            xs = np.arange(x0, x1, self.grid_step)
         grid = np.array(
             np.meshgrid(xs, ys),
             dtype=np.float32,
@@ -145,11 +169,21 @@ class OpticalFlowEstimator:
         )
 
         if new_pts is None or status is None:
+            self.last_tracking_ratio = 0.0
+            self.last_good_points = 0
+            self.last_total_points = len(pts)
             return np.zeros(2, dtype=float)
 
         # Keep only points that were successfully tracked
         good_mask = status.ravel() == 1
+        self.last_total_points = len(pts)
+        self.last_good_points = int(np.count_nonzero(good_mask))
+        self.last_tracking_ratio = self.last_good_points / max(
+            self.last_total_points, 1
+        )
         if not np.any(good_mask):
+            return np.zeros(2, dtype=float)
+        if self.last_tracking_ratio < self.min_tracking_ratio:
             return np.zeros(2, dtype=float)
 
         old_good = pts[good_mask].reshape(-1, 2)

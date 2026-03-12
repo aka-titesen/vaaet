@@ -95,21 +95,33 @@ class TestOpticalFlowEstimator:
         assert pts.dtype == np.float32
 
     def test_build_grid_points_coverage(self) -> None:
-        """Grid should cover the frame with expected number of points."""
-        est = OpticalFlowEstimator(grid_step=40)
+        """Grid should skip border margins while covering the interior."""
+        est = OpticalFlowEstimator(grid_step=40, border_margin=20)
         pts = est._build_grid_points(480, 640)
-        expected_rows = len(range(0, 480, 40))
-        expected_cols = len(range(0, 640, 40))
+        expected_rows = len(range(20, 480 - 20, 40))
+        expected_cols = len(range(20, 640 - 20, 40))
+        assert pts.shape[0] == expected_rows * expected_cols
+
+    def test_build_grid_points_falls_back_when_margin_is_too_large(self) -> None:
+        """If the border margin would remove all points, fallback to full-frame grid."""
+        est = OpticalFlowEstimator(grid_step=40, border_margin=10_000)
+        pts = est._build_grid_points(80, 80)
+        expected_rows = len(range(0, 80, 40))
+        expected_cols = len(range(0, 80, 40))
         assert pts.shape[0] == expected_rows * expected_cols
 
     def test_custom_parameters(self) -> None:
         """Constructor should accept and store custom parameters."""
         est = OpticalFlowEstimator(
             grid_step=20,
+            border_margin=12,
             win_size=(15, 15),
             max_level=2,
             running_mean_window=10,
+            min_tracking_ratio=0.5,
         )
         assert est.grid_step == 20
+        assert est.border_margin == 12
         assert est.win_size == (15, 15)
         assert est.max_level == 2
+        assert est.min_tracking_ratio == 0.5

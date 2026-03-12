@@ -18,6 +18,8 @@ from typing import Any
 import numpy as np
 
 from src.config import (
+    OPTICAL_FLOW_MIN_TRACKING_RATIO,
+    PERSPECTIVE_BLEND_BAND,
     PERSPECTIVE_ZONES,
     PIXELS_PER_METER,
     SPEED_DISPLACEMENT_NOISE_FLOOR,
@@ -27,8 +29,14 @@ from src.config import (
     SPEED_MLP_VALID_RANGE,
     SPEED_MLP_WEIGHT,
     SPEED_PHYSICS_WEIGHT,
+    SPEED_RECOVERY_SKIP_GAP,
+    SPEED_ROBUST_OUTLIER_SIGMA,
+    SPEED_ROBUST_TRIM_RATIO,
     SPEED_RANGE,
+    STATIONARY_ENTRY_FRAMES,
     STATIONARY_AVG_FRAME_MAX,
+    STATIONARY_EXIT_FRAMES,
+    STATIONARY_EXIT_SPEED_MIN,
     STATIONARY_MAX_FRAME_MAX,
     STATIONARY_MAX_SEGMENT_MAX,
     STATIONARY_STD_MAX,
@@ -39,10 +47,27 @@ __all__ = [
     "estimate_speed",
     "compensate_camera_motion",
     "get_perspective_factor",
+    "is_speed_measurement_reliable",
     "is_stationary",
+    "robust_speed_summary",
     "fuse_speed",
     "SmoothedSpeedTracker",
+    "TrackMotionStateTracker",
 ]
+
+
+def _lerp(start: float, end: float, alpha: float) -> float:
+    """Linearly interpolate between two values."""
+    return start + (end - start) * alpha
+
+
+def _recent_displacement_norms(history: deque, window: int = 8) -> np.ndarray:
+    """Return recent per-frame displacement magnitudes for a track history."""
+    if len(history) < 2:
+        return np.array([], dtype=float)
+    positions = np.array(list(history)[-window:], dtype=float)
+    displacements = np.diff(positions, axis=0)
+    return np.linalg.norm(displacements, axis=1)
 
 
 def get_perspective_factor(
@@ -75,9 +100,31 @@ def get_perspective_factor(
     _far = far_factor if far_factor is not None else PERSPECTIVE_ZONES["far"]["factor"]
 
     ratio = y / max(frame_height, 1)
-    if ratio > PERSPECTIVE_ZONES["near"]["threshold"]:
+    near_threshold = PERSPECTIVE_ZONES["near"]["threshold"]
+    mid_threshold = PERSPECTIVE_ZONES["mid"]["threshold"]
+    blend_band = max(PERSPECTIVE_BLEND_BAND, 0.0)
+
+    if blend_band <= 0:
+        if ratio > near_threshold:
+            return _near
+        elif ratio > mid_threshold:
+            return _mid
+        return _far
+
+    if ratio >= near_threshold + blend_band:
         return _near
-    elif ratio > PERSPECTIVE_ZONES["mid"]["threshold"]:
+    if ratio <= mid_threshold - blend_band:
+        return _far
+
+    if near_threshold - blend_band <= ratio <= near_threshold + blend_band:
+        alpha = (ratio - (near_threshold - blend_band)) / (2.0 * blend_band)
+        return _lerp(_mid, _near, float(np.clip(alpha, 0.0, 1.0)))
+
+    if mid_threshold - blend_band <= ratio <= mid_threshold + blend_band:
+        alpha = (ratio - (mid_threshold - blend_band)) / (2.0 * blend_band)
+        return _lerp(_far, _mid, float(np.clip(alpha, 0.0, 1.0)))
+
+    if ratio > mid_threshold:
         return _mid
     return _far
 
@@ -237,6 +284,77 @@ def is_stationary(history: deque) -> bool:
     )
 
 
+def is_speed_measurement_reliable(
+    history: deque,
+    flow_tracking_ratio: float = 1.0,
+    recovered_after_gap: int = 0,
+    min_flow_tracking_ratio: float = OPTICAL_FLOW_MIN_TRACKING_RATIO,
+    recovery_skip_gap: int = SPEED_RECOVERY_SKIP_GAP,
+) -> bool:
+    """Return whether a track's speed estimate is reliable enough to use.
+
+    Rejects the first frame after a track recovers from a gap, low-confidence
+    optical-flow intervals, and severe last-step jumps that strongly suggest an
+    ID swap or centroid discontinuity.
+    """
+    if len(history) < max(2, SPEED_MIN_TRACK_LENGTH):
+        return False
+    if recovered_after_gap >= recovery_skip_gap:
+        return False
+    if flow_tracking_ratio < min_flow_tracking_ratio:
+        return False
+
+    norms = _recent_displacement_norms(history)
+    if len(norms) < 3:
+        return True
+
+    non_zero = norms[norms > 0]
+    if len(non_zero) == 0:
+        return True
+
+    median_baseline = float(np.median(non_zero))
+    if median_baseline <= 0:
+        return True
+
+    anomaly_limit = max(4.0 * median_baseline, SPEED_DISPLACEMENT_NOISE_FLOOR * 3.0)
+    return float(np.max(norms)) <= anomaly_limit
+
+
+def robust_speed_summary(
+    speeds: list[float] | np.ndarray,
+    trim_ratio: float = SPEED_ROBUST_TRIM_RATIO,
+    outlier_sigma: float = SPEED_ROBUST_OUTLIER_SIGMA,
+) -> float:
+    """Aggregate speeds using a robust mean that suppresses isolated spikes."""
+    arr = np.asarray(speeds, dtype=float)
+    if arr.size == 0:
+        return 0.0
+
+    arr = arr[np.isfinite(arr)]
+    arr = arr[arr >= 0.0]
+    if arr.size == 0:
+        return 0.0
+    if arr.size == 1:
+        return round(float(arr[0]), 2)
+
+    median = float(np.median(arr))
+    mad = float(np.median(np.abs(arr - median)))
+    if mad > 0:
+        modified_z = 0.6745 * (arr - median) / mad
+        filtered = arr[np.abs(modified_z) <= outlier_sigma]
+        if filtered.size > 0:
+            arr = filtered
+
+    if arr.size >= 4 and 0.0 < trim_ratio < 0.5:
+        trim_n = int(arr.size * trim_ratio)
+        if trim_n > 0 and (arr.size - (2 * trim_n)) >= 1:
+            arr = np.sort(arr)[trim_n:-trim_n]
+
+    if arr.size == 0:
+        return 0.0
+    return round(float(np.mean(arr)), 2)
+
+
 # MLP 70/30 speed fusion
 
 
@@ -338,3 +456,57 @@ class SmoothedSpeedTracker:
     def remove_track(self, track_id: int) -> None:
         """Remove speed history for a track that has been pruned."""
         self._speeds.pop(track_id, None)
+
+
+class TrackMotionStateTracker:
+    """Hysteresis-based stationary state tracker per vehicle track."""
+
+    def __init__(
+        self,
+        enter_frames: int = STATIONARY_ENTRY_FRAMES,
+        exit_frames: int = STATIONARY_EXIT_FRAMES,
+        exit_speed_min: float = STATIONARY_EXIT_SPEED_MIN,
+    ) -> None:
+        self.enter_frames = enter_frames
+        self.exit_frames = exit_frames
+        self.exit_speed_min = exit_speed_min
+        self._stationary: dict[int, bool] = {}
+        self._enter_votes: dict[int, int] = {}
+        self._exit_votes: dict[int, int] = {}
+
+    def update(
+        self,
+        track_id: int,
+        history: deque,
+        candidate_speed: float | None = None,
+    ) -> bool:
+        """Update and return the hysteresis-filtered stationary state."""
+        raw_stationary = is_stationary(history)
+        current = self._stationary.get(track_id, False)
+
+        if raw_stationary:
+            self._enter_votes[track_id] = self._enter_votes.get(track_id, 0) + 1
+            self._exit_votes[track_id] = 0
+        else:
+            self._enter_votes[track_id] = 0
+            moving_vote = (
+                candidate_speed is not None and candidate_speed >= self.exit_speed_min
+            )
+            self._exit_votes[track_id] = self._exit_votes.get(track_id, 0) + (
+                1 if moving_vote else 0
+            )
+
+        if current:
+            if self._exit_votes.get(track_id, 0) >= self.exit_frames:
+                current = False
+        elif self._enter_votes.get(track_id, 0) >= self.enter_frames:
+            current = True
+
+        self._stationary[track_id] = current
+        return current
+
+    def remove_track(self, track_id: int) -> None:
+        """Forget all state for a track that disappeared or was pruned."""
+        self._stationary.pop(track_id, None)
+        self._enter_votes.pop(track_id, None)
+        self._exit_votes.pop(track_id, None)

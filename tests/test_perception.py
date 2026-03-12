@@ -13,14 +13,18 @@ import numpy as np
 import pytest
 
 from src.perception.detector import Detection, select_model_variant
+from src.perception.optical_flow import OpticalFlowEstimator
 from src.perception.tracker import SORTTracker, Track
 from src.perception.speed import (
     SmoothedSpeedTracker,
+    TrackMotionStateTracker,
     compensate_camera_motion,
     estimate_speed,
     fuse_speed,
     get_perspective_factor,
+    is_speed_measurement_reliable,
     is_stationary,
+    robust_speed_summary,
 )
 
 
@@ -120,6 +124,22 @@ class TestSORTTracker:
         # Should have 2 tracks: old car (lost) + new truck
         assert any(t.vehicle_type == "truck" for t in active)
 
+    def test_recovered_track_exposes_gap(self) -> None:
+        tracker = SORTTracker(max_distance=50, max_lost=5)
+        tracker.update([((100, 100), "car")])
+        tracker.update([])
+        active = tracker.update([((110, 100), "car")])
+        assert len(active) == 1
+        assert active[0].track_id == 1
+        assert active[0].recovered_after_gap == 1
+
+    def test_prune_tracks_reports_removed_ids(self) -> None:
+        tracker = SORTTracker(max_distance=50, max_lost=1)
+        tracker.update([((100, 100), "car")])
+        tracker.update([])
+        tracker.update([])
+        assert tracker.last_pruned_track_ids == [1]
+
 
 # Speed estimation
 
@@ -141,6 +161,63 @@ class TestGetPerspectiveFactor:
         """frame_height=0 should not cause division by zero."""
         result = get_perspective_factor(0, 0)
         assert isinstance(result, float)
+
+    def test_near_boundary_is_blended(self) -> None:
+        """Perspective factor should change smoothly around the near threshold."""
+        result = get_perspective_factor(int(0.66 * 1080), 1080)
+        assert 1.0 < result < 1.8
+
+    def test_mid_boundary_is_blended(self) -> None:
+        """Perspective factor should change smoothly around the mid threshold."""
+        result = get_perspective_factor(int(0.33 * 1080), 1080)
+        assert 0.6 < result < 1.0
+
+
+class TestOpticalFlowEstimator:
+    def test_low_tracking_ratio_returns_zero_motion(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        estimator = OpticalFlowEstimator(
+            grid_step=10, border_margin=0, min_tracking_ratio=0.75
+        )
+        frame = np.zeros((40, 40, 3), dtype=np.uint8)
+        estimator._prev_gray = np.zeros((40, 40), dtype=np.uint8)
+
+        def fake_lk(prev_gray, gray, pts, _next_pts, **kwargs):
+            new_pts = pts.copy()
+            status = np.zeros((len(pts), 1), dtype=np.uint8)
+            status[:2] = 1
+            return new_pts, status, None
+
+        monkeypatch.setattr(
+            "src.perception.optical_flow.cv2.calcOpticalFlowPyrLK", fake_lk
+        )
+
+        motion = estimator.update(frame)
+        np.testing.assert_array_equal(motion, np.zeros(2))
+        assert estimator.last_tracking_ratio < 0.75
+
+    def test_high_tracking_ratio_returns_median_motion(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        estimator = OpticalFlowEstimator(
+            grid_step=10, border_margin=0, min_tracking_ratio=0.1
+        )
+        frame = np.zeros((40, 40, 3), dtype=np.uint8)
+        estimator._prev_gray = np.zeros((40, 40), dtype=np.uint8)
+
+        def fake_lk(prev_gray, gray, pts, _next_pts, **kwargs):
+            new_pts = pts + np.array([2.0, 1.0], dtype=np.float32)
+            status = np.ones((len(pts), 1), dtype=np.uint8)
+            return new_pts, status, None
+
+        monkeypatch.setattr(
+            "src.perception.optical_flow.cv2.calcOpticalFlowPyrLK", fake_lk
+        )
+
+        motion = estimator.update(frame)
+        np.testing.assert_allclose(motion, np.array([2.0, 1.0]))
+        assert estimator.last_tracking_ratio == pytest.approx(1.0)
 
 
 class TestCompensateCameraMotion:
@@ -195,6 +272,44 @@ class TestEstimateSpeed:
         )
         if speed_no_comp is not None and speed_comp is not None:
             assert speed_comp < speed_no_comp
+
+    def test_recovered_track_speed_is_not_reliable(self) -> None:
+        history = deque([(100 + i * 5, 540) for i in range(15)])
+        reliable = is_speed_measurement_reliable(
+            history,
+            flow_tracking_ratio=1.0,
+            recovered_after_gap=1,
+        )
+        assert reliable is False
+
+    def test_low_flow_confidence_speed_is_not_reliable(self) -> None:
+        history = deque([(100 + i * 5, 540) for i in range(15)])
+        reliable = is_speed_measurement_reliable(
+            history,
+            flow_tracking_ratio=0.1,
+            recovered_after_gap=0,
+        )
+        assert reliable is False
+
+    def test_last_jump_speed_is_not_reliable(self) -> None:
+        history = deque(
+            [
+                (100, 540),
+                (105, 540),
+                (110, 540),
+                (115, 540),
+                (250, 540),
+                (255, 540),
+                (260, 540),
+                (265, 540),
+            ],
+        )
+        reliable = is_speed_measurement_reliable(
+            history,
+            flow_tracking_ratio=1.0,
+            recovered_after_gap=0,
+        )
+        assert reliable is False
 
 
 # Track.mark_counted
@@ -334,6 +449,45 @@ class TestSmoothedSpeedTracker:
         result = sst.update(1, 20.0)
         # Should be exactly 20, not averaged with old 80s
         assert result == 20.0
+
+
+class TestTrackMotionStateTracker:
+    def test_stationary_requires_consecutive_votes(self) -> None:
+        tracker = TrackMotionStateTracker(
+            enter_frames=2, exit_frames=2, exit_speed_min=6.0
+        )
+        history = deque([(100, 100)] * 20)
+        assert tracker.update(1, history, candidate_speed=None) is False
+        assert tracker.update(1, history, candidate_speed=None) is True
+
+    def test_stationary_exit_uses_hysteresis(self) -> None:
+        tracker = TrackMotionStateTracker(
+            enter_frames=1, exit_frames=2, exit_speed_min=6.0
+        )
+        stationary_history = deque([(100, 100)] * 20)
+        moving_history = deque([(100 + i * 10, 100) for i in range(20)])
+        assert tracker.update(1, stationary_history, candidate_speed=None) is True
+        assert tracker.update(1, moving_history, candidate_speed=12.0) is True
+        assert tracker.update(1, moving_history, candidate_speed=12.0) is False
+
+    def test_remove_track_clears_state(self) -> None:
+        tracker = TrackMotionStateTracker(enter_frames=1)
+        history = deque([(100, 100)] * 20)
+        assert tracker.update(1, history, candidate_speed=None) is True
+        tracker.remove_track(1)
+        assert tracker.update(1, history, candidate_speed=None) is True
+
+
+class TestRobustSpeedSummary:
+    def test_empty_returns_zero(self) -> None:
+        assert robust_speed_summary([]) == 0.0
+
+    def test_single_value_is_preserved(self) -> None:
+        assert robust_speed_summary([12.34]) == 12.34
+
+    def test_outlier_is_suppressed(self) -> None:
+        result = robust_speed_summary([20.0, 21.0, 19.5, 22.0, 130.0])
+        assert 19.0 <= result <= 25.0
 
 
 # select_model_variant

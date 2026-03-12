@@ -30,9 +30,9 @@ def assign_traffic_state(df: pd.DataFrame) -> pd.Series:
     ``delta_speed``.
 
     Accident detection uses a two-phase model:
-      1. **Impact**: sudden braking (``delta_speed < -20``) detected within a
-         recent 5-record window.
-      2. **Persistence**: speed near zero for ≥ 3 consecutive records.
+        1. **Impact**: sudden braking or cumulative multi-step braking detected
+            within a recent rolling window.
+        2. **Persistence**: speed near zero for ≥ N consecutive records.
 
     Args:
         df: DataFrame with engineered features.
@@ -46,6 +46,14 @@ def assign_traffic_state(df: pd.DataFrame) -> pd.Series:
     # Accident (3)
     low_speed = df["avg_speed"] < t["accident_speed_max"]
     braking = df["delta_speed"] < t["accident_delta_min"]
+    cumulative_braking = (
+        df["delta_speed"]
+        .rolling(
+            window=int(t["rolling_window"]),
+            min_periods=1,
+        )
+        .sum()
+    )
     had_recent_braking = (
         braking.rolling(
             window=int(t["rolling_window"]),
@@ -54,6 +62,7 @@ def assign_traffic_state(df: pd.DataFrame) -> pd.Series:
         .max()
         .astype(bool)
     )
+    had_cumulative_braking = cumulative_braking < t["accident_cumulative_delta_min"]
     consecutive_low = (
         low_speed.rolling(
             window=int(t["accident_persistence"]),
@@ -61,7 +70,9 @@ def assign_traffic_state(df: pd.DataFrame) -> pd.Series:
         ).sum()
         >= t["accident_persistence"]
     )
-    accident_mask = low_speed & had_recent_braking & consecutive_low
+    accident_mask = (
+        low_speed & (had_recent_braking | had_cumulative_braking) & consecutive_low
+    )
     states[accident_mask] = 3
 
     # Congested (2)

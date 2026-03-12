@@ -42,14 +42,17 @@ class Track:
         default_factory=lambda: deque(maxlen=TRACKER_HISTORY_MAXLEN),
     )
     frames_since_seen: int = 0
+    recovered_after_gap: int = 0
     total_frames: int = 0
     counted: bool = False  # True after the vehicle has been tallied once
 
     def update(self, centroid: tuple[int, int]) -> None:
         """Update the track with a new centroid position."""
+        gap = self.frames_since_seen
         self.centroid = centroid
         self.history.append(centroid)
         self.frames_since_seen = 0
+        self.recovered_after_gap = gap if gap > 0 else 0
         self.total_frames += 1
 
     def mark_counted(self) -> bool:
@@ -77,6 +80,7 @@ class SORTTracker:
         self.max_lost = max_lost
         self._tracks: list[Track] = []
         self._next_id: int = 1
+        self.last_pruned_track_ids: list[int] = []
 
     @property
     def active_tracks(self) -> list[Track]:
@@ -92,6 +96,7 @@ class SORTTracker:
         """Clear all tracks (call between clips or minutes)."""
         self._tracks.clear()
         self._next_id = 1
+        self.last_pruned_track_ids = []
 
     def update(
         self,
@@ -164,4 +169,8 @@ class SORTTracker:
 
     def _prune(self) -> None:
         """Remove tracks that have been lost for too long."""
+        pruned = [
+            t.track_id for t in self._tracks if t.frames_since_seen > self.max_lost
+        ]
+        self.last_pruned_track_ids = pruned
         self._tracks = [t for t in self._tracks if t.frames_since_seen <= self.max_lost]

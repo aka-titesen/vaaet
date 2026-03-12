@@ -179,7 +179,14 @@ SPEED_MLP_WEIGHT: float = 0.30
 SPEED_MLP_VALID_RANGE: tuple[float, float] = (5.0, 100.0)  # MLP plausibility
 
 # Minimum track length (frames) before speed estimation is reliable
-SPEED_MIN_TRACK_LENGTH: int = 20
+SPEED_MIN_TRACK_LENGTH: int = 8
+
+# Rolling window (frames) for speed calculation (~1 s at 30 fps, matches legacy)
+SPEED_ESTIMATION_WINDOW: int = 30
+
+# Per-frame displacement noise floor (px). Displacements below this are
+# zeroed to prevent tracking jitter from producing phantom speed.
+SPEED_DISPLACEMENT_NOISE_FLOOR: float = 2.0
 
 # Per-vehicle-type speed limits (km/h) for plausibility filtering
 SPEED_LIMITS_PER_TYPE: dict[str, tuple[float, float]] = MappingProxyType(

@@ -20,6 +20,8 @@ import numpy as np
 from src.config import (
     PERSPECTIVE_ZONES,
     PIXELS_PER_METER,
+    SPEED_DISPLACEMENT_NOISE_FLOOR,
+    SPEED_ESTIMATION_WINDOW,
     SPEED_LIMITS_PER_TYPE,
     SPEED_MIN_TRACK_LENGTH,
     SPEED_MLP_VALID_RANGE,
@@ -104,15 +106,20 @@ def estimate_speed(
     global_motion: np.ndarray | None = None,
     vehicle_type: str | None = None,
     min_track_length: int = SPEED_MIN_TRACK_LENGTH,
+    window_frames: int = SPEED_ESTIMATION_WINDOW,
+    noise_floor: float = SPEED_DISPLACEMENT_NOISE_FLOOR,
 ) -> float | None:
     """Estimate vehicle speed in km/h from its centroid history.
 
     The calculation follows the physics-based approach:
-      1. Compute cumulative Euclidean displacement in pixel space.
-      2. Optionally subtract global camera motion (optical flow).
-      3. Apply perspective correction based on vertical position.
-      4. Convert pixels → meters → km/h.
-      5. Filter by plausibility range (global and per-type).
+      1. Slice history to the most recent *window_frames* positions.
+      2. Compute per-frame Euclidean displacements.
+      3. Zero out displacements below *noise_floor* (tracking jitter).
+      4. Clamp outlier displacements >3× median (track-ID switch guard).
+      5. Optionally subtract global camera motion (optical flow).
+      6. Apply perspective correction based on vertical position.
+      7. Convert pixels → meters → km/h.
+      8. Filter by plausibility range (global and per-type).
 
     Args:
         history: Deque of ``(cx, cy)`` centroid positions.
@@ -122,6 +129,10 @@ def estimate_speed(
         global_motion: Optional global motion vector to compensate.
         vehicle_type: Optional vehicle type for per-type speed limits.
         min_track_length: Minimum frames in history for reliable estimate.
+        window_frames: Use only the last *N* positions for the estimate
+            (~1 s at 30 fps). Defaults to ``SPEED_ESTIMATION_WINDOW``.
+        noise_floor: Per-frame displacement (px) below which movement is
+            treated as zero (jitter suppression).
 
     Returns:
         Estimated speed in km/h, or *None* if implausible / insufficient data.
@@ -129,15 +140,30 @@ def estimate_speed(
     if len(history) < max(2, min_track_length):
         return None
 
-    positions = np.array(history, dtype=float)
+    # Use only the most recent window of positions (matches legacy 1-s window)
+    window = min(window_frames, len(history))
+    positions = np.array(list(history)[-window:], dtype=float)
     displacements = np.diff(positions, axis=0)
 
     # Camera-motion compensation
     if global_motion is not None:
         displacements = displacements - global_motion
 
+    # Per-frame displacement magnitudes
+    norms = np.linalg.norm(displacements, axis=1)
+
+    # Noise floor: zero out sub-pixel jitter
+    norms[norms < noise_floor] = 0.0
+
+    # Outlier clamping: cap any single displacement > 3× median to median.
+    # Protects against track-ID switches (greedy SORT swapping vehicles).
+    if len(norms) >= 3:
+        med = float(np.median(norms[norms > 0])) if np.any(norms > 0) else 0.0
+        if med > 0:
+            norms = np.minimum(norms, 3.0 * med)
+
     # Total displacement in pixels
-    total_px = float(np.sum(np.linalg.norm(displacements, axis=1)))
+    total_px = float(np.sum(norms))
 
     # Perspective correction (use average Y)
     avg_y = float(positions[:, 1].mean())
@@ -147,8 +173,8 @@ def estimate_speed(
     # Convert to meters
     distance_m = total_px / pixels_per_meter
 
-    # Time span
-    n_frames = len(history) - 1
+    # Time span (from the windowed slice, not full history)
+    n_frames = len(positions) - 1
     time_s = n_frames / max(fps, 1)
 
     if time_s <= 0:
@@ -287,6 +313,9 @@ class SmoothedSpeedTracker:
             Smoothed (and optionally fused) speed, or *None*.
         """
         if physics_speed is None:
+            # Clear stale history so old speeds don't resurface when
+            # the vehicle starts moving again.
+            self._speeds.pop(track_id, None)
             return None
 
         if track_id not in self._speeds:

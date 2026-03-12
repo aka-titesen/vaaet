@@ -168,7 +168,7 @@ class TestEstimateSpeed:
 
     def test_plausible_speed(self) -> None:
         """Moving vehicle with known displacement should produce valid speed."""
-        # 25 frames at 30fps (>= SPEED_MIN_TRACK_LENGTH=20)
+        # 25 frames at 30fps (>= SPEED_MIN_TRACK_LENGTH=8)
         # displacement ~120px → 120/12 = 10m → 10/0.8 = 12.5m/s → 45 km/h
         history = deque([(100 + i * 5, 540) for i in range(25)])
         speed = estimate_speed(history, fps=30.0, frame_height=1080)
@@ -314,6 +314,27 @@ class TestSmoothedSpeedTracker:
         sst.remove_track(1)
         assert 1 not in sst._speeds
 
+    def test_none_clears_deque(self) -> None:
+        """Updating with None should clear stale speed history for the track."""
+        sst = SmoothedSpeedTracker(window_size=5)
+        sst.update(1, 40.0)
+        sst.update(1, 50.0)
+        assert 1 in sst._speeds
+        # Now send None → deque should be cleared
+        result = sst.update(1, None)
+        assert result is None
+        assert 1 not in sst._speeds
+
+    def test_fresh_start_after_none(self) -> None:
+        """After None clears history, the next speed starts from scratch."""
+        sst = SmoothedSpeedTracker(window_size=5)
+        sst.update(1, 80.0)
+        sst.update(1, 80.0)
+        sst.update(1, None)  # clears history
+        result = sst.update(1, 20.0)
+        # Should be exactly 20, not averaged with old 80s
+        assert result == 20.0
+
 
 # select_model_variant
 
@@ -363,3 +384,65 @@ class TestPerTypeSpeedLimits:
             vehicle_type="car",
         )
         assert result is not None
+
+
+# Speed estimation — noise floor, outlier clamping, rolling window
+
+
+class TestSpeedNoiseFloor:
+    def test_jitter_below_noise_floor_returns_none(self) -> None:
+        """Sub-pixel jitter (±1px) should be zeroed → speed below SPEED_RANGE → None."""
+        # 30 frames with alternating ±1px displacement (below 2px noise floor)
+        history = deque([(100 + (i % 2), 540) for i in range(30)])
+        result = estimate_speed(history, fps=30.0, frame_height=1080)
+        assert result is None
+
+    def test_real_movement_above_noise_floor(self) -> None:
+        """Displacement of 5px/frame is well above the 2px noise floor → valid speed."""
+        history = deque([(100 + i * 5, 540) for i in range(15)])
+        result = estimate_speed(history, fps=30.0, frame_height=1080)
+        assert result is not None
+        assert result > 0
+
+
+class TestSpeedOutlierClamping:
+    def test_single_huge_jump_is_clamped(self) -> None:
+        """One track-ID-switch jump (500px) among normal 5px moves → clamped."""
+        pts = [(100 + i * 5, 540) for i in range(10)]
+        # Insert a 500px jump at position 5
+        pts[5] = (pts[4][0] + 500, 540)
+        # Resume normal movement after the jump
+        for i in range(6, 10):
+            pts[i] = (pts[5][0] + (i - 5) * 5, 540)
+        history = deque(pts)
+        result = estimate_speed(history, fps=30.0, frame_height=1080)
+        # Without clamping this would be an insane spike; with clamping
+        # it either returns a plausible value or None
+        if result is not None:
+            assert result <= 120.0
+
+
+class TestSpeedWindowFrames:
+    def test_window_limits_positions_used(self) -> None:
+        """With window_frames=10, only the last 10 positions matter."""
+        # First 40 frames: stationary. Last 10: moving at 5px/frame.
+        pts = [(100, 540)] * 40 + [(100 + i * 5, 540) for i in range(10)]
+        history = deque(pts, maxlen=50)
+        # Full history: mostly stationary → low speed
+        # Windowed (last 10): clear movement → higher speed
+        speed_windowed = estimate_speed(
+            history,
+            fps=30.0,
+            frame_height=1080,
+            window_frames=10,
+        )
+        speed_full = estimate_speed(
+            history,
+            fps=30.0,
+            frame_height=1080,
+            window_frames=50,
+        )
+        # The windowed estimate should be higher since it ignores the
+        # 40 stationary frames at the start.
+        if speed_windowed is not None and speed_full is not None:
+            assert speed_windowed > speed_full

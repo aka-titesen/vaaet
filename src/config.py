@@ -16,6 +16,13 @@ from types import MappingProxyType
 RANDOM_SEED: int = 42
 
 
+# Dataset provenance
+
+DATA_ORIGIN_COL: str = "data_origin"
+SYNTHETIC_SCENARIO_COL: str = "synthetic_scenario"
+DATA_ORIGINS: tuple[str, ...] = ("real", "synthetic")
+SYNTHETIC_SCENARIOS: tuple[str, ...] = ("observed", "accident", "congestion")
+
 # Traffic state definitions
 
 STATE_LABELS: dict[int, str] = MappingProxyType(
@@ -31,7 +38,7 @@ STATE_LABELS: dict[int, str] = MappingProxyType(
 N_STATES: int = len(STATE_LABELS)
 
 
-# Feature columns (14) — canonical order used by scaler and model
+# Feature columns (19) — canonical order used by scaler and model
 
 FEATURE_COLS: list[str] = [
     "avg_speed",
@@ -46,6 +53,11 @@ FEATURE_COLS: list[str] = [
     "delta_count",
     "transition_flag",
     "speed_variance",
+    "cumulative_delta_speed",
+    "low_speed_persistence",
+    "speed_measurement_quality",
+    "near_zero_motion_ratio",
+    "stationary_confirmed_ratio",
     "hour_of_day",
     "weather_condition",
 ]
@@ -58,22 +70,28 @@ FEATURE_COLS: list[str] = [
 
 LABELING_THRESHOLDS: dict[str, float | int] = MappingProxyType(
     {  # type: ignore[assignment]
-        "accident_speed_max": 2,  # km/h — near zero (unchanged)
-        "accident_delta_min": -15,  # km/h — sudden braking (was -20)
-        "accident_cumulative_delta_min": -18,  # km/h — multi-step braking window
-        "accident_persistence": 2,  # consecutive records (was 3)
-        "congested_speed_max": 7,  # km/h — below P25 of bridge data (was 5)
-        "congested_vehicles_min": 8,  # ≈P85 of bridge volume (was 25)
-        "congested_persistence": 2,  # consecutive records (unchanged)
-        "reduced_speed_min": 7,  # km/h — = congested_speed_max (was 5)
-        "reduced_speed_max": 25,  # km/h — ≈P80 of bridge speeds (was 40)
-        "reduced_vehicles_min": 5,  # ≈P65 of bridge volume (was 15)
-        "reduced_vehicles_max": 12,  # ≈P95 of bridge volume (was 25)
-        "transition_delta_speed": 8,  # abs km/h change (was 10)
-        "transition_delta_count": 3,  # abs vehicle count change (was 5)
-        "rolling_window": 5,  # minutes for speed_variance (unchanged)
+        "accident_speed_max": 2,
+        "accident_delta_min": -15,
+        "accident_cumulative_delta_min": -18,
+        "accident_persistence": 2,
+        "congested_speed_max": 7,
+        "congested_vehicles_min": 8,
+        "congested_persistence": 2,
+        "reduced_speed_min": 7,
+        "reduced_speed_max": 25,
+        "reduced_vehicles_min": 5,
+        "reduced_vehicles_max": 12,
+        "transition_delta_speed": 8,
+        "transition_delta_count": 3,
+        "rolling_window": 5,
     }
 )
+
+ACCIDENT_GATE_MIN_EVIDENCE_SCORE: float = 0.75
+ACCIDENT_GATE_LOW_CONFIDENCE_MAX: float = 0.70
+SPEED_MEASUREMENT_QUALITY_MIN: float = 0.45
+NEAR_ZERO_RATIO_MIN: float = 0.20
+STATIONARY_CONFIRMED_RATIO_MIN: float = 0.10
 
 
 # Artifact paths (relative to repository root)
@@ -105,7 +123,7 @@ DB_ENV_VARS: tuple[str, ...] = (
 DEFAULT_DB_PORT: str = "5432"
 
 # Model versioning
-MODEL_VERSION: str = "mlp-v1.0"
+MODEL_VERSION: str = "mlp-v1.1"
 
 
 # Bridge domain context
@@ -148,24 +166,24 @@ YOLO_NMS_IOU: float = 0.4
 
 # Tracker Constants
 
-TRACKER_MAX_DISTANCE: float = 100.0  # Maximum Euclidean px for matching
-TRACKER_MAX_LOST: int = 60  # Frames before track removal
-TRACKER_HISTORY_MAXLEN: int = 50  # Centroid history deque length
+TRACKER_MAX_DISTANCE: float = 100.0
+TRACKER_MAX_LOST: int = 60
+TRACKER_HISTORY_MAXLEN: int = 50
 
 
 # Optical Flow Constants
 
-OPTICAL_FLOW_GRID_STEP: int = 40  # Pixel grid spacing for feature points
-OPTICAL_FLOW_BORDER_MARGIN: int = 20  # Skip low-quality border points
-OPTICAL_FLOW_WIN_SIZE: tuple[int, int] = (21, 21)  # Lucas-Kanade window
-OPTICAL_FLOW_MAX_LEVEL: int = 3  # Pyramid levels
-OPTICAL_FLOW_RUNNING_MEAN: int = 30  # Frames for motion smoothing
-OPTICAL_FLOW_MIN_TRACKING_RATIO: float = 0.35  # Reject low-confidence flow
+OPTICAL_FLOW_GRID_STEP: int = 40
+OPTICAL_FLOW_BORDER_MARGIN: int = 20
+OPTICAL_FLOW_WIN_SIZE: tuple[int, int] = (21, 21)
+OPTICAL_FLOW_MAX_LEVEL: int = 3
+OPTICAL_FLOW_RUNNING_MEAN: int = 30
+OPTICAL_FLOW_MIN_TRACKING_RATIO: float = 0.35
 
 
 # Speed Estimation Constants
 
-PIXELS_PER_METER: float = 12.0  # Bridge-camera calibration factor
+PIXELS_PER_METER: float = 12.0
 
 # Perspective correction zones (fraction of frame height)
 PERSPECTIVE_ZONES: dict[str, dict[str, float]] = MappingProxyType(
@@ -183,10 +201,10 @@ PERSPECTIVE_BLEND_BAND: float = 0.05
 # MLP smoother fusion weight: final = PHYSICS_WEIGHT * physics + MLP_WEIGHT * mlp
 SPEED_PHYSICS_WEIGHT: float = 0.70
 SPEED_MLP_WEIGHT: float = 0.30
-SPEED_MLP_VALID_RANGE: tuple[float, float] = (5.0, 100.0)  # MLP plausibility
-SPEED_RECOVERY_SKIP_GAP: int = 1  # Skip speed on the first frame after recovery
-SPEED_ROBUST_TRIM_RATIO: float = 0.15  # Trim minute-level outliers when possible
-SPEED_ROBUST_OUTLIER_SIGMA: float = 3.5  # Modified-z threshold for outliers
+SPEED_MLP_VALID_RANGE: tuple[float, float] = (5.0, 100.0)
+SPEED_RECOVERY_SKIP_GAP: int = 1
+SPEED_ROBUST_TRIM_RATIO: float = 0.15
+SPEED_ROBUST_OUTLIER_SIGMA: float = 3.5
 
 # Minimum track length (frames) before speed estimation is reliable
 SPEED_MIN_TRACK_LENGTH: int = 8
@@ -210,16 +228,25 @@ SPEED_LIMITS_PER_TYPE: dict[str, tuple[float, float]] = MappingProxyType(
 )
 
 
+# Near-zero motion detection (broader than stationary)
+
+NEAR_ZERO_TOTAL_DISP_MAX: float = 12.0
+NEAR_ZERO_MAX_SEGMENT_MAX: float = 6.0
+NEAR_ZERO_STD_MAX: float = 4.0
+NEAR_ZERO_AVG_FRAME_MAX: float = 1.2
+NEAR_ZERO_MAX_FRAME_MAX: float = 3.5
+
+
 # Stationary Detection (AND-conjunction — see AGENTS.md)
 
-STATIONARY_TOTAL_DISP_MAX: float = 5.0  # Total displacement in pixels
-STATIONARY_MAX_SEGMENT_MAX: float = 3.0  # Max single-frame displacement
-STATIONARY_STD_MAX: float = 2.5  # Std-dev of displacements
-STATIONARY_AVG_FRAME_MAX: float = 0.3  # Average per-frame displacement
-STATIONARY_MAX_FRAME_MAX: float = 1.5  # Max per-frame displacement
-STATIONARY_ENTRY_FRAMES: int = 2  # Hysteresis: consecutive stationary votes to enter
-STATIONARY_EXIT_FRAMES: int = 3  # Hysteresis: consecutive moving votes to exit
-STATIONARY_EXIT_SPEED_MIN: float = 6.0  # Speed threshold to leave stationary state
+STATIONARY_TOTAL_DISP_MAX: float = 5.0
+STATIONARY_MAX_SEGMENT_MAX: float = 3.0
+STATIONARY_STD_MAX: float = 2.5
+STATIONARY_AVG_FRAME_MAX: float = 0.3
+STATIONARY_MAX_FRAME_MAX: float = 1.5
+STATIONARY_ENTRY_FRAMES: int = 2
+STATIONARY_EXIT_FRAMES: int = 3
+STATIONARY_EXIT_SPEED_MIN: float = 6.0
 
 
 # Video I/O

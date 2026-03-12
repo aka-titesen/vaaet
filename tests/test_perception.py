@@ -22,6 +22,7 @@ from src.perception.speed import (
     estimate_speed,
     fuse_speed,
     get_perspective_factor,
+    is_near_zero_motion,
     is_speed_measurement_reliable,
     is_stationary,
     robust_speed_summary,
@@ -600,3 +601,15 @@ class TestSpeedWindowFrames:
         # 40 stationary frames at the start.
         if speed_windowed is not None and speed_full is not None:
             assert speed_windowed > speed_full
+
+
+class TestNearZeroMotion:
+    def test_relaxed_stationary_band_detects_near_zero_motion(self) -> None:
+        history = deque([(100, 100), (101, 100), (102, 101), (103, 101)])
+        assert is_near_zero_motion(history) is True
+
+    def test_large_motion_is_not_near_zero(self) -> None:
+        history = deque([(100, 100), (120, 100), (140, 100), (160, 100)])
+        assert is_near_zero_motion(history) is False
+
+

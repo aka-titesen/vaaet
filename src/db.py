@@ -1,7 +1,7 @@
 """Database connection utilities for the VAAET intelligence layer.
 
 Provides a reusable SQLAlchemy engine factory and helper functions used by
-both the data-preparation and production notebooks.  Credentials are obtained
+both the data-preparation and production notebooks. Credentials are obtained
 from environment variables or interactive input — never hard-coded.
 """
 
@@ -14,17 +14,21 @@ import re
 import shutil
 import subprocess
 from pathlib import Path
-from typing import Any
 
 import pandas as pd
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
 
 from src.config import DB_ENV_VARS, DEFAULT_DB_PORT
+from src.exceptions import ArtifactNotFoundError, DatabaseNotConfiguredError
+from src.logging_utils import get_logger
+
+logger = get_logger(__name__)
 
 __all__ = [
     "get_db_config",
     "get_engine",
+    "get_optional_db_config",
     "load_from_backup",
     "load_telemetry",
     "parse_sql_dump",
@@ -37,20 +41,7 @@ __all__ = [
 
 
 def get_db_config(*, interactive: bool = True) -> dict[str, str]:
-    """Obtain database configuration from env vars or interactive input.
-
-    Args:
-        interactive: If *False*, raise :class:`RuntimeError` when required
-            env vars are missing instead of prompting via ``input()``.
-            Use this in automated / notebook contexts where blocking on
-            ``input()`` would stall execution.
-
-    Returns:
-        Dictionary with keys: host, port, dbname, user, password.
-
-    Raises:
-        RuntimeError: If *interactive* is False and DB env vars are not set.
-    """
+    """Obtain database configuration from env vars or interactive input."""
     config: dict[str, str] = {
         "host": os.environ.get("DB_HOST", ""),
         "port": os.environ.get("DB_PORT", DEFAULT_DB_PORT),
@@ -61,21 +52,28 @@ def get_db_config(*, interactive: bool = True) -> dict[str, str]:
 
     if not config["host"]:
         if not interactive:
-            raise RuntimeError(
+            raise DatabaseNotConfiguredError(
                 "DB credentials not found in environment variables "
                 "(DB_HOST, DB_NAME, DB_USER, DB_PASSWORD). "
                 "Set them or use interactive=True to prompt for input."
             )
-        print("📋 PostgreSQL configuration (env vars not found)")
-        config["host"] = input("   Host: ").strip()
-        config["port"] = (
-            input(f"   Port [{DEFAULT_DB_PORT}]: ").strip() or DEFAULT_DB_PORT
-        )
-        config["dbname"] = input("   Database: ").strip()
-        config["user"] = input("   User: ").strip()
-        config["password"] = getpass.getpass("   Password: ")
+        logger.info("PostgreSQL configuration not found in env vars; prompting interactively")
+        config["host"] = input("Host: ").strip()
+        config["port"] = input(f"Port [{DEFAULT_DB_PORT}]: ").strip() or DEFAULT_DB_PORT
+        config["dbname"] = input("Database: ").strip()
+        config["user"] = input("User: ").strip()
+        config["password"] = getpass.getpass("Password: ")
 
     return config
+
+
+def get_optional_db_config(*, interactive: bool = False) -> dict[str, str] | None:
+    """Return DB config when available, otherwise ``None`` without raising."""
+    try:
+        return get_db_config(interactive=interactive)
+    except DatabaseNotConfiguredError:
+        logger.info("Optional database configuration not found; continuing without DB")
+        return None
 
 
 def _build_connection_string(config: dict[str, str]) -> str:
@@ -90,27 +88,20 @@ def _build_connection_string(config: dict[str, str]) -> str:
 
 
 def get_engine(config: dict[str, str] | None = None) -> Engine:
-    """Create a disposable SQLAlchemy engine.
-
-    Args:
-        config: Database config dict. If *None*, calls :func:`get_db_config`.
-
-    Returns:
-        A new :class:`sqlalchemy.engine.Engine`.
-    """
+    """Create a disposable SQLAlchemy engine."""
     if config is None:
         config = get_db_config()
     return create_engine(_build_connection_string(config))
 
 
 def test_connection(engine: Engine) -> bool:
-    """Return *True* if the engine can connect to the database."""
+    """Return ``True`` if the engine can connect to the database."""
     try:
         with engine.connect() as conn:
             conn.execute(text("SELECT 1"))
         return True
-    except Exception as exc:
-        print(f"🔴 Connection test failed: {exc}")
+    except Exception as exc:  # pragma: no cover - depends on real DB
+        logger.warning("Connection test failed: %s", exc)
         return False
 
 
@@ -130,21 +121,15 @@ def load_telemetry(
     config: dict[str, str] | None = None,
     engine: Engine | None = None,
 ) -> pd.DataFrame:
-    """Load raw telemetry from the ``traffic_data`` table.
+    """Load raw telemetry from the ``traffic_data`` table."""
+    owns_engine = engine is None
+    active_engine = engine or get_engine(config)
 
-    Args:
-        config: DB credentials (used if *engine* is None).
-        engine: Pre-existing SQLAlchemy engine.
-
-    Returns:
-        DataFrame with raw telemetry ordered by ``record_time``.
-    """
-    if engine is None:
-        engine = get_engine(config)
-
-    df: pd.DataFrame = pd.read_sql(text(TELEMETRY_QUERY), engine)
-    engine.dispose()
-    return df
+    try:
+        return pd.read_sql(text(TELEMETRY_QUERY), active_engine)
+    finally:
+        if owns_engine:
+            active_engine.dispose()
 
 
 # Backup restoration helpers
@@ -154,42 +139,28 @@ def restore_backup_to_sql(
     backup_path: str | Path,
     output_path: str | Path | None = None,
 ) -> Path:
-    """Convert a binary ``pg_dump`` backup to a plain SQL text file.
-
-    Requires ``pg_restore`` to be available on ``$PATH``.
-
-    Args:
-        backup_path: Path to the ``.backup`` (pg_dump custom format) file.
-        output_path: Where to write the SQL text.  Defaults to
-            ``<backup_path>.sql`` next to the original file.
-
-    Returns:
-        The *Path* to the generated SQL file.
-
-    Raises:
-        FileNotFoundError: If the backup file or ``pg_restore`` is missing.
-        RuntimeError: If ``pg_restore`` exits with an error or produces
-            incompatible-version diagnostics.
-    """
+    """Convert a binary ``pg_dump`` backup to a plain SQL text file."""
     backup_path = Path(backup_path)
     if not backup_path.is_file():
-        raise FileNotFoundError(f"Backup file not found: {backup_path}")
+        raise ArtifactNotFoundError(f"Backup file not found: {backup_path}")
 
     pg_restore_path = shutil.which("pg_restore")
     if pg_restore_path is None:
-        raise FileNotFoundError(
+        raise ArtifactNotFoundError(
             "pg_restore not found. Install postgresql-client:\n"
             "  Colab/Ubuntu: !apt-get install -y postgresql-client\n"
             "  macOS:        brew install libpq\n"
             "  Windows:      install PostgreSQL or add bin/ to PATH"
         )
 
-    # Log version for diagnostics
     ver_result = subprocess.run(
-        [pg_restore_path, "--version"], capture_output=True, text=True
+        [pg_restore_path, "--version"],
+        capture_output=True,
+        text=True,
+        check=False,
     )
     pg_version = ver_result.stdout.strip() if ver_result.returncode == 0 else "unknown"
-    print(f"🔧 Using: {pg_version}")
+    logger.info("Using %s", pg_version)
 
     if output_path is None:
         output_path = backup_path.with_suffix(".sql")
@@ -207,31 +178,28 @@ def restore_backup_to_sql(
         ],
         capture_output=True,
         text=True,
+        check=False,
     )
 
     stderr = result.stderr.strip()
-
-    # Detect version mismatch (returncode=1 but with "unsupported version")
-    _VERSION_ERROR_PATTERNS = [
+    version_error_patterns = [
         "unsupported version",
         "unsupported archive",
         "unrecognized archive format",
     ]
-    if any(pat in stderr.lower() for pat in _VERSION_ERROR_PATTERNS):
+    if any(pattern in stderr.lower() for pattern in version_error_patterns):
         raise RuntimeError(
             f"pg_restore version mismatch ({pg_version}).\n"
-            f"The backup was created with a newer PostgreSQL version.\n"
-            f"Install a newer postgresql-client (e.g. postgresql-client-17).\n"
+            "The backup was created with a newer PostgreSQL version.\n"
+            "Install a newer postgresql-client (e.g. postgresql-client-17).\n"
             f"stderr: {stderr}"
         )
 
-    # Hard failures (returncode >= 2)
     if result.returncode not in (0, 1):
         raise RuntimeError(f"pg_restore failed (exit {result.returncode}):\n{stderr}")
 
-    # Returncode 1 with other warnings is OK (e.g. missing roles)
     if stderr and result.returncode == 1:
-        print(f"⚠️ pg_restore warnings: {stderr[:200]}")
+        logger.warning("pg_restore warnings: %s", stderr[:200])
 
     if not output_path.is_file() or output_path.stat().st_size == 0:
         raise RuntimeError(
@@ -239,14 +207,14 @@ def restore_backup_to_sql(
             f"stderr: {stderr}"
         )
 
-    print(
-        f"✅ Backup converted to SQL: {output_path} "
-        f"({output_path.stat().st_size / 1024:.0f} KB)"
+    logger.info(
+        "Backup converted to SQL: %s (%.0f KB)",
+        output_path,
+        output_path.stat().st_size / 1024,
     )
     return output_path
 
 
-# Column spec for the COPY block (matches TELEMETRY_QUERY)
 _TRAFFIC_DATA_COLUMNS: list[str] = [
     "id",
     "clip_id",
@@ -262,28 +230,12 @@ _TRAFFIC_DATA_COLUMNS: list[str] = [
 
 
 def parse_sql_dump(sql_path: str | Path) -> pd.DataFrame:
-    """Parse a plain-text SQL dump and extract ``traffic_data`` rows.
-
-    Looks for ``COPY public.traffic_data (...) FROM stdin;`` blocks and
-    reads the tab-separated rows until the ``\\.`` terminator.
-
-    Args:
-        sql_path: Path to the ``.sql`` file produced by :func:`restore_backup_to_sql`.
-
-    Returns:
-        DataFrame with the standard telemetry columns, typed appropriately.
-
-    Raises:
-        FileNotFoundError: If the SQL file does not exist.
-        ValueError: If no ``traffic_data`` COPY block is found.
-    """
+    """Parse a plain-text SQL dump and extract ``traffic_data`` rows."""
     sql_path = Path(sql_path)
     if not sql_path.is_file():
-        raise FileNotFoundError(f"SQL file not found: {sql_path}")
+        raise ArtifactNotFoundError(f"SQL file not found: {sql_path}")
 
     text_content = sql_path.read_text(encoding="utf-8", errors="replace")
-
-    # Find COPY ... FROM stdin blocks for traffic_data
     copy_pattern = re.compile(
         r"COPY\s+(?:public\.)?traffic_data\s*\(([^)]+)\)\s+FROM\s+stdin;",
         re.IGNORECASE,
@@ -291,18 +243,14 @@ def parse_sql_dump(sql_path: str | Path) -> pd.DataFrame:
 
     rows: list[str] = []
     columns: list[str] | None = None
-
     lines = text_content.splitlines()
     i = 0
     while i < len(lines):
         line = lines[i]
         match = copy_pattern.match(line.strip())
         if match:
-            # Extract column names from the COPY statement
-            raw_cols = [c.strip() for c in match.group(1).split(",")]
-            columns = raw_cols
+            columns = [col.strip() for col in match.group(1).split(",")]
             i += 1
-            # Read data rows until the terminator
             while i < len(lines) and lines[i].strip() != "\\.":
                 row = lines[i].strip()
                 if row:
@@ -316,7 +264,6 @@ def parse_sql_dump(sql_path: str | Path) -> pd.DataFrame:
             "Ensure the backup contains the traffic_data table."
         )
 
-    # Parse tab-separated rows into a DataFrame
     assert columns is not None
     tsv = "\n".join(rows)
     df = pd.read_csv(
@@ -327,7 +274,6 @@ def parse_sql_dump(sql_path: str | Path) -> pd.DataFrame:
         na_values=["\\N"],
     )
 
-    # Type casting (safe — columns may or may not be present)
     int_cols = [
         "id",
         "count_car",
@@ -347,11 +293,9 @@ def parse_sql_dump(sql_path: str | Path) -> pd.DataFrame:
     if "record_time" in df.columns:
         df["record_time"] = pd.to_datetime(df["record_time"], errors="coerce")
 
-    # Keep only the standard telemetry columns (in canonical order)
     available = [c for c in _TRAFFIC_DATA_COLUMNS if c in df.columns]
     df = df[available]
-
-    print(f"✅ Parsed {len(df)} records from SQL dump ({len(columns)} columns)")
+    logger.info("Parsed %s records from SQL dump", len(df))
     return df
 
 
@@ -359,32 +303,21 @@ def load_from_backup(
     backup_path: str | Path,
     cache_csv: str | Path | None = None,
 ) -> pd.DataFrame:
-    """End-to-end: restore a binary backup → parse → return DataFrame.
-
-    Optionally saves a CSV cache so future runs skip ``pg_restore``.
-
-    Args:
-        backup_path: Path to the ``.backup`` file.
-        cache_csv: If provided, the parsed DataFrame is saved here.
-
-    Returns:
-        DataFrame with standard telemetry columns.
-    """
+    """End-to-end: restore a binary backup → parse → return DataFrame."""
     backup_path = Path(backup_path)
     sql_path = restore_backup_to_sql(backup_path)
 
     try:
         df = parse_sql_dump(sql_path)
     finally:
-        # Clean up the intermediate SQL file
         if sql_path.is_file():
             sql_path.unlink()
-            print(f"🗑️  Temporary SQL file removed: {sql_path}")
+            logger.info("Temporary SQL file removed: %s", sql_path)
 
     if cache_csv is not None:
         cache_csv = Path(cache_csv)
         cache_csv.parent.mkdir(parents=True, exist_ok=True)
         df.to_csv(cache_csv, index=False)
-        print(f"💾 CSV cache saved: {cache_csv}")
+        logger.info("CSV cache saved: %s", cache_csv)
 
     return df

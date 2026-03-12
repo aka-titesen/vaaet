@@ -18,6 +18,11 @@ from typing import Any
 import numpy as np
 
 from src.config import (
+    NEAR_ZERO_AVG_FRAME_MAX,
+    NEAR_ZERO_MAX_FRAME_MAX,
+    NEAR_ZERO_MAX_SEGMENT_MAX,
+    NEAR_ZERO_STD_MAX,
+    NEAR_ZERO_TOTAL_DISP_MAX,
     OPTICAL_FLOW_MIN_TRACKING_RATIO,
     PERSPECTIVE_BLEND_BAND,
     PERSPECTIVE_ZONES,
@@ -29,12 +34,12 @@ from src.config import (
     SPEED_MLP_VALID_RANGE,
     SPEED_MLP_WEIGHT,
     SPEED_PHYSICS_WEIGHT,
+    SPEED_RANGE,
     SPEED_RECOVERY_SKIP_GAP,
     SPEED_ROBUST_OUTLIER_SIGMA,
     SPEED_ROBUST_TRIM_RATIO,
-    SPEED_RANGE,
-    STATIONARY_ENTRY_FRAMES,
     STATIONARY_AVG_FRAME_MAX,
+    STATIONARY_ENTRY_FRAMES,
     STATIONARY_EXIT_FRAMES,
     STATIONARY_EXIT_SPEED_MIN,
     STATIONARY_MAX_FRAME_MAX,
@@ -47,6 +52,7 @@ __all__ = [
     "estimate_speed",
     "compensate_camera_motion",
     "get_perspective_factor",
+    "is_near_zero_motion",
     "is_speed_measurement_reliable",
     "is_stationary",
     "robust_speed_summary",
@@ -70,6 +76,23 @@ def _recent_displacement_norms(history: deque, window: int = 8) -> np.ndarray:
     return np.linalg.norm(displacements, axis=1)
 
 
+def _motion_stats(history: deque) -> tuple[float, float, float, float, float]:
+    if len(history) < 2:
+        return (0.0, 0.0, 0.0, 0.0, 0.0)
+
+    positions = np.array(history, dtype=float)
+    frame_disps = np.linalg.norm(np.diff(positions, axis=0), axis=1)
+    if frame_disps.size == 0:
+        return (0.0, 0.0, 0.0, 0.0, 0.0)
+
+    total_disp = float(np.sum(frame_disps))
+    max_segment = float(np.max(frame_disps))
+    std_disp = float(np.std(frame_disps))
+    avg_frame = float(np.mean(frame_disps))
+    max_frame = float(np.max(frame_disps))
+    return total_disp, max_segment, std_disp, avg_frame, max_frame
+
+
 def get_perspective_factor(
     y: float,
     frame_height: int,
@@ -77,22 +100,7 @@ def get_perspective_factor(
     mid_factor: float | None = None,
     far_factor: float | None = None,
 ) -> float:
-    """Return a perspective correction factor based on vertical position.
-
-    Objects near the bottom of the frame (close to camera) appear to move
-    faster in pixel space; objects near the top (far) appear slower.
-    Factors default to the values in ``config.PERSPECTIVE_ZONES``.
-
-    Args:
-        y: Vertical coordinate of the object centroid.
-        frame_height: Height of the video frame in pixels.
-        near_factor: Override scale factor for near zone.
-        mid_factor: Override scale factor for mid zone.
-        far_factor: Override scale factor for far zone.
-
-    Returns:
-        A multiplicative correction factor.
-    """
+    """Return a perspective correction factor based on vertical position."""
     _near = (
         near_factor if near_factor is not None else PERSPECTIVE_ZONES["near"]["factor"]
     )
@@ -107,7 +115,7 @@ def get_perspective_factor(
     if blend_band <= 0:
         if ratio > near_threshold:
             return _near
-        elif ratio > mid_threshold:
+        if ratio > mid_threshold:
             return _mid
         return _far
 
@@ -133,15 +141,7 @@ def compensate_camera_motion(
     displacement: np.ndarray,
     global_motion: np.ndarray,
 ) -> np.ndarray:
-    """Subtract estimated camera motion from a vehicle displacement vector.
-
-    Args:
-        displacement: 2-D displacement vector of the tracked vehicle.
-        global_motion: Estimated global motion vector (median optical flow).
-
-    Returns:
-        Compensated displacement vector.
-    """
+    """Subtract estimated camera motion from a vehicle displacement vector."""
     return displacement - global_motion
 
 
@@ -156,125 +156,66 @@ def estimate_speed(
     window_frames: int = SPEED_ESTIMATION_WINDOW,
     noise_floor: float = SPEED_DISPLACEMENT_NOISE_FLOOR,
 ) -> float | None:
-    """Estimate vehicle speed in km/h from its centroid history.
-
-    The calculation follows the physics-based approach:
-      1. Slice history to the most recent *window_frames* positions.
-      2. Compute per-frame Euclidean displacements.
-      3. Zero out displacements below *noise_floor* (tracking jitter).
-      4. Clamp outlier displacements >3× median (track-ID switch guard).
-      5. Optionally subtract global camera motion (optical flow).
-      6. Apply perspective correction based on vertical position.
-      7. Convert pixels → meters → km/h.
-      8. Filter by plausibility range (global and per-type).
-
-    Args:
-        history: Deque of ``(cx, cy)`` centroid positions.
-        fps: Video frames per second.
-        pixels_per_meter: Calibration factor.
-        frame_height: Frame height for perspective correction.
-        global_motion: Optional global motion vector to compensate.
-        vehicle_type: Optional vehicle type for per-type speed limits.
-        min_track_length: Minimum frames in history for reliable estimate.
-        window_frames: Use only the last *N* positions for the estimate
-            (~1 s at 30 fps). Defaults to ``SPEED_ESTIMATION_WINDOW``.
-        noise_floor: Per-frame displacement (px) below which movement is
-            treated as zero (jitter suppression).
-
-    Returns:
-        Estimated speed in km/h, or *None* if implausible / insufficient data.
-    """
+    """Estimate vehicle speed in km/h from its centroid history."""
     if len(history) < max(2, min_track_length):
         return None
 
-    # Use only the most recent window of positions (matches legacy 1-s window)
     window = min(window_frames, len(history))
     positions = np.array(list(history)[-window:], dtype=float)
     displacements = np.diff(positions, axis=0)
 
-    # Camera-motion compensation
     if global_motion is not None:
         displacements = displacements - global_motion
 
-    # Per-frame displacement magnitudes
     norms = np.linalg.norm(displacements, axis=1)
-
-    # Noise floor: zero out sub-pixel jitter
     norms[norms < noise_floor] = 0.0
 
-    # Outlier clamping: cap any single displacement > 3× median to median.
-    # Protects against track-ID switches (greedy SORT swapping vehicles).
     if len(norms) >= 3:
         med = float(np.median(norms[norms > 0])) if np.any(norms > 0) else 0.0
         if med > 0:
             norms = np.minimum(norms, 3.0 * med)
 
-    # Total displacement in pixels
     total_px = float(np.sum(norms))
-
-    # Perspective correction (use average Y)
     avg_y = float(positions[:, 1].mean())
     pf = get_perspective_factor(avg_y, frame_height)
     total_px *= pf
 
-    # Convert to meters
     distance_m = total_px / pixels_per_meter
-
-    # Time span (from the windowed slice, not full history)
     n_frames = len(positions) - 1
     time_s = n_frames / max(fps, 1)
-
     if time_s <= 0:
         return None
 
     speed_kmh = (distance_m / time_s) * 3.6
 
-    # Per-vehicle-type plausibility filter
     if vehicle_type and vehicle_type in SPEED_LIMITS_PER_TYPE:
         lo, hi = SPEED_LIMITS_PER_TYPE[vehicle_type]
         if not (lo <= speed_kmh <= hi):
             return None
-    else:
-        # Fallback to global range
-        if not (SPEED_RANGE[0] <= speed_kmh <= SPEED_RANGE[1]):
-            return None
+    elif not (SPEED_RANGE[0] <= speed_kmh <= SPEED_RANGE[1]):
+        return None
 
     return round(speed_kmh, 2)
+
+
+def is_near_zero_motion(history: deque) -> bool:
+    """Return ``True`` when motion is minimal but not necessarily stationary."""
+    total_disp, max_segment, std_disp, avg_frame, max_frame = _motion_stats(history)
+    return (
+        total_disp < NEAR_ZERO_TOTAL_DISP_MAX
+        and max_segment < NEAR_ZERO_MAX_SEGMENT_MAX
+        and std_disp < NEAR_ZERO_STD_MAX
+        and avg_frame < NEAR_ZERO_AVG_FRAME_MAX
+        and max_frame < NEAR_ZERO_MAX_FRAME_MAX
+    )
 
 
 # Stationary detection
 
 
 def is_stationary(history: deque) -> bool:
-    """Determine whether a tracked vehicle is stationary.
-
-    Uses the **AND-conjunction** of five criteria (all must be true):
-      1. Total displacement < ``STATIONARY_TOTAL_DISP_MAX``
-      2. Max single-segment displacement < ``STATIONARY_MAX_SEGMENT_MAX``
-      3. Displacement std-dev < ``STATIONARY_STD_MAX``
-      4. Average per-frame displacement < ``STATIONARY_AVG_FRAME_MAX``
-      5. Max per-frame displacement < ``STATIONARY_MAX_FRAME_MAX``
-
-    **Do not relax to OR without an ADR** (see AGENTS.md).
-
-    Args:
-        history: Deque of ``(cx, cy)`` centroid positions.
-
-    Returns:
-        ``True`` if the vehicle is considered stationary.
-    """
-    if len(history) < 2:
-        return True
-
-    positions = np.array(history, dtype=float)
-    frame_disps = np.linalg.norm(np.diff(positions, axis=0), axis=1)
-
-    total_disp = float(np.sum(frame_disps))
-    max_segment = float(np.max(frame_disps))
-    std_disp = float(np.std(frame_disps))
-    avg_frame = float(np.mean(frame_disps))
-    max_frame = float(np.max(frame_disps))
-
+    """Determine whether a tracked vehicle is stationary."""
+    total_disp, max_segment, std_disp, avg_frame, max_frame = _motion_stats(history)
     return (
         total_disp < STATIONARY_TOTAL_DISP_MAX
         and max_segment < STATIONARY_MAX_SEGMENT_MAX
@@ -291,12 +232,7 @@ def is_speed_measurement_reliable(
     min_flow_tracking_ratio: float = OPTICAL_FLOW_MIN_TRACKING_RATIO,
     recovery_skip_gap: int = SPEED_RECOVERY_SKIP_GAP,
 ) -> bool:
-    """Return whether a track's speed estimate is reliable enough to use.
-
-    Rejects the first frame after a track recovers from a gap, low-confidence
-    optical-flow intervals, and severe last-step jumps that strongly suggest an
-    ID swap or centroid discontinuity.
-    """
+    """Return whether a track's speed estimate is reliable enough to use."""
     if len(history) < max(2, SPEED_MIN_TRACK_LENGTH):
         return False
     if recovered_after_gap >= recovery_skip_gap:
@@ -362,21 +298,7 @@ def fuse_speed(
     physics_speed: float,
     mlp_speed: float | None,
 ) -> float:
-    """Fuse physics-based and MLP-predicted speed estimates.
-
-    The formula is ``0.7 * physics + 0.3 * mlp`` when the MLP prediction
-    falls within a plausible range, otherwise uses physics-only.
-
-    **Do not alter the 70/30 split without experimental evidence**
-    (see AGENTS.md).
-
-    Args:
-        physics_speed: Speed from the physics-based estimator (km/h).
-        mlp_speed: Speed from the MLP smoother (km/h), or *None*.
-
-    Returns:
-        Fused speed estimate in km/h.
-    """
+    """Fuse physics-based and MLP-predicted speed estimates."""
     if mlp_speed is None:
         return physics_speed
 
@@ -389,21 +311,8 @@ def fuse_speed(
     return physics_speed
 
 
-# SmoothedSpeedTracker
-
-
 class SmoothedSpeedTracker:
-    """Per-track speed smoothing with optional MLP fusion.
-
-    Maintains a per-vehicle running window of raw speed estimates and
-    optionally fuses with an MLP regressor prediction.
-
-    Args:
-        window_size: Number of recent speed estimates to average.
-        mlp_model: Optional scikit-learn ``MLPRegressor`` instance.
-            Expected to accept a 10-feature vector and return a single
-            speed value.
-    """
+    """Per-track speed smoothing with optional MLP fusion."""
 
     def __init__(
         self,
@@ -420,19 +329,8 @@ class SmoothedSpeedTracker:
         physics_speed: float | None,
         mlp_features: np.ndarray | None = None,
     ) -> float | None:
-        """Record a new physics speed estimate and return the smoothed value.
-
-        Args:
-            track_id: Unique track identifier.
-            physics_speed: Raw physics-based speed (km/h), or *None*.
-            mlp_features: Optional 10-element feature vector for the MLP.
-
-        Returns:
-            Smoothed (and optionally fused) speed, or *None*.
-        """
+        """Record a new physics speed estimate and return the smoothed value."""
         if physics_speed is None:
-            # Clear stale history so old speeds don't resurface when
-            # the vehicle starts moving again.
             self._speeds.pop(track_id, None)
             return None
 
@@ -442,7 +340,6 @@ class SmoothedSpeedTracker:
         self._speeds[track_id].append(physics_speed)
         avg_physics = float(np.mean(self._speeds[track_id]))
 
-        # MLP fusion
         mlp_speed: float | None = None
         if self.mlp_model is not None and mlp_features is not None:
             try:

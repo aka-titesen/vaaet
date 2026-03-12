@@ -30,11 +30,12 @@ class TestConstants:
     def test_feature_cols_count(self) -> None:
         from src.config import FEATURE_COLS
 
-        assert len(FEATURE_COLS) == 14
+        assert len(FEATURE_COLS) == 19
         assert isinstance(FEATURE_COLS, list)
-        # First and last elements
         assert FEATURE_COLS[0] == "avg_speed"
         assert FEATURE_COLS[-1] == "weather_condition"
+        assert "speed_measurement_quality" in FEATURE_COLS
+        assert "stationary_confirmed_ratio" in FEATURE_COLS
 
     def test_labeling_thresholds_immutable(self) -> None:
         from src.config import LABELING_THRESHOLDS
@@ -44,6 +45,17 @@ class TestConstants:
         assert "accident_cumulative_delta_min" in LABELING_THRESHOLDS
         assert "rolling_window" in LABELING_THRESHOLDS
         assert len(LABELING_THRESHOLDS) == 14
+
+    def test_accident_gate_constants(self) -> None:
+        from src.config import (
+            ACCIDENT_GATE_LOW_CONFIDENCE_MAX,
+            ACCIDENT_GATE_MIN_EVIDENCE_SCORE,
+            SPEED_MEASUREMENT_QUALITY_MIN,
+        )
+
+        assert 0.0 < ACCIDENT_GATE_MIN_EVIDENCE_SCORE <= 1.0
+        assert 0.0 < ACCIDENT_GATE_LOW_CONFIDENCE_MAX <= 1.0
+        assert 0.0 < SPEED_MEASUREMENT_QUALITY_MIN <= 1.0
 
     def test_model_version_format(self) -> None:
         from src.config import MODEL_VERSION
@@ -74,6 +86,18 @@ class TestConstants:
 
         import os
 
-        # Paths must be relative (no leading / or drive letter)
         for path in [MODEL_DIR, DATA_PROCESSED_DIR, DATA_RAW_DIR]:
             assert not os.path.isabs(path), f"{path} should be relative"
+
+    def test_provenance_constants(self) -> None:
+        from src.config import (
+            DATA_ORIGINS,
+            DATA_ORIGIN_COL,
+            SYNTHETIC_SCENARIOS,
+            SYNTHETIC_SCENARIO_COL,
+        )
+
+        assert DATA_ORIGIN_COL == "data_origin"
+        assert SYNTHETIC_SCENARIO_COL == "synthetic_scenario"
+        assert DATA_ORIGINS == ("real", "synthetic")
+        assert SYNTHETIC_SCENARIOS == ("observed", "accident", "congestion")

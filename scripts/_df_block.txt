@@ -1,0 +1,19 @@
+    # Build classified DataFrame
+    df_records = pd.DataFrame(records)
+    df_classified_out: pd.DataFrame = df_records
+    if model is not None and scaler is not None and label_mapping is not None and not df_records.empty:
+        try:
+            df_feat = engineer_features(df_records)
+            X = scaler.transform(df_feat[FEATURE_COLS].values)
+            proba = model.predict(X, verbose=0)
+            df_feat["traffic_state"] = proba.argmax(axis=1)
+            df_feat["state_label"] = [label_mapping.get(c, "Unknown") for c in df_feat["traffic_state"]]
+            df_feat["confidence"] = proba.max(axis=1).round(4)
+            df_classified_out = df_feat
+            print("\n✅ Classification summary:")
+            for code in sorted(df_classified_out["traffic_state"].unique()):
+                lbl = label_mapping.get(code, "Unknown")
+                cnt = (df_classified_out["traffic_state"] == code).sum()
+                print(f"   {lbl:>10}: {cnt} records")
+        except Exception as exc:
+            print(f"⚠️ Final classification failed: {exc}")

@@ -1,0 +1,13 @@
+        # Classify the partial minute too
+        if model is not None and scaler is not None and label_mapping is not None:
+            try:
+                df_tmp = pd.DataFrame(records[-1:])
+                df_feat = engineer_features(df_tmp)
+                X = scaler.transform(df_feat[FEATURE_COLS].values)
+                proba = model.predict(X, verbose=0)
+                cur_state_code = int(proba.argmax(axis=1)[0])
+                cur_confidence = float(proba.max(axis=1)[0])
+                cur_state_label = label_mapping.get(cur_state_code, "Unknown")
+                print(f"\n   🏷️  Final partial minute: {cur_state_label} ({cur_confidence:.0%})")
+            except Exception as exc:
+                print(f"   ⚠️ Partial classification error: {exc}")

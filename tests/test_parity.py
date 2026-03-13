@@ -126,6 +126,9 @@ class TestModule2Parity:
             "from src.perception.optical_flow import OpticalFlowEstimator" in self.code
         )
 
+    def test_imports_shared_telemetry_pipeline(self) -> None:
+        assert "from src.perception.pipeline import process_clip_telemetry" in self.code
+
     def test_imports_video_utils(self) -> None:
         assert "from src.video import" in self.code
 
@@ -150,6 +153,10 @@ class TestModule2Parity:
     def test_no_inline_get_perspective_factor(self) -> None:
         assert "def get_perspective_factor(" not in self.code
 
+    def test_no_inline_process_clip(self) -> None:
+        assert "def process_clip(" not in self.code
+
     def test_model_existence_guard(self) -> None:
         """Module 2 Cell 1 must guard against missing .keras file."""
         assert "Missing trained artifacts" in self.code or "os.path.isfile" in self.code
+

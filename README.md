@@ -17,7 +17,7 @@ flowchart LR
 
     subgraph "Module 1 — Data Preparation (one-time)"
         TD -->|Telemetry| M1[data_preparation.ipynb]
-        M1 -->|9→14 features| M1
+        M1 -->|telemetry → quality-aware features| M1
         M1 -->|Auto-label + SMOTE| M1
         M1 -->|Train MLP| ART[.keras + .joblib]
     end
@@ -60,13 +60,17 @@ vaaet/
 │       └── traffic_analyzer.ipynb       # Module 2: YOLO + classifier + feedback
 ├── src/
 │   ├── __init__.py
+│   ├── calibration.py                   # Manual bridge-landmark speed calibration helpers
+│   ├── classification.py                # Shared inference + conservative accident gate
 │   ├── config.py                        # Single source of truth: constants, paths, thresholds
 │   ├── db.py                            # SQLAlchemy engine factory, credential handling
-│   ├── features.py                      # Feature engineering (9 → 14 columns)
+│   ├── features.py                      # Feature engineering + quality-aware signals
 │   ├── labeling.py                      # Auto-labeling rules (4 traffic states)
+│   ├── persistence.py                   # Optional DB persistence for Modules 1 and 2
 │   └── perception/
 │       ├── __init__.py
 │       ├── detector.py                  # YOLODetector wrapper
+│       ├── pipeline.py                  # Shared per-minute telemetry extraction
 │       ├── tracker.py                   # SORTTracker wrapper
 │       └── speed.py                     # Physics-based speed estimation
 ├── models/
@@ -106,7 +110,7 @@ pip install -r requirements.txt
 1. Open `notebooks/01_data_prep/data_preparation.ipynb` in Google Colab
 2. Run all 9 code cells in order (Cell 0 through Cell 8)
 3. Configure DB credentials via environment variables in Cell 2 (`DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`)
-4. The system extracts telemetry from `traffic_data`, engineers 14 features, auto-labels 4 traffic states, balances classes with SMOTE, and trains an MLP classifier
+4. The system extracts telemetry from `traffic_data`, engineers quality-aware features, auto-labels 4 traffic states, balances classes with SMOTE, and trains an MLP classifier
 5. **Artifacts exported**: `models/intelligence/traffic_classifier.keras`, `feature_scaler.joblib`, `label_mapping.joblib`
 6. **Target metric**: F1-macro ≥ 0.85
 
@@ -116,7 +120,7 @@ pip install -r requirements.txt
 2. Run Cell 0 (environment setup) and Cell 1 (load trained model)
 3. Upload a video clip with format `bridge_YYYY-MM-DD_HH-MM-SS_to_HH-MM-SS.mp4`
 4. Run Cell 2 to process the clip (YOLO 11 detection + SORT tracking + speed estimation)
-5. Run Cell 3 to classify traffic state using the trained MLP
+5. Run Cell 3 to classify traffic state using the trained MLP plus the conservative accident gate
 6. Run Cell 4 to persist results to DB (optional)
 7. Run Cell 5 for HITL feedback and re-training (optional)
 8. Run Cell 6 for visualization dashboard
@@ -126,8 +130,8 @@ pip install -r requirements.txt
 | Feature | Description |
 |---|---|
 | **Adaptive YOLO selection** | 5 model variants selected by video duration (<1h: yolo11x, 1-3h: yolo11l, etc.) |
-| **Hybrid speed estimation** | 70% physics + 30% MLP smoothing, with plausibility filters [2-120 km/h] |
-| **4 traffic states** | Normal, Reduced, Congested, Accident — classified by MLP from 14 engineered features |
+| **Hybrid speed estimation** | Physics-first speed with optical-flow compensation, perspective correction, plausibility filters, and robust minute aggregation |
+| **4 traffic states** | Normal, Reduced, Congested, Accident — classified from quality-aware telemetry features with a conservative accident gate |
 | **Self-improving feedback** | HITL corrections feed back into retraining pipeline |
 | **Multi-camera support** | Auto-detects 1, 2, or 4 camera layouts |
 | **Silent degradation** | Continues without DB if unavailable; falls back to physics-only speed |
@@ -158,18 +162,29 @@ CREATE TABLE IF NOT EXISTS traffic_data (
 ```sql
 CREATE TABLE IF NOT EXISTS telemetry_raw (
   id SERIAL PRIMARY KEY,
-  source_record_id INTEGER REFERENCES traffic_data(id),
+  source_record_id INTEGER UNIQUE,
+  clip_id TEXT,
   record_time TIMESTAMP NOT NULL,
-  avg_speed NUMERIC(5,2),
+  avg_speed NUMERIC(8,2),
   total_vehicles INTEGER,
   count_car INTEGER, count_truck INTEGER, count_bus INTEGER,
   count_motorcycle INTEGER, count_bicycle INTEGER,
-  heavy_vehicle_ratio NUMERIC(5,4),
-  delta_speed NUMERIC(6,2), delta_count INTEGER,
+  heavy_vehicle_ratio NUMERIC(8,4),
+  delta_speed NUMERIC(8,2), delta_count INTEGER,
   transition_flag SMALLINT DEFAULT 0,
-  speed_variance NUMERIC(6,2),
-  hour_of_day SMALLINT, weather_condition SMALLINT DEFAULT 0,
-  UNIQUE (source_record_id)
+  speed_variance NUMERIC(8,4),
+  cumulative_delta_speed NUMERIC(8,2),
+  low_speed_persistence NUMERIC(8,2),
+  speed_measurement_quality NUMERIC(8,4),
+  near_zero_motion_ratio NUMERIC(8,4),
+  stationary_confirmed_ratio NUMERIC(8,4),
+  near_zero_motion_count INTEGER,
+  stationary_confirmed_count INTEGER,
+  rejected_speed_count INTEGER,
+  recovered_track_count INTEGER,
+  speed_sample_count INTEGER,
+  data_origin TEXT,
+  synthetic_scenario TEXT
 );
 
 CREATE TABLE IF NOT EXISTS traffic_classifications (
@@ -178,8 +193,14 @@ CREATE TABLE IF NOT EXISTS traffic_classifications (
   classified_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   traffic_state SMALLINT NOT NULL,
   state_label TEXT NOT NULL,
-  confidence NUMERIC(5,4) NOT NULL,
+  confidence NUMERIC(8,4) NOT NULL,
   model_version TEXT NOT NULL,
+  model_traffic_state SMALLINT,
+  model_state_label TEXT,
+  model_confidence NUMERIC(8,4),
+  accident_rule_triggered BOOLEAN DEFAULT FALSE,
+  accident_gate_applied BOOLEAN DEFAULT FALSE,
+  accident_evidence_score NUMERIC(8,4),
   is_human_validated BOOLEAN DEFAULT FALSE,
   human_override_state SMALLINT,
   validated_at TIMESTAMP,
@@ -211,6 +232,13 @@ CREATE TABLE IF NOT EXISTS traffic_classifications (
 ```bash
 pip install -r requirements.txt
 ```
+
+## Academic Validation
+
+- Speed calibration remains lightweight and academic: bridge landmarks, manual timing, and pseudo-ground-truth helpers in `src/calibration.py`
+- `near_zero_motion` and `stationary_confirmed` are tracked separately to reduce false stationary labels in congestion
+- `Accident` is treated as a rare, conservative class supported by rules plus synthetic episodes until enough real cases exist
+- The runtime target is Google Colab free, so infrastructure-heavy optimizations are intentionally out of scope
 
 ## Documentation
 

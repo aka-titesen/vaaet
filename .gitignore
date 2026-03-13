@@ -10,6 +10,13 @@ build/
 
 # Jupyter Notebook
 .ipynb_checkpoints/
+*.ipynb.bak
+
+# Temporary patch/debug artifacts
+scripts/_*.txt
+scripts/_patch_*.py
+scripts/_fix_*.py
+
 
 # YOLO models (downloaded at runtime)
 *.pt

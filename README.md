@@ -5,7 +5,7 @@ For agentic context see AGENTS.md. For technical design see docs/DDS.md. -->
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-Advanced vehicular traffic analysis system for the **General Manuel Belgrano Bridge** (Corrientes, Argentina), optimized for SISE dynamic surveillance cameras and long-duration video. Three-module pipeline: **bootstrap** (archived), **data preparation** (one-time training), and **production** (YOLO 11 + MLP classifier + self-improving feedback loop).
+Advanced vehicular traffic analysis system for the **General Manuel Belgrano Bridge** (Corrientes, Argentina), optimized for SISE dynamic surveillance cameras and long-duration video. Three-module pipeline: **bootstrap** (archived), **data preparation** (one-time training), and **production** (YOLO 11 + physics-first speed telemetry + MLP traffic classifier + optional HITL scaffold).
 
 ## Architecture
 
@@ -29,7 +29,7 @@ flowchart LR
         ART -->|Load model| M2
         M2 -->|Classify| M2
         M2 -->|Persist| DB[(AWS RDS<br/>PostgreSQL)]
-        M2 -->|Feedback loop| M2
+        M2 -->|Optional HITL scaffold| M2
         M2 -->|Annotated video + state| USR
     end
 
@@ -41,7 +41,7 @@ flowchart LR
 
 - **Module 0 — Bootstrap (archived)**: `archive/00_bootstrap/01_legacy_collection.ipynb` — Historical YOLO 11 pipeline that generated `traffic_data`. **Never runs again.**
 - **Module 1 — Data Preparation**: `notebooks/01_data_prep/data_preparation.ipynb` — Feature engineering + auto-labeling + SMOTE + MLP training → exports `.keras` and `.joblib` artifacts
-- **Module 2 — Production**: `notebooks/02_production/traffic_analyzer.ipynb` — YOLO 11 + SORT + speed estimation + trained MLP classifier + DB persistence + self-improving feedback loop
+- **Module 2 — Production**: `notebooks/02_production/traffic_analyzer.ipynb` — YOLO 11 + SORT + physics-first speed estimation + trained MLP classifier + optional DB persistence + experimental HITL scaffold
 - **Shared code**: `src/` — Reusable Python modules imported by Modules 1 and 2
 - **Persistence**: PostgreSQL on AWS RDS (optional). 3 tables: `traffic_data` (legacy), `telemetry_raw` + `traffic_classifications` (active)
 
@@ -94,6 +94,11 @@ vaaet/
 └── LICENSE
 ```
 
+## Manual Utilities
+
+- `scripts/convert_backup.py` — one-time local helper for converting a PostgreSQL `.backup` into the CSV fallback used by Module 1 on Colab
+- `scripts/evaluate_real_clips.py` — offline evaluator for comparing baseline vs candidate telemetry exports on real clips
+
 ## Quick Start
 
 ### Prerequisites
@@ -108,9 +113,9 @@ pip install -r requirements.txt
 ### Module 1 — Data Preparation (run once)
 
 1. Open `notebooks/01_data_prep/data_preparation.ipynb` in Google Colab
-2. Run all 9 code cells in order (Cell 0 through Cell 8)
-3. Configure DB credentials via environment variables in Cell 2 (`DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`)
-4. The system extracts telemetry from `traffic_data`, engineers quality-aware features, auto-labels 4 traffic states, balances classes with SMOTE, and trains an MLP classifier
+2. Run the required code cells in order. Optional academic cells are `7b` (cross-validation), `7c` (Drive export), and `8` (DB persistence)
+3. Configure DB credentials via environment variables in Cell 2 only if you want database access (`DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`)
+4. The system extracts telemetry from `traffic_data`, engineers 19 quality-aware features, auto-labels 4 traffic states, balances classes with SMOTE, and trains an MLP classifier
 5. **Artifacts exported**: `models/intelligence/traffic_classifier.keras`, `feature_scaler.joblib`, `label_mapping.joblib`
 6. **Target metric**: F1-macro ≥ 0.85
 
@@ -119,20 +124,22 @@ pip install -r requirements.txt
 1. Open `notebooks/02_production/traffic_analyzer.ipynb` in Google Colab
 2. Run Cell 0 (environment setup) and Cell 1 (load trained model)
 3. Upload a video clip with format `bridge_YYYY-MM-DD_HH-MM-SS_to_HH-MM-SS.mp4`
-4. Run Cell 2 to process the clip (YOLO 11 detection + SORT tracking + speed estimation)
+4. Run Cell 2 for telemetry-only processing, or Cell 2b if you also want annotated video output
 5. Run Cell 3 to classify traffic state using the trained MLP plus the conservative accident gate
 6. Run Cell 4 to persist results to DB (optional)
-7. Run Cell 5 for HITL feedback and re-training (optional)
+7. Treat Cell 5 as an experimental HITL/retraining scaffold, not as part of the validated base workflow
 8. Run Cell 6 for visualization dashboard
+
+Automated tests verify notebook parity and code-cell compilation, but an end-to-end Google Colab smoke run is still a manual validation step.
 
 ## Key Features
 
 | Feature | Description |
 |---|---|
 | **Adaptive YOLO selection** | 5 model variants selected by video duration (<1h: yolo11x, 1-3h: yolo11l, etc.) |
-| **Hybrid speed estimation** | Physics-first speed with optical-flow compensation, perspective correction, plausibility filters, and robust minute aggregation |
+| **Physics-first speed estimation** | Optical-flow compensation, perspective correction, plausibility filters, and robust minute aggregation tuned for an academic Colab workflow |
 | **4 traffic states** | Normal, Reduced, Congested, Accident — classified from quality-aware telemetry features with a conservative accident gate |
-| **Self-improving feedback** | HITL corrections feed back into retraining pipeline |
+| **Optional HITL scaffold** | Research-oriented retraining cell kept in the notebook, but not treated as a validated production loop |
 | **Multi-camera support** | Auto-detects 1, 2, or 4 camera layouts |
 | **Silent degradation** | Continues without DB if unavailable; falls back to physics-only speed |
 | **Strict validation** | Video filename format enforced; speeds outside range silently discarded |

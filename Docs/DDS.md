@@ -13,6 +13,15 @@ VAAET's architecture is designed as a **three-module sequential processing pipel
 
 See [ADR-009](adr/ADR-009-modular-three-stage-architecture.md) for the rationale behind the modular three-stage architecture.
 
+## Current Implementation Note (2026-03-13)
+
+- `archive/00_bootstrap/` is frozen and retained only as historical context
+- The active speed pipeline is physics-first: optical-flow compensation, perspective correction, reliability gates, and robust per-minute aggregation
+- Optional MLP speed fusion exists in `src/perception/speed.py`, but `src/perception/pipeline.py` does not wire it by default
+- `near_zero_motion` and `stationary_confirmed` are tracked as separate signals to avoid collapsing slow traffic into parked-vehicle logic
+- `src/persistence.py` is the source of truth for the active PostgreSQL schema
+- Notebook compilation and parity are automated; end-to-end Google Colab execution remains a manual smoke test
+
 ### Logical Data Flow Diagram
 
 ```mermaid
@@ -32,7 +41,7 @@ flowchart TD
     
     G --> H[Detect vehicles<br/>YOLODetector.detect]
     H --> I[Match tracks<br/>SORTTracker.update]
-    I --> J[Calculate speed<br/>estimate_speed - 70/30 fusion]
+    I --> J[Calculate speed<br/>physics-first robust path]
     J --> K{Stationary?<br/>AND-conjunction 6 criteria}
     
     K -->|Yes| L[Mark as stationary<br/>Speed = 0]
@@ -92,51 +101,53 @@ See [detailed Colab+AWS architecture diagram](diagrams/colab-aws-architecture.md
 
 ### 2.2. Per-Vehicle Speed Calculation Flow
 
-**Objective:** Robustly estimate each vehicle's speed, compensating for perspective nonlinearities and camera dynamics.
+**Objective:** Robustly estimate each vehicle's speed under camera motion, perspective changes, and noisy tracks without overengineering the academic runtime.
 
 **Detailed Process:**
 
-1. **Trajectory History Maintenance:** For each tracked vehicle, a fixed-size `collections.deque` stores the last N centroid coordinates `(cx, cy)`, enabling O(1) insertion and deletion.
+1. **Trajectory History Maintenance:** Each track stores recent centroid coordinates in a fixed-size `collections.deque`, keeping the implementation simple and testable.
 
-2. **Camera Motion Compensation (Virtual Stabilization):**
-   - Optical Flow computed via `cv2.calcOpticalFlowPyrLK` (pyramidal Lucas-Kanade)
-   - Robust statistical filtering (median vector via `numpy.median`) estimates global camera motion
-   - Global motion vector is **subtracted** from vehicle displacement, isolating true vehicle movement
+2. **Camera Motion Compensation:**
+   - Optical Flow estimates global frame motion
+   - The global motion vector is subtracted from per-vehicle displacement
+   - Low tracking-ratio or recently recovered tracks are treated as lower-quality samples
 
-3. **Displacement Calculation and Perspective Correction:**
-   - Cumulative Euclidean displacement computed in pixel space
-   - Mapped to real-world space via `get_perspective_factor()` — a nonlinear scale factor based on Y-coordinate, acting as an **implicit homography approximation**
+3. **Physics-First Speed Estimation:**
+   - Euclidean displacement is accumulated in pixel space over a short temporal window
+   - `get_perspective_factor()` applies a zone-based scale correction tied to vehicle Y-position
+   - Physical speed is computed from distance and FPS, then filtered by noise floor and per-type plausibility limits
 
-4. **Speed Calculation and Fusion:**
-   - Physical distance (meters) / time interval (from FPS) → initial speed in km/h
-   - Combined with MLP prediction: **70% physics + 30% MLP** (convex weighted combination)
-   - Plausibility filter: speeds outside [2, 120] km/h silently discarded
+4. **Reliability Gates and Robust Aggregation:**
+   - Tracks with abrupt anomalies, weak flow support, or recovery after a gap can be rejected from minute-level speed summaries
+   - Accepted per-track speeds are aggregated with `robust_speed_summary()` to suppress isolated spikes
+   - Optional MLP fusion remains available in code, but it is not the default path used by `process_clip_telemetry()`
 
 **Key Libraries and Techniques:**
-- **OpenCV**: `cv2.calcOpticalFlowPyrLK()` for Lucas-Kanade Optical Flow
-- **NumPy**: Vectorial operations, norms, statistics
-- **scikit-learn**: `MLPRegressor` for speed refinement
-- **Optical Flow**: Camera motion estimation and compensation
-- **Data Fusion**: Physics-based + data-driven model combination
+- **OpenCV**: Optical Flow and video I/O
+- **NumPy**: Vectorized displacement, norms, and robust statistics
+- **Optical Flow**: Camera-motion compensation
+- **Robust statistics**: Outlier rejection and trimmed aggregation
 
 ### 2.3. Stationary Vehicle Detection Flow
 
-**Objective:** Reliably classify stopped vehicles with high precision (few false positives) to avoid misclassifying slow traffic as stationary.
+**Objective:** Separate slow traffic from genuinely stationary vehicles with conservative rules suitable for dynamic bridge footage.
 
-**Process (`is_stationary()`):**
+**Process:**
 
-1. **Minimum temporal window**: Only activates after `min_stationary_observation` frames (~200) of tracking history
-2. **Statistical trajectory analysis**: Computes position variance (`numpy.std`), total displacement (Euclidean), and max/average inter-frame movement
-3. **Decision criterion**: A vehicle is classified as stationary **if and only if** ALL statistical criteria are met simultaneously (AND-conjunction). This makes the classifier **ultra-conservative** — high precision at the cost of potentially lower recall.
+1. **Two internal signals:** `is_near_zero_motion()` captures minimal movement; `TrackMotionStateTracker` confirms `stationary_confirmed` with hysteresis
+2. **Trajectory statistics:** The detector evaluates total displacement, segment maxima, dispersion, and average frame motion over recent history
+3. **Entry/exit hysteresis:** Stationary confirmation requires repeated low-motion evidence, while exit requires sustained movement or speed evidence
+4. **Minute-level reporting:** The pipeline stores `near_zero_motion` and `stationary_confirmed` separately to avoid contaminating average speed with parked-vehicle decisions
 
 See [ADR-006](adr/ADR-006-deteccion-estacionarios-conservadora.md) for the rationale.
 
 ### 2.4. Strategies for Reducing Error Margin in Dynamic Environments
 
-- **Camera Motion Compensation (Optical Flow)**: Primary strategy against camera non-stationarity
-- **Adaptive Perspective Correction**: Dynamic scale factor based on Y-coordinate, flexible across zoom changes
-- **Physical Plausibility Filtering**: Post-hoc filter eliminates tracking error outliers
-- **Temporal Speed Smoothing**: Weighted moving average acts as a low-pass filter
+- **Camera Motion Compensation (Optical Flow)**: Primary strategy against pan/tilt/zoom disturbances
+- **Adaptive Perspective Correction**: Lightweight zone-based correction calibrated for the bridge
+- **Physical Plausibility Filtering**: Rejects impossible or highly unstable speed estimates
+- **Robust Minute Aggregation**: Suppresses spikes without erasing real low-speed signals
+- **Quality Signals**: `speed_measurement_quality`, rejected samples, recovered tracks, near-zero motion, and stationary confirmation are fed forward into classification
 
 ---
 
@@ -146,7 +157,7 @@ See [ADR-005](adr/ADR-005-postgresql-aws-rds.md) for PostgreSQL vs SQLite ration
 
 ### Schema
 
-Three tables with FK chain: `traffic_data` -> `telemetry_raw` -> `traffic_classifications`.
+Three tables with FK chain: `traffic_data` (legacy source) -> `telemetry_raw` (active quality-aware telemetry) -> `traffic_classifications` (active predictions and optional validation metadata). `src/persistence.py` is the source of truth.
 
 ```sql
 -- Module 0 legacy table
@@ -164,32 +175,53 @@ CREATE TABLE IF NOT EXISTS traffic_data (
     UNIQUE (clip_id, record_time)
 );
 
--- Module 1/2 engineered features
+-- Module 1/2 active telemetry
 CREATE TABLE IF NOT EXISTS telemetry_raw (
     id SERIAL PRIMARY KEY,
-    source_record_id INTEGER REFERENCES traffic_data(id),
+    source_record_id INTEGER UNIQUE,
+    clip_id TEXT,
     record_time TIMESTAMP NOT NULL,
-    avg_speed NUMERIC(5,2),
+    avg_speed NUMERIC(8,2),
     total_vehicles INTEGER,
-    count_car INTEGER, count_truck INTEGER, count_bus INTEGER,
-    count_motorcycle INTEGER, count_bicycle INTEGER,
-    heavy_vehicle_ratio NUMERIC(5,4),
-    delta_speed NUMERIC(6,2), delta_count INTEGER,
+    count_car INTEGER,
+    count_truck INTEGER,
+    count_bus INTEGER,
+    count_motorcycle INTEGER,
+    count_bicycle INTEGER,
+    heavy_vehicle_ratio NUMERIC(8,4),
+    delta_speed NUMERIC(8,2),
+    delta_count INTEGER,
     transition_flag SMALLINT DEFAULT 0,
-    speed_variance NUMERIC(6,2),
-    hour_of_day SMALLINT, weather_condition SMALLINT DEFAULT 0,
-    UNIQUE (source_record_id)
+    speed_variance NUMERIC(8,4),
+    cumulative_delta_speed NUMERIC(8,2),
+    low_speed_persistence NUMERIC(8,2),
+    speed_measurement_quality NUMERIC(8,4),
+    near_zero_motion_ratio NUMERIC(8,4),
+    stationary_confirmed_ratio NUMERIC(8,4),
+    near_zero_motion_count INTEGER,
+    stationary_confirmed_count INTEGER,
+    rejected_speed_count INTEGER,
+    recovered_track_count INTEGER,
+    speed_sample_count INTEGER,
+    data_origin TEXT,
+    synthetic_scenario TEXT
 );
 
--- Module 1/2 classifications with HITL fields
+-- Module 1/2 active classifications
 CREATE TABLE IF NOT EXISTS traffic_classifications (
     id SERIAL PRIMARY KEY,
     telemetry_id INTEGER REFERENCES telemetry_raw(id),
     classified_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     traffic_state SMALLINT NOT NULL,
     state_label TEXT NOT NULL,
-    confidence NUMERIC(5,4) NOT NULL,
+    confidence NUMERIC(8,4) NOT NULL,
     model_version TEXT NOT NULL,
+    model_traffic_state SMALLINT,
+    model_state_label TEXT,
+    model_confidence NUMERIC(8,4),
+    accident_rule_triggered BOOLEAN DEFAULT FALSE,
+    accident_gate_applied BOOLEAN DEFAULT FALSE,
+    accident_evidence_score NUMERIC(8,4),
     is_human_validated BOOLEAN DEFAULT FALSE,
     human_override_state SMALLINT,
     validated_at TIMESTAMP,
@@ -232,7 +264,7 @@ Each ROI is processed with its own tracking instance:
 
 ## 5. Synthetic Video Generator
 
-Module 0 (archived) includes a synthetic demo generator for portfolio demonstrations.
+Module 0 (archived) includes a synthetic generator that is preserved only as historical/bootstrap context, not as part of the active runtime.
 
 | Scenario | Description |
 |---|---|
@@ -250,7 +282,7 @@ Vehicle distribution: car 65%, truck 15%, bus 8%, motorcycle 10%, bicycle 2%.
 
 ### General Strategy
 
-The system adopts **silent degradation**: errors are caught, reported via `print()` with emoji, and processing continues when possible.
+The system adopts **graceful degradation**: shared modules log concise contextual messages via the standard logging stack, while notebooks keep short user-facing status messages when appropriate. Processing continues when recovery is safe.
 
 | Component | Error | Behavior |
 |---|---|---|
@@ -259,7 +291,7 @@ The system adopts **silent degradation**: errors are caught, reported via `print
 | Optical Flow | No feature points | Uses speed without camera compensation |
 | YOLO | No detections | Uses historical averages |
 | Tracking | No match | Creates new track |
-| MLP | Prediction outside [5, 100] | Uses physics-only speed (100%) |
+| Optional MLP fusion | Prediction outside valid range | Falls back to physics-only speed |
 | Video | Corrupt frame | Skips to next frame |
 | File | Invalid name | Aborts processing (fatal error) |
 

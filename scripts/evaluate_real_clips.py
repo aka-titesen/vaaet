@@ -1,4 +1,7 @@
-"""Compare baseline vs candidate results on real clips.
+"""Manual offline evaluator for baseline vs candidate results on real clips.
+
+This utility is not imported by the active notebooks. It is intended for
+academic review of robustness changes on exported telemetry CSVs.
 
 This script focuses on three robustness goals:
 1. Speed spike reduction.

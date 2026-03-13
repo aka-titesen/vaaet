@@ -1,43 +1,43 @@
-<!-- context: VAAET/docs/diagrams/speed-calculation.md — Detailed speed calculation flow.
-Referenced by DDS.md, ADR-004. -->
+        <!-- context: VAAET/docs/diagrams/speed-calculation.md -- Detailed speed calculation flow.
+        Referenced by DDS.md as the active physics-first speed path. -->
 
-# Hybrid Speed Calculation Flow
+        # Physics-First Speed Calculation Flow
 
-Detail of the `estimate_speed()` pipeline in `src/perception/speed.py`.
+        Detail of the active `estimate_speed()` + `process_clip_telemetry()` pipeline in
+        `src/perception/speed.py` and `src/perception/pipeline.py`.
 
-```mermaid
-flowchart TD
-    A[Track Data<br/>deque of last 30 frame centroids] --> B[Compute global motion<br/>Lucas-Kanade Optical Flow]
-    
-    B --> C[Compensate camera motion<br/>Subtract median global vector]
-    
-    C --> D[Compute Euclidean displacement<br/>in pixel space]
-    
-    D --> E[Get perspective factor<br/>by vehicle Y coordinate]
-    
-    E --> F{Perspective zone}
-    F -->|Y > 0.7 - Near| G1[Factor: 1.8x]
-    F -->|0.3-0.7 - Mid| G2[Factor: 1.0x]
-    F -->|Y < 0.3 - Far| G3[Factor: 0.6x]
-    
-    G1 & G2 & G3 --> H[Convert pixels to meters<br/>pixels_per_meter x factor]
-    
-    H --> I[Physics Speed<br/>distance_meters / dt -> km/h]
-    
-    A --> J[Extract 10 features<br/>displacement, std_x, std_y,<br/>len, perspective, y_ratio,<br/>mean_dx, mean_dy, max_dx, time]
-    
-    J --> K[MLPRegressor predict<br/>hidden_layers: 64, 32]
-    
-    K --> L{MLP output in 5-100?}
-    L -->|Yes| M[Valid MLP prediction]
-    L -->|No| N[Discard MLP prediction<br/>Use physics only]
-    
-    I & M --> O[Fusion: 0.7 x Physics + 0.3 x MLP]
-    I & N --> O2[Use 100% Physics]
-    
-    O & O2 --> P{Speed in 2-120 km/h?}
-    P -->|Yes| Q[Speed accepted]
-    P -->|No| R[Discarded as implausible]
-    
-    Q --> S[Temporal smoothing<br/>Weighted moving average<br/>0.6 / 0.3 / 0.1 last 3s]
-```
+        ```mermaid
+        flowchart TD
+            A[Track history<br/>recent centroid deque] --> B[Estimate global motion<br/>Optical Flow]
+            B --> C[Compensate camera motion<br/>subtract global vector]
+            C --> D[Compute per-frame displacement norms]
+            D --> E[Apply noise floor<br/>clip abrupt anomalies]
+            E --> F[Perspective correction<br/>zone-based factor by Y position]
+            F --> G[Convert pixels to meters<br/>pixels_per_meter]
+            G --> H[Physics speed<br/>distance / dt -> km/h]
+            H --> I{Plausible speed<br/>for vehicle type?}
+            I -->|No| J[Reject sample]
+            I -->|Yes| K{Reliable track?
+flow ratio, gap recovery,
+recent anomaly checks}
+            K -->|No| L[Exclude from minute summary]
+            K -->|Yes| M[Track-level smoothing
+short moving average]
+
+            A --> N[Motion state analysis
+near_zero vs stationary]
+            N --> O[Hysteresis-based stationary confirmation]
+
+            M --> P[Minute accumulator]
+            O --> P
+            J --> P
+            L --> P
+
+            P --> Q[Robust minute summary
+trimmed / outlier-aware mean]
+            Q --> R[Quality signals
+rejected, recovered, stationary, near-zero]
+            R --> S[Classifier-ready telemetry row]
+
+            T[Optional dormant path<br/>MLP speed fusion] -.only if explicitly wired.-> M
+        ```

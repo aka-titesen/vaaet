@@ -56,13 +56,13 @@ The system has NOT been systematically evaluated under:
 - Real MAE is unknown -- the "< 5 km/h" target is a goal without benchmark
 - Calibration was estimated from known bridge dimensions (8.3m width, cameras at 60m)
 
-### 2.2 Speed Smoother MLP Trained with Random Data
+### 2.2 Optional Speed-Fusion MLP Is Not Part of the Active Runtime Path
 
-- The `cnn_validator` component (misnomer -- it is an `MLPRegressor`) is trained with `np.random.rand()`
-- Does NOT provide real learning about speed patterns
-- Acts as a stochastic regularizer toward the mean (~60 km/h)
-- Its contribution is capped at 30% of the fusion, limiting damage
-- See [ADR-004](adr/ADR-004-mlp-como-suavizador.md) for details
+- The active telemetry pipeline is physics-first and does **not** wire the optional MLP fusion path by default
+- The legacy `cnn_validator` naming is historical and misleading; the optional code path is not treated as validated signal
+- If the optional MLP fusion were reactivated, it would still require proper supervised data before being considered reliable
+- Current mitigation: the active runtime relies on optical-flow compensation, plausibility filters, reliability gates, and robust aggregation instead
+- See [ADR-004](adr/ADR-004-mlp-como-suavizador.md) as historical context, not as the current default runtime design
 
 ### 2.3 Tracking Without Visual Re-Identification
 

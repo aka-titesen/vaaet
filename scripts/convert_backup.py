@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Convert traffic_data.backup (pg_dump binary) → traffic_data_raw.csv.
+"""Manual utility to convert traffic_data.backup into traffic_data_raw.csv.
+
+This script is not used by the active notebooks at runtime. It exists as a
+one-time local helper for preparing a Colab-friendly CSV from a PostgreSQL
+binary backup.
 
 Run this script locally (where the correct PostgreSQL version is installed)
 to produce a CSV that can be committed to the repo.  Once committed, the

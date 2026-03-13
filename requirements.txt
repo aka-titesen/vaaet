@@ -6,8 +6,8 @@ ultralytics>=8.0.0          # YOLO 11 object detection
 opencv-python>=4.8.0        # Video I/O, optical flow, annotations
 numpy>=1.24.0               # Vectorized operations, statistics
 
-# ── ML — Speed smoothing (MLPRegressor) ──
-scikit-learn>=1.3.0         # MLP speed smoother (70/30 fusion)
+# ── ML — Shared classical ML utilities ──
+scikit-learn>=1.3.0         # Scaling, metrics, splits, optional offline utilities
 
 # ── Database — PostgreSQL (AWS RDS) ──
 psycopg2-binary>=2.9.0     # PostgreSQL driver

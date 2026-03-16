@@ -42,6 +42,7 @@ class MinuteTelemetryAccumulator:
     clip_id: str
     minute_counts: dict[str, int] = field(default_factory=_empty_vehicle_counts)
     minute_speeds: list[float] = field(default_factory=list)
+    flow_tracking_ratios: list[float] = field(default_factory=list)
     counted_tracks: set[int] = field(default_factory=set)
     cumulative_counts: dict[str, int] = field(default_factory=_empty_vehicle_counts)
     near_zero_motion_count: int = 0
@@ -59,6 +60,7 @@ class MinuteTelemetryAccumulator:
         near_zero_motion: bool,
         stationary_confirmed: bool,
         recovered_gap: int,
+        flow_tracking_ratio: float,
     ) -> None:
         """Register one track observation into the current minute bucket."""
         if near_zero_motion:
@@ -73,6 +75,8 @@ class MinuteTelemetryAccumulator:
         elif smoothed_speed is not None:
             self.minute_speeds.append(smoothed_speed)
             self.speed_sample_count += 1
+            
+        self.flow_tracking_ratios.append(flow_tracking_ratio)
 
         if track.track_id not in self.counted_tracks and track.mark_counted():
             self.minute_counts[track.vehicle_type] = (
@@ -94,6 +98,12 @@ class MinuteTelemetryAccumulator:
             else 0.0
         )
         avg_speed = robust_speed_summary(self.minute_speeds) if self.minute_speeds else 0.0
+        avg_flow = (
+            sum(self.flow_tracking_ratios) / len(self.flow_tracking_ratios)
+            if self.flow_tracking_ratios
+            else 1.0
+        )
+
         return {
             "clip_id": self.clip_id,
             "record_time": record_time,
@@ -110,6 +120,7 @@ class MinuteTelemetryAccumulator:
             "recovered_track_count": self.recovered_track_count,
             "speed_sample_count": self.speed_sample_count,
             "speed_measurement_quality": quality,
+            "optical_flow_tracking_ratio": round(avg_flow, 4),
         }
 
     def rollover_minute(self) -> None:
@@ -120,6 +131,7 @@ class MinuteTelemetryAccumulator:
             )
         self.minute_counts = _empty_vehicle_counts()
         self.minute_speeds.clear()
+        self.flow_tracking_ratios.clear()
         self.counted_tracks.clear()
         self.near_zero_motion_count = 0
         self.stationary_confirmed_count = 0
@@ -232,6 +244,7 @@ def process_clip_telemetry(
                 near_zero_motion=near_zero_now,
                 stationary_confirmed=stationary_now,
                 recovered_gap=recovered_gap,
+                flow_tracking_ratio=flow_tracking_ratio,
             )
 
         frame_idx += 1

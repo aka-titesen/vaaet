@@ -85,22 +85,22 @@ def generate_accident_sequences(
                 cars = int(rng.integers(3, 10))
                 trucks = int(rng.integers(0, 3))
                 buses = int(rng.integers(0, 2))
-                nzm = 0.0
-                sc = 0.0
+                nzm_pct = 0.0
+                sc_pct = 0.0
             elif i == n_approach:
                 rec["avg_speed"] = round(rng.uniform(0, t["accident_speed_max"]), 2)
                 cars = int(rng.integers(0, 3))
                 trucks = int(rng.integers(0, 2))
                 buses = 0
-                nzm = round(rng.uniform(0.1, 0.4), 2)
-                sc = 0.0
+                nzm_pct = round(rng.uniform(0.1, 0.4), 2)
+                sc_pct = 0.0
             else:
                 rec["avg_speed"] = round(rng.uniform(0, 1.5), 2)
                 cars = int(rng.integers(0, 2))
                 trucks = 0
                 buses = 0
-                nzm = round(rng.uniform(0.5, 1.0), 2)
-                sc = round(rng.uniform(0.2, 0.8), 2)
+                nzm_pct = round(rng.uniform(0.5, 1.0), 2)
+                sc_pct = round(rng.uniform(0.2, 0.8), 2)
 
             motos = int(rng.integers(0, 2))
             bikes = int(rng.integers(0, 1))
@@ -116,8 +116,9 @@ def generate_accident_sequences(
                     "count_motorcycle": motos,
                     "count_bicycle": bikes,
                     "total_vehicles": max(total, 1),
-                    "near_zero_motion_ratio": nzm,
-                    "stationary_confirmed_ratio": sc,
+                    "near_zero_motion_count": int(max(total, 1) * nzm_pct),
+                    "stationary_confirmed_count": int(max(total, 1) * sc_pct),
+                    "speed_sample_count": max(total, 1),
                     "speed_measurement_quality": round(rng.uniform(0.7, 1.0), 2),
                 }
             )
@@ -179,8 +180,9 @@ def generate_congestion_sequences(
                     "count_motorcycle": motos,
                     "count_bicycle": bikes,
                     "total_vehicles": total,
-                    "near_zero_motion_ratio": round(rng.uniform(0.1, 0.3), 2),
-                    "stationary_confirmed_ratio": round(rng.uniform(0.0, 0.15), 2),
+                    "near_zero_motion_count": int(total * round(rng.uniform(0.1, 0.3), 2)),
+                    "stationary_confirmed_count": int(total * round(rng.uniform(0.0, 0.15), 2)),
+                    "speed_sample_count": total,
                     "speed_measurement_quality": round(rng.uniform(0.7, 1.0), 2),
                 }
             )

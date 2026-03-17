@@ -138,19 +138,26 @@ def build_accident_mask(df: pd.DataFrame) -> pd.Series:
 
 
 def assign_instant_state(df: pd.DataFrame) -> pd.Series:
-    """Label short clips purely based on instantaneous speeds without history."""
-    t = LABELING_THRESHOLDS
+    """Label short clips purely based on instantaneous metrics (no history).
+
+    Uses wider thresholds than the temporal labeler because sprint mode
+    cannot rely on persistence or rolling windows to filter noise.
+    Threshold rationale for Belgrano Bridge:
+      - avg_speed < 15 km/h with vehicles present -> Congested
+      - avg_speed 15-30 km/h -> Reduced
+      - avg_speed >= 30 km/h -> Normal
+    """
     states = pd.Series(0, index=df.index, dtype=int)
     if df.empty or "avg_speed" not in df.columns:
         return states
 
-    # Congested (2)
-    congested_mask = (df["avg_speed"] < t["congested_speed_max"]) & (df["total_vehicles"] > 0)
+    # Congested (2): Very low speed with any vehicles present
+    congested_mask = (df["avg_speed"] < 15) & (df["total_vehicles"] > 0)
     states[congested_mask] = 2
 
-    # Reduced (1)
+    # Reduced (1): Moderate speed
     reduced_mask = (
-        df["avg_speed"].between(t["reduced_speed_min"], t["reduced_speed_max"])
+        df["avg_speed"].between(15, 30)
         & (states == 0)
     )
     states[reduced_mask] = 1

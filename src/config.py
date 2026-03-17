@@ -75,7 +75,7 @@ LABELING_THRESHOLDS: dict[str, float | int] = MappingProxyType(
         "accident_cumulative_delta_min": -18,
         "accident_persistence": 2,
         "congested_speed_max": 7,
-        "congested_vehicles_min": 8,
+        "congested_vehicles_min": 4,
         "congested_persistence": 2,
         "reduced_speed_min": 7,
         "reduced_speed_max": 25,

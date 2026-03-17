@@ -15,7 +15,7 @@ from src.config import (
     STATE_LABELS,
 )
 from src.features import engineer_features
-from src.labeling import build_accident_signal_frame
+from src.labeling import assign_instant_state, build_accident_signal_frame
 
 __all__ = [
     "apply_conservative_accident_gate",
@@ -139,10 +139,21 @@ def classify_raw_telemetry(
     label_mapping: Mapping[int, str] | None = None,
     feature_cols: list[str] | None = None,
     model_version: str = MODEL_VERSION,
+    inference_mode: str = "stable",
 ) -> pd.DataFrame:
     """Engineer features from raw telemetry and classify them safely."""
     if df_telemetry.empty:
         return df_telemetry.copy()
+
+    if inference_mode == "sprint":
+        out = df_telemetry.copy()
+        states = assign_instant_state(out)
+        out["traffic_state"] = states.astype(int)
+        out["state_label"] = out["traffic_state"].map(STATE_LABELS)
+        out["confidence"] = 0.90
+        out["model_version"] = "sprint_heuristic"
+        out["accident_evidence_score"] = 0.0
+        return out
 
     df_feat = engineer_features(df_telemetry)
     if df_feat.empty and not df_telemetry.empty:

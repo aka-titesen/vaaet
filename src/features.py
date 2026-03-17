@@ -118,7 +118,9 @@ def engineer_features(df: pd.DataFrame) -> pd.DataFrame:
     out["hour_of_day"] = out["record_time"].dt.hour
     out["weather_condition"] = (~out["hour_of_day"].between(6, 18)).astype(int)
 
-    out = out.dropna(subset=["delta_speed", "delta_count"]).reset_index(drop=True)
+    out["delta_speed"] = out["delta_speed"].fillna(0.0)
+    out["delta_count"] = out["delta_count"].fillna(0.0)
+    out = out.reset_index(drop=True)
 
     for col in FEATURE_COLS:
         if col not in out.columns:

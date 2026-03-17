@@ -266,9 +266,6 @@ def process_clip_telemetry(
             else:
                 smoothed = speed_tracker.update(track.track_id, speed)
 
-                flow_tracking_ratio=flow_tracking_ratio,
-            )
-
             # Assign lane based on horizontal vector
             track_direction = None
             if len(track.history) >= 5:

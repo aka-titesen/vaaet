@@ -145,11 +145,7 @@ def assign_instant_state(df: pd.DataFrame) -> pd.Series:
         return states
 
     # Congested (2)
-    # If either lane hits the threshold independently, or the global hits it
-    lane_0_cong = (df.get("lane_0_avg_speed", 999) < t["congested_speed_max"]) & (df.get("lane_0_total_vehicles", 0) > 0)
-    lane_1_cong = (df.get("lane_1_avg_speed", 999) < t["congested_speed_max"]) & (df.get("lane_1_total_vehicles", 0) > 0)
-    global_cong = (df["avg_speed"] < t["congested_speed_max"]) & (df["total_vehicles"] > 0)
-    congested_mask = lane_0_cong | lane_1_cong | global_cong
+    congested_mask = (df["avg_speed"] < t["congested_speed_max"]) & (df["total_vehicles"] > 0)
     states[congested_mask] = 2
 
     # Reduced (1)
@@ -172,16 +168,9 @@ def assign_traffic_state(df: pd.DataFrame) -> pd.Series:
     states[accident_mask] = 3
 
     # Congested (2)
-    lane_0_cong = (df.get("lane_0_avg_speed", 999) < t["congested_speed_max"]) & (
-        df.get("lane_0_total_vehicles", 0) >= t["congested_vehicles_min"]
+    congestion = (df["avg_speed"] < t["congested_speed_max"]) & (
+        df["total_vehicles"] >= t["congested_vehicles_min"]
     )
-    lane_1_cong = (df.get("lane_1_avg_speed", 999) < t["congested_speed_max"]) & (
-        df.get("lane_1_total_vehicles", 0) >= t["congested_vehicles_min"]
-    )
-    global_cong = (df["avg_speed"] < t["congested_speed_max"]) & (
-        df["total_vehicles"] >= (int(t["congested_vehicles_min"]) * 2)
-    )
-    congestion = lane_0_cong | lane_1_cong | global_cong
     consecutive_congestion = (
         congestion.rolling(
             window=int(t["congested_persistence"]),

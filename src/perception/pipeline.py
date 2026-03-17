@@ -41,11 +41,7 @@ class MinuteTelemetryAccumulator:
 
     clip_id: str
     minute_counts: dict[str, int] = field(default_factory=_empty_vehicle_counts)
-    minute_counts_lane_0: dict[str, int] = field(default_factory=_empty_vehicle_counts)
-    minute_counts_lane_1: dict[str, int] = field(default_factory=_empty_vehicle_counts)
     minute_speeds: list[float] = field(default_factory=list)
-    minute_speeds_lane_0: list[float] = field(default_factory=list)
-    minute_speeds_lane_1: list[float] = field(default_factory=list)
     flow_tracking_ratios: list[float] = field(default_factory=list)
     counted_tracks: set[int] = field(default_factory=set)
     cumulative_counts: dict[str, int] = field(default_factory=_empty_vehicle_counts)
@@ -65,7 +61,6 @@ class MinuteTelemetryAccumulator:
         stationary_confirmed: bool,
         recovered_gap: int,
         flow_tracking_ratio: float,
-        track_direction: str | None,
     ) -> None:
         """Register one track observation into the current minute bucket."""
         if near_zero_motion:
@@ -79,21 +74,14 @@ class MinuteTelemetryAccumulator:
                 self.recovered_track_count += 1
         elif smoothed_speed is not None:
             self.minute_speeds.append(smoothed_speed)
-            if track_direction == "lane_0":
-                self.minute_speeds_lane_0.append(smoothed_speed)
-            elif track_direction == "lane_1":
-                self.minute_speeds_lane_1.append(smoothed_speed)
             self.speed_sample_count += 1
             
         self.flow_tracking_ratios.append(flow_tracking_ratio)
 
         if track.track_id not in self.counted_tracks and track.mark_counted():
-            v_type = track.vehicle_type
-            self.minute_counts[v_type] = self.minute_counts.get(v_type, 0) + 1
-            if track_direction == "lane_0":
-                self.minute_counts_lane_0[v_type] = self.minute_counts_lane_0.get(v_type, 0) + 1
-            elif track_direction == "lane_1":
-                self.minute_counts_lane_1[v_type] = self.minute_counts_lane_1.get(v_type, 0) + 1
+            self.minute_counts[track.vehicle_type] = (
+                self.minute_counts.get(track.vehicle_type, 0) + 1
+            )
             self.counted_tracks.add(track.track_id)
 
     def has_pending_data(self) -> bool:
@@ -110,8 +98,6 @@ class MinuteTelemetryAccumulator:
             else 0.0
         )
         avg_speed = robust_speed_summary(self.minute_speeds) if self.minute_speeds else 0.0
-        avg_lane_0 = robust_speed_summary(self.minute_speeds_lane_0) if self.minute_speeds_lane_0 else 0.0
-        avg_lane_1 = robust_speed_summary(self.minute_speeds_lane_1) if self.minute_speeds_lane_1 else 0.0
 
         avg_flow = (
             sum(self.flow_tracking_ratios) / len(self.flow_tracking_ratios)
@@ -129,16 +115,6 @@ class MinuteTelemetryAccumulator:
             "count_motorcycle": self.minute_counts.get("motorcycle", 0),
             "count_bicycle": self.minute_counts.get("bicycle", 0),
             "total_vehicles": total,
-            "lane_0_avg_speed": round(avg_lane_0, 2),
-            "lane_0_count_car": self.minute_counts_lane_0.get("car", 0),
-            "lane_0_count_truck": self.minute_counts_lane_0.get("truck", 0),
-            "lane_0_count_bus": self.minute_counts_lane_0.get("bus", 0),
-            "lane_0_total_vehicles": sum(self.minute_counts_lane_0.values()),
-            "lane_1_avg_speed": round(avg_lane_1, 2),
-            "lane_1_count_car": self.minute_counts_lane_1.get("car", 0),
-            "lane_1_count_truck": self.minute_counts_lane_1.get("truck", 0),
-            "lane_1_count_bus": self.minute_counts_lane_1.get("bus", 0),
-            "lane_1_total_vehicles": sum(self.minute_counts_lane_1.values()),
             "near_zero_motion_count": self.near_zero_motion_count,
             "stationary_confirmed_count": self.stationary_confirmed_count,
             "rejected_speed_count": self.rejected_speed_count,
@@ -155,11 +131,7 @@ class MinuteTelemetryAccumulator:
                 self.cumulative_counts.get(vehicle_type, 0) + count
             )
         self.minute_counts = _empty_vehicle_counts()
-        self.minute_counts_lane_0 = _empty_vehicle_counts()
-        self.minute_counts_lane_1 = _empty_vehicle_counts()
         self.minute_speeds.clear()
-        self.minute_speeds_lane_0.clear()
-        self.minute_speeds_lane_1.clear()
         self.flow_tracking_ratios.clear()
         self.counted_tracks.clear()
         self.near_zero_motion_count = 0
@@ -266,13 +238,6 @@ def process_clip_telemetry(
             else:
                 smoothed = speed_tracker.update(track.track_id, speed)
 
-            # Assign lane based on horizontal vector
-            track_direction = None
-            if len(track.history) >= 5:
-                dx = track.history[-1][0] - track.history[0][0]
-                if abs(dx) > 10:
-                    track_direction = "lane_1" if dx > 0 else "lane_0"
-
             accumulator.observe_track(
                 track,
                 smoothed_speed=smoothed,
@@ -281,7 +246,6 @@ def process_clip_telemetry(
                 stationary_confirmed=stationary_now,
                 recovered_gap=recovered_gap,
                 flow_tracking_ratio=flow_tracking_ratio,
-                track_direction=track_direction,
             )
 
         frame_idx += 1

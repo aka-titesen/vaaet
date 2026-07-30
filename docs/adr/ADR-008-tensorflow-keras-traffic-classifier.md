@@ -1,5 +1,5 @@
-<!-- context: VAAET/Docs/adr/ADR-008 — Decisión de usar TensorFlow/Keras para clasificación de estado de tráfico.
-Referenciado por AGENTS.md, DDS.md §8, README.md, notebook 02_traffic_state_classifier.ipynb.
+<!-- context: VAAET/docs/adr/ADR-008 — Decisión de usar TensorFlow/Keras para clasificación de estado de tráfico.
+Referenciado por AGENTS.md, SAD.md §8, README.md, notebook 02_traffic_state_classifier.ipynb.
 Introduce la Etapa 2 (Inteligencia) del pipeline VAAET. -->
 
 # ADR-008: TensorFlow/Keras para Clasificación de Estado de Tráfico

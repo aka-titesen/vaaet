@@ -1,5 +1,5 @@
-<!-- context: VAAET/Docs/adr/ADR-003 — Decisión de usar SORT sobre alternativas de tracking.
-Referenciado por AGENTS.md, DDS.md §2.1. -->
+<!-- context: VAAET/docs/adr/ADR-003 — Decisión de usar SORT sobre alternativas de tracking.
+Referenciado por AGENTS.md, SAD.md §2.1. -->
 
 # ADR-003: SORT sobre DeepSORT/ByteTrack
 

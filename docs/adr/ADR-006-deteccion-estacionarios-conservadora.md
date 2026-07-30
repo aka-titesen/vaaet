@@ -1,5 +1,5 @@
-<!-- context: VAAET/Docs/adr/ADR-006 — Decisión de detección ultra-conservadora de estacionarios.
-Referenciado por AGENTS.md, DDS.md §2.3. -->
+<!-- context: VAAET/docs/adr/ADR-006 — Decisión de detección ultra-conservadora de estacionarios.
+Referenciado por AGENTS.md, SAD.md §2.3. -->
 
 # ADR-006: Detección de Estacionarios Ultra-Conservadora (AND-Conjunction)
 

@@ -1,5 +1,5 @@
 <!-- context: VAAET/docs/diagrams/erd.md — Entity-Relationship diagram.
-Referenced by DDS.md, ADR-005, README.md. -->
+Referenced by SAD.md, ADR-005, README.md. -->
 
 # Database Schema (ERD)
 

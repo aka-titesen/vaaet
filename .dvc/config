@@ -1,0 +1,8 @@
+[core]
+    remote = gdrive
+['remote "gdrive"']
+    url = gdrive://VAAET-DVC-Storage
+['remote "s3"']
+    url = s3://vaaet-model-registry
+['remote "local"']
+    url = /tmp/vaaet-dvc-local

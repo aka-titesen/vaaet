@@ -1,4 +1,4 @@
-<!-- context: VAAET/Docs/adr/ADR-007 — Decisión de usar Google Colab como runtime principal.
+<!-- context: VAAET/docs/adr/ADR-007 — Decisión de usar Google Colab como runtime principal.
 Referenciado por AGENTS.md, PRD.md, ADR-001. -->
 
 # ADR-007: Google Colab como Entorno de Ejecución Principal

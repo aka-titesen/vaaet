@@ -1,112 +1,181 @@
-<!-- context: VAAET/docs/PRD.md — Product requirements for the VAAET system.
-Complements DDS.md (technical design) and KPIs.md (performance metrics). -->
+<!-- context: VAAET/docs/PRD.md — Requisitos del producto.
+Complementa SAD.md (arquitectura) y KPIs/KPIs.md (métricas). -->
 
-# PRD — VAAET: Advanced Vehicular Traffic Analysis System
+# Documento de Requisitos del Producto (PRD) — VAAET
 
-## Executive Summary
+## Identificación del Proyecto
 
-VAAET is an academic vehicular traffic analysis system for the General Manuel Belgrano Bridge. The active implementation combines YOLO 11 detection, SORT tracking, optical-flow-assisted camera-motion compensation, physics-first speed estimation, and a TF/Keras traffic-state classifier with a conservative accident gate.
-
-The system is optimized for Google Colab Free, keeps notebooks as orchestrators, and pushes reusable logic into `src/`. It aims for defensible academic rigor rather than production-infrastructure completeness.
-
-## Current Implementation Status
-
-- `archive/00_bootstrap/` is historical only and no longer part of the runtime path
-- The active speed path is physics-first with optical-flow compensation, plausibility filters, and robust per-minute aggregation
-- Optional MLP speed fusion still exists in code as a dormant capability, but it is not wired by default in the active telemetry pipeline
-- HITL/retraining remains an experimental notebook scaffold, not a validated operational feedback loop
-- Notebook code compiles and parity tests pass, but end-to-end Google Colab execution is still validated manually
+| Campo | Detalles |
+|---|---|
+| **Nombre del Proyecto** | VAAET — Video Advanced Analysis of Traffic |
+| **Versión** | 3.0.0 |
+| **Fecha de Creación** | 2025-03-06 |
+| **Estado** | Aprobado |
+| **Responsable Técnico** | Facundo Nicolás González |
+| **Fecha de Emisión** | 2026-07-23 |
 
 ---
 
-## Unique Value Proposition
+## 1. Resumen Ejecutivo
 
-- **Robust academic pipeline**: Combines YOLO 11 detection, Optical Flow, conservative stationary handling, and a traffic-state classifier without overengineering the Colab workflow
-- **Dynamic model selection**: Automatically selects the optimal YOLO 11 model by video duration
-- **Secure persistence**: Integration with PostgreSQL AWS RDS without exposing credentials
-- **Clear outputs**: Processed video with overlays, metrics, and minimalist informational panel
-- **Colab optimization**: Adapted to Google Colab Free/Pro resources and limitations
-- **Dynamic context handling**: Supports camera changes, zoom, multi-view, and real bridge conditions
-- **Modularity and scalability**: Shared `src/` modules, compact notebooks, clear outputs
+### 1.1 Definición del Problema
 
----
+El monitoreo del tráfico vehicular en el Puente Gral. Manuel Belgrano (Corrientes, Argentina) se realiza actualmente de forma manual por operadores SISE. Este método es lento, subjetivo y no genera datos cuantitativos que permitan análisis retrospectivo o planificación vial informada. Los accidentes y congestiones se detectan con demora, y no existe un registro histórico granular del flujo vehicular.
 
-## Three-Module Architecture
+### 1.2 Solución Propuesta
 
-### Module 0 — Bootstrap (ARCHIVED)
+VAAET es un sistema de análisis vehicular automatizado que procesa video de vigilancia existente para extraer telemetría por minuto (conteos por tipo, velocidad promedio, señales de calidad) y clasificar el estado del tráfico en 4 categorías. Opera sobre infraestructura de costo cercano a cero (Google Colab + AWS RDS opcional).
 
-Historical YOLO 11 + OpenCV + SORT pipeline (`archive/00_bootstrap/01_legacy_collection.ipynb`) that generated the original `traffic_data` table. **Never runs again.**
+### 1.3 Valor Diferenciador
 
-### Module 1 — Data Preparation (one-time)
-
-`notebooks/01_data_prep/data_preparation.ipynb` — Quality-aware feature engineering from legacy telemetry into a 19-feature classifier dataset, auto-labeling of 4 traffic states, SMOTE balancing, MLP training, and model export.
-
-### Module 2 — Production (ongoing)
-
-`notebooks/02_production/traffic_analyzer.ipynb` — YOLO 11 + SORT + physics-first speed estimation + trained MLP classifier + optional DB persistence + experimental HITL scaffold.
+- **Pipeline physics-first**: Estimación de velocidad basada en óptica computacional con compensación de movimiento, no en modelos de caja negra
+- **Selección adaptativa de modelo**: 5 variantes de YOLO 11 seleccionadas automáticamente por duración del video
+- **Gate conservador de accidentes**: Regla heurística que complementa al modelo ML para la clase más crítica
+- **19 features de calidad**: Incluyen señales de calidad de medición, no solo datos crudos
+- **Costo mínimo**: Runtime gratuito (Colab Free), BD opcional ($15/mes)
+- **Degradación silenciosa**: Funciona sin BD, sin GPU, y ante videos con frames corruptos
 
 ---
 
-## Requirements Compliance Summary
+## 2. Objetivos y Métricas de Éxito (KPIs)
 
-1. **Video upload**: Only accepts files with format `bridge_YYYY-MM-DD_HH-MM-SS_to_HH-MM-SS.mp4`
-2. **Automatic YOLO 11 selection**: Chooses between yolo11x/l/m/s/n by duration (<1h, 1-3h, 3-6h, 6-12h, >12h)
-3. **Optional persistence**: User decides whether to persist to PostgreSQL AWS RDS; valid data each minute; no hardcoded credentials
-4. **Speed calculation**: Uses a physics-first pipeline with Optical Flow compensation, plausibility filters, conservative stationary handling, and robust per-minute aggregation; optional MLP fusion is not part of the default runtime path
-5. **Multi-camera and perspective**: Automatic layout detection (1, 2, 4 views); calibrable homography; adapts to camera and zoom changes
-6. **Robust tracking**: Persistent tracking (SORT), unique IDs, exclusion of out-of-frame vehicles
-7. **Historical and outputs**: Informational panel and persistence use recent averages when no readings; processed video with overlays and automatic download
-8. **Colab optimization**: Frame skipping, memory cleanup, support for free/pro environments
-9. **Modularity and robustness**: Shared `src/` modules, auxiliary functions, error handling
-10. **Clear outputs**: Concise outputs, success/error messages with emoji prefixes
-11. **Secure credential management**: Environment variables only; never exposes sensitive data
-12. **Aligned database**: Persistence in 3 tables per required schema
-13. **Dynamic context**: Adapts to mobile cameras, zoom, variable angles, and real bridge conditions
-14. **Traffic state classification**: TF/Keras MLP classifies each minute into 4 states from 19 engineered features plus a conservative accident gate
+| Métrica | Definición | Objetivo |
+|---|---|---|
+| **F1-macro del clasificador** | F1-Score promedio no ponderado de las 4 clases | ≥ 0.85 |
+| **F1-Score de detección** | Precisión de detección vehicular YOLO 11 | ≥ 0.97 (objetivo declarado) |
+| **MAE de velocidad** | Error absoluto medio de velocidad estimada | < 5 km/h (objetivo, sin benchmark) |
+| **ID Switches de tracking** | Cambios de identidad por video | Minimizar (sin umbral formal) |
+| **Disponibilidad del pipeline** | Capacidad de procesar un video exitosamente | > 95% (sesiones de Colab) |
+
+Ver [KPIs/KPIs.md](KPIs/KPIs.md) para la guía completa de validación.
 
 ---
 
-## YOLO 11 Detection Model
+## 3. Alcance del Producto
 
-- **Models**: yolo11n, yolo11s, yolo11m, yolo11l, yolo11x
-- **Selection by duration**: ≤1h→x, 1-3h→l, 3-6h→m, 6-12h→s, >12h→n
-- **Auto-diagnosis**: Automatic download of missing weights
+### 3.1 Funcionalidades Incluidas (En Alcance)
 
-## Dependencies
+- **Percepción**: Detección YOLO 11 + tracking SORT + estimación de velocidad physics-first
+- **Inteligencia**: Feature engineering de 19 columnas + clasificador MLP de 4 estados
+- **Persistencia**: Telemetría y clasificaciones en PostgreSQL (opcional)
+- **Visualización**: Video anotado con bounding boxes y HUD + dashboard de métricas
+- **Datos sintéticos**: Generación de secuencias de Accidente y Congestión para entrenamiento
+- **Scaffold HITL**: Celda experimental de validación humana (no productiva)
 
-- **Core**: numpy, pandas, sqlalchemy, psycopg2-binary, joblib
-- **Data Preparation**: tensorflow, scikit-learn, imbalanced-learn, matplotlib, seaborn
-- **Production**: ultralytics, opencv-python, tensorflow, scikit-learn
+### 3.2 Fuera de Alcance
 
-## PostgreSQL Persistence (optional)
-
-- **Frequency**: One record per minute (avg_speed, counts by type, total)
-- **Schema**: 3 tables — `traffic_data` (legacy), `telemetry_raw`, `traffic_classifications`
-- **Security**: Environment variables; no credentials exposed; prompt if missing
-
----
-
-## Use Cases
-
-- SISE operational monitoring
-- Traffic engineering
-- Urban planning
-- Academic research
-- Emergency management
+- Backend web o API REST (reservado para fase futura)
+- Análisis de patentes individuales
+- Predicción de tráfico futuro
+- Soporte multi-idioma en la interfaz
+- Alertas push en tiempo real
 
 ---
 
-## KPIs
+## 4. Historias de Usuario
 
-See [KPIs/KPIs.md](KPIs/KPIs.md) for detailed metrics and validation guide.
+### 4.1 Sistema de Priorización
 
-- Detection precision, speed accuracy, stationary detection, processing efficiency
-- Traffic classification: F1-macro ≥ 0.85, recall per class
+- **P0 (Crítico)**: Bloquea el flujo principal. Sin esto, el sistema no es usable.
+- **P1 (Alto)**: Flujo secundario de alto valor. Impacta a >30% de los usuarios.
+- **P2 (Medio)**: Mejora la experiencia o la eficiencia.
+
+### 4.2 Catálogo de Historias
+
+#### US-001: Procesar Video de Tráfico — P0
+
+**Como** operador SISE, **quiero** subir un video del puente y obtener un análisis automático, **para** no depender del conteo manual.
+
+**Criterios de Aceptación:**
+- **Dado** un video con formato `bridge_YYYY-MM-DD_HH-MM-SS_to_HH-MM-SS.mp4`
+- **Cuando** el operador lo procesa en el Módulo 2
+- **Entonces** obtiene telemetría por minuto con conteos, velocidad promedio, y estado del tráfico
+
+#### US-002: Clasificar Estado del Tráfico — P0
+
+**Como** operador SISE, **quiero** conocer el estado del tráfico de cada minuto procesado, **para** detectar condiciones anómalas rápidamente.
+
+**Criterios de Aceptación:**
+- **Dado** telemetría procesada con 19 features
+- **Cuando** el sistema clasifica cada registro
+- **Entonces** asigna uno de 4 estados (Normal, Reducido, Congestionado, Accidente) con confianza numérica
+
+#### US-003: Entrenar el Clasificador — P0
+
+**Como** investigador, **quiero** entrenar el clasificador MLP con datos de telemetría, **para** obtener un modelo capaz de clasificar 4 estados del tráfico.
+
+**Criterios de Aceptación:**
+- **Dado** datos de `traffic_data` con secuencias sintéticas inyectadas
+- **Cuando** el sistema completa el entrenamiento con SMOTE y EarlyStopping
+- **Entonces** el F1-macro en el conjunto de test es ≥ 0.85
+
+#### US-004: Persistir Resultados — P1
+
+**Como** investigador, **quiero** que los resultados se guarden en una base de datos, **para** poder analizarlos históricamente.
+
+**Criterios de Aceptación:**
+- **Dado** credenciales de BD configuradas vía variables de entorno
+- **Cuando** el sistema persiste telemetría y clasificaciones
+- **Entonces** los registros se insertan con upsert idempotente en `telemetry_raw` y `traffic_classifications`
 
 ---
 
-## Compatible Environments
+## 5. Requisitos Técnicos y No Funcionales
 
-- **Google Colab Free**: Primary runtime and design target
-- **Google Colab Pro**: Compatible but not required
-- **Local development**: Partial validation environment; full runtime behavior still needs notebook-specific smoke tests
+### 5.1 Arquitectura
+
+- Pipeline CT/CI de MLOps Nivel 1 con 3 módulos secuenciales
+- Código compartido en `src/` (13 módulos Python)
+- Notebooks como orquestadores (Colab)
+- Ver [SAD.md](SAD.md) para el diseño completo
+
+### 5.2 Seguridad
+
+- Credenciales por variables de entorno exclusivamente
+- Consultas SQL parametrizadas (prevención de inyección)
+- No se procesan datos personales (patentes, identidades)
+
+### 5.3 Compatibilidad
+
+- Python 3.8+
+- Google Colab Free (runtime principal)
+- Google Colab Pro (compatible, no requerido)
+- Desarrollo local (validación parcial)
+
+---
+
+## 6. Plan de Proyecto
+
+| Hito | Entregable | Fecha | Estado |
+|---|---|---|---|
+| M1: Percepción | Pipeline YOLO 11 + SORT + velocidad | 2025-03-15 | ✅ |
+| M2: Inteligencia | Clasificador MLP + auto-etiquetado | 2025-07-14 | ✅ |
+| M3: Persistencia | PostgreSQL + upsert idempotente | 2025-07-14 | ✅ |
+| M4: Testing | 19 archivos de test | 2026-06-30 | ✅ |
+| M5: Documentación | 25+ documentos (estándares 2026) | 2026-07-23 | ✅ |
+| M6: Web App MVP | Dashboard de tráfico | TBD | 📋 Planificado |
+
+---
+
+## 7. Análisis de Riesgos
+
+Ver [RISK_MATRIX.md](RISK_MATRIX.md) para la matriz completa de 10 riesgos identificados.
+
+Riesgos principales:
+- **R-005**: Clases Accidente/Congestionado nunca observadas en datos reales (Severidad: Crítica)
+- **R-001**: Desconexión de Colab durante procesamiento largo (Severidad: Crítica)
+- **R-009**: Exposición accidental de credenciales (Severidad: Crítica)
+
+---
+
+## Entornos Compatibles
+
+- **Google Colab Free**: Runtime principal y objetivo de diseño
+- **Google Colab Pro**: Compatible, no requerido
+- **Desarrollo local**: Entorno de validación parcial; la ejecución end-to-end en Colab sigue siendo validación manual
+
+---
+
+Responsable del documento: Facundo Nicolás González
+Fecha de revisión: 2026-07-23
+Documentos de referencia: [SAD.md](SAD.md), [SRS.md](SRS.md), [KPIs/KPIs.md](KPIs/KPIs.md)

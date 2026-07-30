@@ -1,5 +1,5 @@
 <!-- context: VAAET/docs/diagrams/pipeline-flow.md — Main processing pipeline diagram.
-Referenced by DDS.md, AGENTS.md, llms-full.txt. -->
+Referenced by SAD.md, AGENTS.md, llms-full.txt. -->
 
 # VAAET Processing Pipeline
 

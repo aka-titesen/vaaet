@@ -1,138 +1,139 @@
-<!-- context: VAAET/docs/USER_GUIDE.md -- User guide for VAAET.
-Complements README.md (overview) and DDS.md (technical design). -->
+<!-- context: VAAET/docs/USER_GUIDE.md — Guía de usuario.
+Complementa README.md (visión general) y SAD.md (arquitectura). -->
 
-# User Guide -- VAAET
+# Guía de Usuario — VAAET
 
-## What is VAAET?
+## ¿Qué es VAAET?
 
-A computer vision system for analyzing vehicular traffic on the General Manuel Belgrano Bridge using YOLO 11, Optical Flow, a physics-first speed pipeline, and a TF/Keras traffic-state classifier. It processes surveillance video, classifies traffic state, and optionally persists results to PostgreSQL.
-
----
-
-## Quick Start
-
-### Module 1 -- Data Preparation (run once)
-
-1. Open `notebooks/01_data_prep/data_preparation.ipynb` in Google Colab
-2. Run the required cells in order. Optional academic cells are `7b` (cross-validation), `7c` (Drive export), and `8` (DB persistence)
-3. Configure DB credentials in Cell 2 via environment variables only if you want DB access: `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`
-4. The system extracts telemetry, engineers 19 quality-aware features, and trains an MLP classifier
-5. Artifacts are exported to `models/intelligence/`
-
-### Module 2 -- Production (ongoing)
-
-1. Open `notebooks/02_production/traffic_analyzer.ipynb` in Google Colab
-2. Run Cell 0 (environment setup) and Cell 1 (load trained model)
-3. Upload your video with name: `bridge_YYYY-MM-DD_HH-MM-SS_to_HH-MM-SS.mp4`
-4. Run Cell 2 for telemetry-only processing, or Cell 2b for annotated video output
-5. Run Cell 3 to classify traffic state
-6. Run Cell 4 to persist results to DB (optional)
-7. Treat Cell 5 as an experimental HITL/retraining scaffold
-8. Run Cell 6 for visualization dashboard
+Un sistema de visión artificial para analizar el tráfico vehicular en el Puente General Manuel Belgrano, utilizando YOLO 11, Flujo Óptico, un pipeline de velocidad physics-first, y un clasificador MLP de TF/Keras para estados del tráfico. Procesa video de vigilancia, clasifica el estado del tráfico, y opcionalmente persiste los resultados en PostgreSQL.
 
 ---
 
-## Video Requirements
+## Inicio Rápido
 
-- **Format**: MP4
-- **Name**: `bridge_YYYY-MM-DD_HH-MM-SS_to_HH-MM-SS.mp4` (strict). Non-compliant names are rejected.
+### Módulo 1 — Preparación de Datos (ejecutar una vez)
+
+1. Abrir `notebooks/01_data_prep/data_preparation.ipynb` en Google Colab
+2. Ejecutar las celdas requeridas en orden. Las celdas académicas opcionales son `7b` (validación cruzada), `7c` (exportación a Drive), y `8` (persistencia en BD)
+3. Configurar credenciales de BD en la Celda 2 vía variables de entorno solo si se desea acceso a la base de datos: `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`
+4. El sistema extrae telemetría, genera 19 features de calidad, y entrena un clasificador MLP
+5. Los artefactos se exportan a `models/intelligence/`
+
+### Módulo 2 — Producción (continua)
+
+1. Abrir `notebooks/02_production/traffic_analyzer.ipynb` en Google Colab
+2. Ejecutar Celda 0 (setup del entorno) y Celda 1 (cargar modelo entrenado)
+3. Subir un video con nombre: `bridge_YYYY-MM-DD_HH-MM-SS_to_HH-MM-SS.mp4`
+4. Ejecutar Celda 2 para procesamiento solo de telemetría, o Celda 2b para video anotado
+5. Ejecutar Celda 3 para clasificar el estado del tráfico
+6. Ejecutar Celda 4 para persistir resultados en BD (opcional)
+7. Tratar la Celda 5 como scaffold experimental de HITL/re-entrenamiento
+8. Ejecutar Celda 6 para el dashboard de visualización
 
 ---
 
-## Automatic Model Selection (YOLO 11)
+## Requisitos de Video
 
-| Duration | Model |
+- **Formato**: MP4
+- **Nombre**: `bridge_YYYY-MM-DD_HH-MM-SS_to_HH-MM-SS.mp4` (estricto). Nombres no conformes son rechazados.
+
+---
+
+## Selección Automática de Modelo (YOLO 11)
+
+| Duración | Modelo |
 |---|---|
-| <= 1h | yolo11x.pt |
+| ≤ 1h | yolo11x.pt |
 | 1-3h | yolo11l.pt |
 | 3-6h | yolo11m.pt |
 | 6-12h | yolo11s.pt |
 | > 12h | yolo11n.pt |
 
-Note: If local files are named "yolov11*.pt", they are automatically normalized to "yolo11*.pt".
+Nota: Si los archivos locales tienen nombre "yolov11*.pt", se normalizan automáticamente a "yolo11*.pt".
 
 ---
 
-## Database (optional)
+## Base de Datos (opcional)
 
-- Persistence is optional -- the system works without a database
-- Uses environment variables if available: `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`
-- Frequency: one record per minute with average speed and counts by type
-- Schema: 3 tables -- `traffic_data` (legacy), `telemetry_raw` (quality-aware telemetry + provenance + speed-quality counters), `traffic_classifications` (predictions + conservative accident gate + optional validation metadata)
-- No JSON/CSV files generated locally
+- La persistencia es opcional — el sistema funciona sin base de datos
+- Usa variables de entorno si están disponibles: `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`
+- Frecuencia: un registro por minuto con velocidad promedio y conteos por tipo
+- Esquema: 3 tablas — `traffic_data` (legado), `telemetry_raw` (telemetría con señales de calidad + proveniencia), `traffic_classifications` (predicciones + gate de accidentes + metadata de validación)
 
 ---
 
-## Traffic States
+## Estados del Tráfico
 
-The classifier outputs one of 4 states per minute:
+El clasificador produce uno de 4 estados por minuto:
 
-| State | Code | Description |
+| Estado | Código | Descripción |
 |---|---|---|
-| Normal | 0 | Free flow, typical speeds 40-80 km/h |
-| Reduced | 1 | Slower flow, moderate volume |
-| Congested | 2 | Very slow flow, high volume |
-| Accident | 3 | Near-zero speeds with sudden deceleration |
+| Normal | 0 | Flujo libre, velocidades típicas 40-80 km/h |
+| Reducido | 1 | Flujo más lento, volumen moderado |
+| Congestionado | 2 | Flujo muy lento, alto volumen |
+| Accidente | 3 | Velocidades casi nulas con desaceleración abrupta |
 
 ---
 
-## Dependencies
+## Dependencias
 
-Install all dependencies:
+Instalar todas las dependencias:
 
 ```bash
+pip install -e ".[all]"
+# O la forma clásica:
 pip install -r requirements.txt
 ```
 
-On Google Colab, dependencies are installed automatically in the first cell.
+En Google Colab, las dependencias se instalan automáticamente en la primera celda.
 
 ---
 
-## Troubleshooting
+## Resolución de Problemas
 
-| Issue | Solution |
+| Problema | Solución |
 |---|---|
-| Missing YOLO weights | Auto-diagnosis downloads them automatically |
-| Memory errors on long videos | Frame skipping and memory cleanup are built-in |
-| DB connection errors | Check environment variables or run without DB |
-| Speeds showing 0 for stationary vehicles | Expected and correct behavior |
-| GPU not available on Colab | System falls back to CPU (slower) |
-| Session disconnects on Colab | Download processed video before closing |
+| Faltan pesos de YOLO | Se descargan automáticamente |
+| Errores de memoria en videos largos | Frame skipping y memory cleanup están integrados |
+| Errores de conexión a BD | Verificar variables de entorno o ejecutar sin BD |
+| Velocidades mostrando 0 para estacionarios | Comportamiento esperado y correcto |
+| GPU no disponible en Colab | El sistema recurre a CPU (más lento) |
+| Sesión se desconecta en Colab | Descargar video procesado antes de cerrar |
 
 ---
 
-## Output
+## Salidas
 
-- **Module 2 Cell 2**: Telemetry-only processing path for quick validation and CSV/DataFrame workflows
-- **Module 2 Cell 2b**: Annotated video with bounding boxes, type + ID, speed, and HUD
-- **Module 2 Cell 3**: Traffic state classification (Normal/Reduced/Congested/Accident)
-- **Module 2 Cell 6**: Visualization dashboard with charts and metrics
-
----
-
-## Historical Archive
-
-`archive/00_bootstrap/01_legacy_collection.ipynb` is kept only as historical context for how the initial telemetry was obtained. It is not part of the active academic workflow and should not be treated as an operational demo notebook.
+- **Módulo 2 Celda 2**: Procesamiento solo de telemetría para validación rápida y flujos CSV/DataFrame
+- **Módulo 2 Celda 2b**: Video anotado con bounding boxes, tipo + ID, velocidad, y HUD
+- **Módulo 2 Celda 3**: Clasificación del estado del tráfico (Normal/Reducido/Congestionado/Accidente)
+- **Módulo 2 Celda 6**: Dashboard de visualización con gráficos y métricas
 
 ---
 
-## Known Limitations
+## Archivo Histórico
 
-- **Speed without ground truth**: Precision depends on manual calibration of `pixels_per_meter`
-- **Tracking without re-ID**: If a vehicle is occluded >1 second, it loses its ID
-- **Colab ephemeral**: Files are lost when session closes -- download before closing
-- **GPU not guaranteed**: At peak hours on Colab Free, may be assigned CPU only (~10x slower)
-- **Auto-labeling is not ground truth**: Labels are engineering proxies, not human-validated
-- **No automated Colab smoke run yet**: Active notebooks compile and have parity tests, but end-to-end Colab execution is still validated manually
-
-For a complete analysis, see [BIAS_AND_LIMITATIONS.md](BIAS_AND_LIMITATIONS.md).
+`archive/00_bootstrap/01_legacy_collection.ipynb` se conserva solo como contexto histórico de cómo se obtuvo la telemetría inicial. No forma parte del flujo de trabajo académico activo.
 
 ---
 
-## Related Documentation
+## Limitaciones Conocidas
 
-- [README.md](../README.md) -- Overview and requirements
-- [DDS.md](DDS.md) -- Detailed technical design
-- [KPIs/KPIs.md](KPIs/KPIs.md) -- Metrics and validation guide
-- [DATA_LINEAGE.md](DATA_LINEAGE.md) -- Data lineage
-- [docs/adr/](adr/) -- Architecture Decision Records
+- **Velocidad sin ground truth**: La precisión depende de la calibración manual de `pixels_per_meter`
+- **Tracking sin re-identificación**: Si un vehículo es ocluido >1 segundo, pierde su ID
+- **Colab efímero**: Los archivos se pierden al cerrar la sesión — descargar antes de cerrar
+- **GPU no garantizada**: En horas pico de Colab Free, puede asignarse solo CPU (~10x más lento)
+- **Auto-etiquetado no es ground truth**: Las etiquetas son proxies de ingeniería, no validadas por humanos
+- **Sin smoke test automatizado en Colab**: Los notebooks compilan y pasan tests de paridad, pero la ejecución end-to-end se valida manualmente
+
+Para un análisis completo, ver [BIAS_AND_LIMITATIONS.md](BIAS_AND_LIMITATIONS.md).
+
+---
+
+## Documentación Relacionada
+
+- [README.md](../README.md) — Visión general y requisitos
+- [SAD.md](SAD.md) — Diseño técnico detallado
+- [KPIs/KPIs.md](KPIs/KPIs.md) — Métricas y guía de validación
+- [DATA_LINEAGE.md](DATA_LINEAGE.md) — Linaje de datos
+- [docs/adr/](adr/) — Decisiones arquitectónicas

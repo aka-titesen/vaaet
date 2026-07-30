@@ -1,82 +1,176 @@
-# Changelog
+# Historial de Cambios — VAAET
 
-All notable changes to the VAAET project are documented in this file.
+Todos los cambios relevantes del proyecto VAAET se documentan en este archivo, siguiendo los estándares de **Semantic Versioning (SemVer)** y la estructura de [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/).
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
+## Identificación del Proyecto
+
+| Campo | Detalles |
+|---|---|
+| **Nombre del Proyecto** | VAAET — Video Advanced Analysis of Traffic |
+| **Responsable Técnico** | Facundo Nicolás González |
+| **Responsable de Contexto** | Facundo Nicolás González |
+| **Repositorio** | [github.com/zgfnicolas/vaaet](https://github.com/zgfnicolas/vaaet) |
+
+---
+
+## [3.1.0] - 2026-07-23
+
+**Hito:** Estandarización de Documentación 2026
+
+### 🚀 Añadido
+
+- **Documentación:** 20+ documentos nuevos siguiendo plantillas estandarizadas:
+  - `docs/SRS.md` — Especificación de Requisitos (IEEE 830)
+  - `docs/SAD.md` — Arquitectura de Software (reemplaza DDS.md)
+  - `docs/DATA_MODEL.md` — Modelo de Datos y Diccionario
+  - `docs/TEST_PLAN.md` — Plan de Pruebas
+  - `docs/MODEL_CARD.md` — Model Card estilo HuggingFace
+  - `docs/USER_PERSONAS.md` — Perfiles de Usuario
+  - `docs/USE_CASES.md` — Casos de Uso del Negocio
+  - `docs/RISK_MATRIX.md` — Matriz de Riesgos
+  - `docs/DEPLOYMENT.md` — Manual de Despliegue
+  - `docs/FEASIBILITY.md` — Estudio de Factibilidad
+  - `docs/SECURITY_POLICY.md` — Política de Seguridad y Privacidad
+  - `docs/BUSINESS_CANVAS.md` — Business Model Canvas
+  - `docs/NDA.md` — Acuerdo de Confidencialidad
+  - `docs/SOW.md` — Declaración de Trabajo
+  - `docs/PROJECT_PLAN.md` — Plan de Gestión del Proyecto
+  - `docs/INDEX.md` — Índice maestro de documentación
+- **Infraestructura:**
+  - `pyproject.toml` — Configuración de paquete Python (compatible Colab)
+  - `.env.example` — Template de variables de entorno
+  - `.github/workflows/ci.yml` — Pipeline CI con GitHub Actions
+  - `SECURITY.md` — Política de seguridad en raíz
+  - `SUPPORT.md` — Canales de soporte
+  - `AGENTS.md` — Contexto de ejecución para agentes de IA
+  - `llms.txt` — Resumen optimizado para RAG/LLMs
+- **ADR:** ADR-010 — Pipeline MLOps con 19 features y señales de calidad
+- **Directorios:** `models/perception/`, `models/intelligence/`, `data/raw/`, `data/processed/`, `data/samples/`
+
+### 🛠️ Cambiado
+
+- **Directorio:** `Docs/` renombrado a `docs/` (convención universal)
+- **Idioma:** Toda la documentación migrada a español argentino formal
+- **README.md:** Reescrito completamente en español con nueva estructura
+- **CONTRIBUTING.md:** Reescrito en español con guías actualizadas
+- **CHANGELOG.md:** Migrado a español con secciones de Context Health
+- **PRD.md:** Reescrito con historias de usuario en formato Gherkin
+- **DDS.md → SAD.md:** Renombrado y reescrito como Documento de Arquitectura de Software
+- **USER_GUIDE.md:** Reescrito en español
+- **DATA_LINEAGE.md:** Reescrito en español con actualización a 19 features
+- **BIAS_AND_LIMITATIONS.md:** Reescrito en español
+- **KPIs/KPIs.md:** Reescrito en español
+
+### 🤖 Gestión de Contexto (Context Health)
+
+- Creado `AGENTS.md` con sistema de gobernanza Always/Ask/Never
+- Creado `llms.txt` optimizado para consumo por RAG
+- Actualización de cross-references entre 30+ documentos
+- Eliminación de deuda de contexto: todas las referencias apuntan a archivos existentes
+- 10 ADRs documentados y clasificados (activos vs supersedidos)
+
+---
 
 ## [3.0.0] - 2025-07-14
 
-### Added
+**Hito:** Arquitectura modular de tres módulos + Clasificador MLP
 
-- Three-module architecture with shared `src/` code (ADR-009)
-- `src/config.py` — single source of truth for constants, paths, thresholds
-- `src/db.py` — SQLAlchemy engine factory with environment variable credentials
-- `src/features.py` — shared feature engineering (9 → 14 columns)
-- `src/labeling.py` — shared auto-labeling rules (4 traffic states)
-- `src/perception/detector.py` — YOLODetector wrapper class
-- `src/perception/tracker.py` — SORTTracker wrapper class
-- `src/perception/speed.py` — physics-based speed estimation
-- Module 2 production notebook: `notebooks/02_production/traffic_analyzer.ipynb`
-- Self-improving feedback loop with HITL corrections
-- ADR-009: Modular three-stage architecture with shared src/
-- AGENTS.md rewritten in English with full architecture documentation
+### 🚀 Añadido
 
-### Changed
+- Arquitectura de tres módulos con código compartido en `src/` (ADR-009)
+- `src/config.py` — Fuente única de verdad para constantes, rutas, umbrales
+- `src/db.py` — Factory de engine SQLAlchemy con credenciales por variables de entorno
+- `src/features.py` — Feature engineering compartido (9 → 19 columnas)
+- `src/labeling.py` — Reglas de auto-etiquetado compartidas (4 estados del tráfico)
+- `src/classification.py` — Inferencia compartida + gate conservador de accidentes
+- `src/contracts.py` — Contratos de datos tipados con validación
+- `src/synthetic.py` — Generador de datos sintéticos para clases raras
+- `src/persistence.py` — Persistencia en BD con upsert idempotente
+- `src/perception/` — Pipeline de percepción: detector, tracker, velocidad, flujo óptico
+- Módulo 2 de producción: `notebooks/02_production/traffic_analyzer.ipynb`
+- Scaffold experimental de feedback loop HITL
+- Suite de tests: 19 archivos, ~2.556 líneas
+- ADR-009: Arquitectura modular de tres etapas
 
-- Module 0 (bootstrap) archived to `archive/00_bootstrap/`
-- Module 1 renamed and moved to `notebooks/01_data_prep/data_preparation.ipynb`
-- ADR-001 through ADR-007 superseded by ADR-009
-- ADR-008 fixed: Input(13,) corrected to Input(14,) to match 14 canonical features
-- All documentation translated to English
-- README.md rewritten with three-module architecture diagram
-- CONTRIBUTING.md updated for modular workflow
-- Project structure reorganized following SOLID, YAGNI, KISS principles
+### 🛠️ Cambiado
 
-### Removed
+- Módulo 0 (bootstrap) archivado en `archive/00_bootstrap/`
+- Módulo 1 movido a `notebooks/01_data_prep/data_preparation.ipynb`
+- ADR-001 a ADR-007 supersedidos por ADR-009
+- ADR-008: Input(13,) corregido a Input(14,) (14 features canónicas, luego 19)
+- Estructura del proyecto reorganizada según principios SOLID, YAGNI, KISS
 
-- `vaaet.ipynb` (duplicate of bootstrap notebook)
-- Old directory structure: `notebooks/phase_1_perception/`, `notebooks/phase_2_intelligence/`
-- `src/utils/` placeholder directory
-- Spanish-language documentation (replaced with English)
+### 🗑️ Eliminado
+
+- `vaaet.ipynb` (duplicado del notebook bootstrap)
+- Estructura de directorios obsoleta: `notebooks/phase_1_perception/`, `notebooks/phase_2_intelligence/`
+- `src/utils/` (directorio placeholder)
+
+---
 
 ## [2.0.0] - 2025-03-07
 
-### Added
+**Hito:** Clasificador de estados del tráfico con TensorFlow/Keras
 
-- Module 1: Traffic state classifier with TensorFlow/Keras MLP
-- 4 traffic states: Normal, Reduced, Congested, Accident
-- Feature engineering: 9 raw fields → 14 engineered features
-- Auto-labeling with traffic engineering rules
-- Class balancing with SMOTE (imbalanced-learn)
-- Two new tables: `telemetry_raw` (14 features + FK), `traffic_classifications` (prediction + HITL)
-- Intelligence pipeline diagram (Mermaid)
-- Extended ERD diagram with 3 tables and FK chain
-- ADR-008: TensorFlow/Keras for traffic classification
+### 🚀 Añadido
 
-### Changed
+- Módulo 1: Clasificador de estados del tráfico con MLP de TensorFlow/Keras
+- 4 estados del tráfico: Normal, Reducido, Congestionado, Accidente
+- Feature engineering: 9 campos crudos → 14 features de ingeniería
+- Auto-etiquetado con reglas de ingeniería de tráfico
+- Balanceo de clases con SMOTE (imbalanced-learn)
+- 2 tablas nuevas: `telemetry_raw` (14 features + FK), `traffic_classifications` (predicción + HITL)
+- Diagrama del pipeline de inteligencia (Mermaid)
+- Diagrama ERD extendido con 3 tablas y cadena de FK
+- ADR-008: TensorFlow/Keras para clasificación de tráfico
 
-- Project restructured: notebooks/, models/, data/, src/, docs/
-- Documentation updated: README, DDS, DATA_LINEAGE, KPIs, BIAS_AND_LIMITATIONS, AGENTS, CONTRIBUTING
-- requirements.txt expanded with 7 new dependencies (tensorflow, pandas, sqlalchemy, etc.)
-- .gitignore updated for *.keras, *.joblib, data/processed/*.csv
+### 🛠️ Cambiado
+
+- Proyecto reestructurado: notebooks/, models/, data/, src/, docs/
+- requirements.txt expandido con 7 dependencias nuevas
+
+---
 
 ## [1.0.0] - 2025-03-06
 
-### Added
+**Hito:** Pipeline completo de análisis vehicular — Percepción
 
-- Complete vehicular traffic analysis pipeline for Gral. Manuel Belgrano Bridge
-- Detection and classification with YOLO 11 (5 variants: n/s/m/l/x)
-- Automatic model selection based on video duration
-- Persistent tracking with lightweight SORT
-- Hybrid speed calculation: 70% physics + 30% MLP smoother
-- Camera motion compensation via Optical Flow (Lucas-Kanade)
-- Adaptive perspective correction by Y-coordinate
-- Ultra-conservative stationary vehicle detection (AND-conjunction)
-- Multi-camera support: automatic layout detection (1, 2, 4 views)
-- Optional PostgreSQL persistence (AWS RDS) per minute
-- Output video with annotations, overlays, and informational HUD
-- Synthetic video generator for portfolio demos
-- Universal upload interface (Colab + local)
-- Google Colab Free/Pro optimization (frame skipping, memory cleanup)
-- Documentation: PRD, DDS, User Guide, KPIs, ADRs
-- Documentation infrastructure: AGENTS.md, llms.txt, Mermaid diagrams, data lineage
+### 🚀 Añadido
+
+- Pipeline completo de análisis vehicular para el Puente Gral. Manuel Belgrano
+- Detección y clasificación con YOLO 11 (5 variantes: n/s/m/l/x)
+- Selección automática de modelo por duración del video
+- Tracking persistente con SORT liviano
+- Cálculo de velocidad híbrido: 70% física + 30% MLP suavizador
+- Compensación de movimiento de cámara vía Flujo Óptico (Lucas-Kanade)
+- Corrección de perspectiva adaptativa por coordenada Y
+- Detección ultraconservadora de vehículos estacionarios (conjunción AND de 6 criterios)
+- Soporte multi-cámara: detección automática de layouts (1, 2, 4 vistas)
+- Persistencia opcional en PostgreSQL (AWS RDS) por minuto
+- Video de salida con anotaciones, overlays, y HUD informativo
+- Generador de video sintético para demos de portfolio
+- Interfaz universal de upload (Colab + local)
+- Optimización para Google Colab Free/Pro (frame skipping, memory cleanup)
+
+---
+
+## Convención de Commits
+
+- `feat(...)`: Nueva funcionalidad
+- `fix(...)`: Corrección de errores
+- `docs(...)`: Cambios en documentación
+- `refactor(...)`: Mejora de código sin cambios funcionales
+- `test(...)`: Adición o modificación de tests
+
+## Versionado
+
+| Tipo de Cambio | Incremento |
+|---|---|
+| **Mayor (Major)** | Cambios que rompen compatibilidad o arquitectura profunda |
+| **Menor (Minor)** | Nuevas funcionalidades sin romper compatibilidad |
+| **Parche (Patch)** | Correcciones menores y mantenimiento |
+
+---
+
+Responsable del documento: Facundo Nicolás González
+Fecha de revisión: 2026-07-23

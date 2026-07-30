@@ -1,5 +1,5 @@
 <!-- context: VAAET/docs/diagrams/intelligence-pipeline.md — Module 1 Intelligence Pipeline.
-Referenced by DDS.md, ADR-008, notebook 01_data_prep/data_preparation.ipynb. -->
+Referenced by SAD.md, ADR-008, notebook 01_data_prep/data_preparation.ipynb. -->
 
 # Intelligence Pipeline — Module 1
 

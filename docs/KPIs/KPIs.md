@@ -1,137 +1,137 @@
-<!-- context: VAAET/docs/KPIs/KPIs.md -- Performance metrics and validation guide.
-Complements PRD.md (requirements) and BIAS_AND_LIMITATIONS.md (limitations). -->
+<!-- context: VAAET/docs/KPIs/KPIs.md — Métricas de rendimiento y guía de validación.
+Complementa PRD.md (requisitos) y BIAS_AND_LIMITATIONS.md (limitaciones). -->
 
-# Performance Metrics (KPIs) and Validation Guide for VAAET
+# Métricas de Rendimiento (KPIs) y Guía de Validación — VAAET
 
-This document describes the Key Performance Indicators (KPIs) that define the success of the VAAET system and provides a detailed guide for validating the stated precision targets.
+Este documento describe los Indicadores Clave de Rendimiento (KPIs) que definen el éxito del sistema VAAET y provee una guía detallada para validar los objetivos de precisión declarados.
 
-## 1. System KPIs
+## 1. KPIs del Sistema
 
-### 1.1 Detection and Classification Precision
+### 1.1 Precisión de Detección y Clasificación
 
-- **What**: Measures the system's ability to correctly identify vehicles and assign the correct class (car, truck, bus, motorcycle, bicycle). Target: **97%**.
-- **Why**: Foundation of the system. If detection fails, all downstream calculations are incorrect.
-- **How**: Measured via **F1-Score** combining Precision and Recall.
-  - **Precision**: `TP / (TP + FP)` -- of detected vehicles, what percentage was correct
-  - **Recall**: `TP / (TP + FN)` -- of real vehicles, what percentage was detected
+- **Qué**: Mide la capacidad del sistema para identificar correctamente vehículos y asignar la clase correcta (auto, camión, colectivo, motocicleta, bicicleta). Objetivo: **97%**.
+- **Por qué**: Base del sistema. Si la detección falla, todos los cálculos posteriores son incorrectos.
+- **Cómo**: Medido vía **F1-Score** que combina Precisión y Recall.
+  - **Precisión**: `TP / (TP + FP)` — de los vehículos detectados, qué porcentaje fue correcto
+  - **Recall**: `TP / (TP + FN)` — de los vehículos reales, qué porcentaje fue detectado
 
-### 1.2 Speed Calculation Precision
+### 1.2 Precisión del Cálculo de Velocidad
 
-- **What**: Difference between VAAET-calculated speed and actual vehicle speed.
-- **Why**: Critical for traffic flow analysis and decision-making.
-- **How**: **Mean Absolute Error (MAE)** = `(1/n) * SUM|RealSpeed - PredictedSpeed|`. Target: MAE < 5 km/h.
+- **Qué**: Diferencia entre la velocidad calculada por VAAET y la velocidad real del vehículo.
+- **Por qué**: Crítico para el análisis del flujo de tráfico y la toma de decisiones.
+- **Cómo**: **Error Absoluto Medio (MAE)** = `(1/n) * Σ|VelocidadReal - VelocidadPredicha|`. Objetivo: MAE < 5 km/h.
 
-### 1.3 Tracking Reliability
+### 1.3 Confiabilidad del Tracking
 
-- **What**: Ability to maintain consistent unique IDs across frames.
-- **Why**: Essential for speed calculation and avoiding double-counting.
-- **How**: **Identity Switches (ID Switches)** -- number of ID changes per video. Target: minimize to near-zero.
+- **Qué**: Capacidad de mantener IDs únicos consistentes entre frames.
+- **Por qué**: Esencial para el cálculo de velocidad y evitar doble conteo.
+- **Cómo**: **Identity Switches (Cambios de ID)** — número de cambios de ID por video. Objetivo: minimizar a casi cero.
 
-### 1.4 Processing Efficiency
+### 1.4 Eficiencia de Procesamiento
 
-- **What**: Video processing speed.
-- **Why**: Determines viability for processing large video volumes.
-- **How**: **Frames Per Second (FPS)** = total frames / processing time.
+- **Qué**: Velocidad de procesamiento de video.
+- **Por qué**: Determina la viabilidad para procesar grandes volúmenes de video.
+- **Cómo**: **Frames Por Segundo (FPS)** = total de frames / tiempo de procesamiento.
 
-### 1.5 Stationary Detection Robustness
+### 1.5 Robustez de Detección de Estacionarios
 
-- **What**: Effectiveness of `is_stationary()` in correctly identifying stopped vehicles.
-- **Why**: Prevents average speed contamination by non-moving vehicles.
-- **How**: True Positive and False Positive rates for stationary classification.
-
----
-
-## 2. Validation Guide for 97% Precision Target
-
-### Step 0: Environment Preparation
-
-1. **Test video**: 2-5 minute representative clip from the Belgrano Bridge (not used for training)
-2. **Annotation tool**: CVAT, VGG Image Annotator (VIA), or similar
-
-### Step 1: Create Ground Truth
-
-1. Load video in annotation tool
-2. Define class labels: `car`, `truck`, `bus`, `motorcycle`, `bicycle`
-3. Annotate each frame (or every N frames): draw bounding boxes, assign classes, assign tracking IDs
-4. Export annotations (JSON/XML/CSV) -- this is your Ground Truth
-
-### Step 2: Run VAAET
-
-1. Process the same test video with the production notebook
-2. Export detections per frame: frame number, bbox [x1,y1,x2,y2], class, track ID, confidence
-
-### Step 3: Compare and Calculate
-
-1. Load both files in a comparison script
-2. Match per frame using IoU > 0.5 threshold
-3. Classify: TP (correct match), FP (no matching ground truth), FN (missed ground truth)
-4. Calculate: `Precision`, `Recall`, `F1-Score = 2*(P*R)/(P+R)`
-
-### Step 4: Interpretation
-
-F1-Score >= 0.97 validates the 97% precision target. If below, Precision/Recall breakdown indicates improvement areas.
+- **Qué**: Efectividad de `is_stationary()` para identificar correctamente vehículos detenidos.
+- **Por qué**: Previene la contaminación de la velocidad promedio por vehículos que no se mueven.
+- **Cómo**: Tasas de Verdaderos Positivos y Falsos Positivos para clasificación de estacionarios.
 
 ---
 
-## 3. Current Measurement Status
+## 2. Guía de Validación del Objetivo de 97% de Precisión
 
-> **Important**: KPI targets listed here are **declared objectives** not yet validated with real benchmarks.
+### Paso 0: Preparación del Entorno
 
-| KPI | Target | Measurement Status |
+1. **Video de test**: Clip representativo de 2-5 minutos del Puente Belgrano (no usado para entrenamiento)
+2. **Herramienta de anotación**: CVAT, VGG Image Annotator (VIA), o similar
+
+### Paso 1: Crear Ground Truth
+
+1. Cargar el video en la herramienta de anotación
+2. Definir etiquetas de clase: `auto`, `camión`, `colectivo`, `motocicleta`, `bicicleta`
+3. Anotar cada frame (o cada N frames): dibujar bounding boxes, asignar clases, asignar IDs de tracking
+4. Exportar anotaciones (JSON/XML/CSV) — esto es tu Ground Truth
+
+### Paso 2: Ejecutar VAAET
+
+1. Procesar el mismo video de test con el notebook de producción
+2. Exportar detecciones por frame: número de frame, bbox [x1,y1,x2,y2], clase, track ID, confianza
+
+### Paso 3: Comparar y Calcular
+
+1. Cargar ambos archivos en un script de comparación
+2. Hacer matching por frame usando umbral de IoU > 0.5
+3. Clasificar: TP (match correcto), FP (sin ground truth correspondiente), FN (ground truth no detectado)
+4. Calcular: `Precisión`, `Recall`, `F1-Score = 2*(P*R)/(P+R)`
+
+### Paso 4: Interpretación
+
+F1-Score ≥ 0.97 valida el objetivo de 97% de precisión. Si está por debajo, el desglose de Precisión/Recall indica las áreas de mejora.
+
+---
+
+## 3. Estado Actual de Medición
+
+> **Importante**: Los objetivos de KPI listados aquí son **metas declaradas** aún no validadas con benchmarks reales.
+
+| KPI | Objetivo | Estado de Medición |
 |---|---|---|
-| F1-Score Detection | 97% | No real benchmark. Requires manually annotated ground truth |
-| MAE Speed | < 5 km/h | No speed ground truth. No reference data for the bridge |
-| ID Switches | Minimize | No formal measurement. Requires ground truth with consistent IDs |
-| FPS Processing | Variable | Not published. Depends on YOLO model and Colab GPU |
-| Stationary Precision | High | No quantitative evaluation. Qualitatively validated with synthetic demos |
-| F1-macro Classification | >= 0.85 | Pending first Module 1 execution |
-| Recall Accident class | > 0 | Pending. Extremely rare class |
+| F1-Score Detección | 97% | Sin benchmark real. Requiere ground truth anotado manualmente |
+| MAE Velocidad | < 5 km/h | Sin ground truth de velocidad. Sin datos de referencia del puente |
+| Cambios de ID | Minimizar | Sin medición formal. Requiere ground truth con IDs consistentes |
+| FPS Procesamiento | Variable | No publicado. Depende del modelo YOLO y GPU de Colab |
+| Precisión Estacionarios | Alta | Sin evaluación cuantitativa. Validado cualitativamente con demos sintéticos |
+| F1-macro Clasificación | ≥ 0.85 | Pendiente primera ejecución del Módulo 1 |
+| Recall clase Accidente | > 0 | Pendiente. Clase extremadamente rara |
 
-### Validation Prerequisites
+### Prerrequisitos de Validación
 
-1. **Test video** representative of the bridge (2-5 minutes)
-2. **Manual annotation** with CVAT or VIA tool (Step 1 of the guide)
-3. **Comparison script** with IoU > 0.5 (not currently provided -- must be implemented)
-4. **Real speed data** (radar or GPS) for MAE validation -- currently unavailable
+1. **Video de test** representativo del puente (2-5 minutos)
+2. **Anotación manual** con herramienta CVAT o VIA (Paso 1 de la guía)
+3. **Script de comparación** con IoU > 0.5 (no provisto actualmente — debe implementarse)
+4. **Datos reales de velocidad** (radar o GPS) para validación de MAE — actualmente no disponibles
 
-### Known Limitations
+### Limitaciones Conocidas
 
-See [BIAS_AND_LIMITATIONS.md](../BIAS_AND_LIMITATIONS.md) for complete analysis of biases affecting KPIs.
+Ver [BIAS_AND_LIMITATIONS.md](../BIAS_AND_LIMITATIONS.md) para el análisis completo de sesgos que afectan los KPIs.
 
 ---
 
-## 4. Traffic State Classification KPIs (Modules 1 and 2)
+## 4. KPIs de Clasificación de Estados del Tráfico (Módulos 1 y 2)
 
-These KPIs evaluate the quality of the MLP classifier.
+Estos KPIs evalúan la calidad del clasificador MLP.
 
 ### 4.1 F1-Score Macro
 
-- **What**: Unweighted average of F1-Score per class. Treats all classes equally regardless of frequency.
-- **Why**: Penalizes poor performance on rare classes (Accident ~0.1%) and frequent classes (Normal ~80%) equitably.
-- **Target**: >= 0.85
-- **How**: `sklearn.metrics.f1_score(y_test, y_pred, average='macro')`
+- **Qué**: Promedio no ponderado del F1-Score por clase. Trata todas las clases por igual independientemente de su frecuencia.
+- **Por qué**: Penaliza el rendimiento pobre en clases raras (Accidente ~0,1%) y clases frecuentes (Normal ~80%) de forma equitativa.
+- **Objetivo**: ≥ 0.85
+- **Cómo**: `sklearn.metrics.f1_score(y_test, y_pred, average='macro')`
 
-### 4.2 Recall per Class
+### 4.2 Recall por Clase
 
-- **What**: Of all records truly belonging to a class, what percentage did the model detect?
-- **Why**: Recall of 0 for Accident means the model NEVER detects the most operationally critical class.
-- **Target**: > 0 for all classes present
-- **Especially critical**: Accident (recall > 0 is the minimum acceptable)
+- **Qué**: De todos los registros que verdaderamente pertenecen a una clase, ¿qué porcentaje detectó el modelo?
+- **Por qué**: Recall de 0 para Accidente significa que el modelo NUNCA detecta la clase más crítica operativamente.
+- **Objetivo**: > 0 para todas las clases presentes
+- **Especialmente crítico**: Accidente (recall > 0 es el mínimo aceptable)
 
-### 4.3 Confusion Matrix
+### 4.3 Matriz de Confusión
 
-- **What**: Table showing prediction vs. reality distribution for each class pair.
-- **Expected confusions**:
-  - Normal <-> Reduced: fuzzy boundary at ~40 km/h
-  - Congested <-> Reduced: fuzzy boundary at ~5 km/h
-  - Accident rarely confused with Normal (very different speeds)
+- **Qué**: Tabla que muestra la distribución de predicciones vs. realidad para cada par de clases.
+- **Confusiones esperadas**:
+  - Normal ↔ Reducido: frontera difusa a ~40 km/h
+  - Congestionado ↔ Reducido: frontera difusa a ~5 km/h
+  - Accidente raramente confundido con Normal (velocidades muy diferentes)
 
-### 4.4 Current Measurement Status (Modules 1 and 2)
+### 4.4 Estado Actual de Medición (Módulos 1 y 2)
 
-| KPI | Target | Status |
+| KPI | Objetivo | Estado |
 |---|---|---|
-| F1-macro | >= 0.85 | Pending first execution |
-| Recall Accident | > 0 | Pending (rare class, SMOTE mitigates) |
-| Recall Normal | > 0.90 | Pending (majority class) |
-| Recall Reduced | > 0.50 | Pending |
-| Recall Congested | > 0.50 | Pending |
+| F1-macro | ≥ 0.85 | Pendiente primera ejecución |
+| Recall Accidente | > 0 | Pendiente (clase rara, SMOTE mitiga) |
+| Recall Normal | > 0.90 | Pendiente (clase mayoritaria) |
+| Recall Reducido | > 0.50 | Pendiente |
+| Recall Congestionado | > 0.50 | Pendiente |

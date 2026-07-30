@@ -1,5 +1,5 @@
 <!-- context: VAAET/docs/diagrams/model-selection.md — YOLO model selection logic.
-Referenced by DDS.md, ADR-002, PRD.md. -->
+Referenced by SAD.md, ADR-002, PRD.md. -->
 
 # Automatic YOLO 11 Model Selection
 

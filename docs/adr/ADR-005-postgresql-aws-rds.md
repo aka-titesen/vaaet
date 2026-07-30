@@ -1,4 +1,4 @@
-<!-- context: VAAET/Docs/adr/ADR-005 — Decisión de usar PostgreSQL en AWS RDS.
+<!-- context: VAAET/docs/adr/ADR-005 — Decisión de usar PostgreSQL en AWS RDS.
 Referenciado por AGENTS.md, PRD.md, README.md. -->
 
 # ADR-005: PostgreSQL (AWS RDS) sobre SQLite/Local

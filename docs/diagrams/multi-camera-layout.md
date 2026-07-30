@@ -1,5 +1,5 @@
 <!-- context: VAAET/docs/diagrams/multi-camera-layout.md — Multi-camera layout detection.
-Referenced by DDS.md, PRD.md. -->
+Referenced by SAD.md, PRD.md. -->
 
 # Multi-Camera Layout Detection
 

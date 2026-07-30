@@ -1,5 +1,5 @@
 <!-- context: VAAET/docs/diagrams/colab-aws-architecture.md — C4 container diagram.
-Referenced by DDS.md, AGENTS.md, ADR-005, ADR-007. -->
+Referenced by SAD.md, AGENTS.md, ADR-005, ADR-007. -->
 
 # Colab + AWS RDS Architecture
 

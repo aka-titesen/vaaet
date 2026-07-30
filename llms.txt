@@ -1,0 +1,32 @@
+# VAAET — Video Advanced Analysis of Traffic
+> Sistema de análisis vehicular avanzado para el Puente Gral. Manuel Belgrano (Corrientes, Argentina)
+
+## Resumen
+VAAET es un pipeline CT/CI (Continuous Training / Continuous Inference) de MLOps Nivel 1 que procesa video de vigilancia SISE para:
+- Detectar y clasificar vehículos (auto, camión, colectivo, moto, bicicleta) con YOLO 11
+- Estimar velocidades individuales mediante óptica computacional con compensación de movimiento de cámara
+- Clasificar el estado del tráfico (Normal, Reducido, Congestionado, Accidente) con un MLP de TensorFlow/Keras
+- Persistir telemetría y clasificaciones en PostgreSQL (AWS RDS)
+
+## Arquitectura
+Pipeline de tres módulos secuenciales con código compartido en src/:
+- Módulo 0 (Bootstrap, archivado): Generó los datos históricos iniciales. Congelado.
+- Módulo 1 (Preparación de Datos): Feature engineering de 19 columnas, auto-etiquetado, SMOTE, entrenamiento MLP. Ejecución única.
+- Módulo 2 (Producción): YOLO 11 + SORT + estimación de velocidad + clasificador MLP + persistencia DB + scaffold HITL. Ejecución continua.
+
+## Stack
+Python 3.8+ | YOLO 11 | OpenCV | TensorFlow/Keras | scikit-learn | SORT | PostgreSQL | Google Colab
+
+## Documentación
+- docs/PRD.md — Requisitos del producto
+- docs/SAD.md — Arquitectura de software
+- docs/SRS.md — Especificación de requisitos
+- docs/MODEL_CARD.md — Model Card del clasificador MLP
+- docs/DATA_MODEL.md — Modelo de datos y diccionario
+- docs/DATA_LINEAGE.md — Linaje de datos
+- docs/USER_GUIDE.md — Guía de usuario
+- docs/BIAS_AND_LIMITATIONS.md — Sesgos y limitaciones
+- docs/KPIs/KPIs.md — Métricas y validación
+- docs/adr/ — 10 Architecture Decision Records
+- AGENTS.md — Contexto para agentes de IA
+- CONTRIBUTING.md — Guía de contribución

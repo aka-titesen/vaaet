@@ -1,5 +1,5 @@
         <!-- context: VAAET/docs/diagrams/speed-calculation.md -- Detailed speed calculation flow.
-        Referenced by DDS.md as the active physics-first speed path. -->
+        Referenced by SAD.md as the active physics-first speed path. -->
 
         # Physics-First Speed Calculation Flow
 

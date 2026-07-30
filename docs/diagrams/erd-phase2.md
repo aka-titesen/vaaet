@@ -1,5 +1,5 @@
 <!-- context: VAAET/docs/diagrams/erd-phase2.md — Complete ERD with all 3 tables.
-Referenced by DDS.md, ADR-008, DATA_LINEAGE.md. -->
+Referenced by SAD.md, ADR-008, DATA_LINEAGE.md. -->
 
 # Database Schema — Module 0 + Module 1
 

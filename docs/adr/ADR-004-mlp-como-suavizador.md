@@ -1,5 +1,5 @@
-<!-- context: VAAET/Docs/adr/ADR-004 — Decisión de usar MLP como suavizador con datos dummy.
-Referenciado por AGENTS.md, DDS.md §2.2, BIAS_AND_LIMITATIONS.md. -->
+<!-- context: VAAET/docs/adr/ADR-004 — Decisión de usar MLP como suavizador con datos dummy.
+Referenciado por AGENTS.md, SAD.md §2.2, BIAS_AND_LIMITATIONS.md. -->
 
 # ADR-004: MLP como Suavizador (No Estimador Primario)
 

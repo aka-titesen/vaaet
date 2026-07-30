@@ -1,5 +1,5 @@
-<!-- context: VAAET/Docs/adr/ADR-002 — Decisión de usar YOLO 11 con selección adaptativa.
-Referenciado por AGENTS.md, DDS.md §2.1, PRD.md. -->
+<!-- context: VAAET/docs/adr/ADR-002 — Decisión de usar YOLO 11 con selección adaptativa.
+Referenciado por AGENTS.md, SAD.md §2.1, PRD.md. -->
 
 # ADR-002: YOLO 11 con Selección Adaptativa por Duración
 

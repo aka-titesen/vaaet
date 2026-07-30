@@ -1,232 +1,223 @@
-<!-- context: VAAET/docs/DATA_LINEAGE.md — Data lineage documentation.
-Complements DDS.md (technical design) and BIAS_AND_LIMITATIONS.md (biases). -->
+<!-- context: VAAET/docs/DATA_LINEAGE.md — Documentación de linaje de datos.
+Complementa SAD.md (arquitectura) y BIAS_AND_LIMITATIONS.md (sesgos). -->
 
-# Data Lineage — VAAET
+# Linaje de Datos — VAAET
 
-This document describes the origin, transformation, and destination of all data flowing through the VAAET system.
+Este documento describe el origen, transformación y destino de todos los datos que fluyen a través del sistema VAAET.
 
 ---
 
-## 1. Data Sources
+## 1. Fuentes de Datos
 
-### Video Input
+### Video de Entrada
 
-| Attribute | Value |
+| Atributo | Valor |
 |---|---|
-| **Origin** | SISE surveillance cameras on Gral. Manuel Belgrano Bridge |
-| **Format** | MP4 (H.264) |
-| **Typical resolution** | 1920x1080 (Full HD) |
-| **FPS** | 30 fps (configurable by camera) |
-| **Naming convention** | `bridge_YYYY-MM-DD_HH-MM-SS_to_HH-MM-SS.mp4` |
-| **Owner** | SISE System (National Highway Directorate) |
-| **Access** | Restricted — videos are not distributed with the project |
+| **Origen** | Cámaras de vigilancia SISE en el Puente Gral. Manuel Belgrano |
+| **Formato** | MP4 (H.264) |
+| **Resolución típica** | 1920×1080 (Full HD) |
+| **FPS** | 30 fps (configurable por cámara) |
+| **Convención de nombre** | `bridge_YYYY-MM-DD_HH-MM-SS_to_HH-MM-SS.mp4` |
+| **Propietario** | Sistema SISE (Dirección Nacional de Vialidad) |
+| **Acceso** | Restringido — los videos no se distribuyen con el proyecto |
 
-### Pre-trained Models
+### Modelos Pre-entrenados
 
-| Model | Source | Training Dataset | Relevant Classes |
+| Modelo | Fuente | Dataset de Entrenamiento | Clases Relevantes |
 |---|---|---|---|
-| yolo11n/s/m/l/x.pt | Ultralytics Hub | MS COCO 2017 | car, truck, bus, motorcycle, bicycle |
+| yolo11n/s/m/l/x.pt | Ultralytics Hub | MS COCO 2017 | auto, camión, colectivo, motocicleta, bicicleta |
 
-**Note**: Models are downloaded automatically at runtime and are NOT versioned in the repository.
+**Nota**: Los modelos se descargan automáticamente en runtime y NO se versionan en el repositorio.
 
 ---
 
-## 2. Module 0 — Bootstrap Pipeline (ARCHIVED)
+## 2. Módulo 0 — Pipeline Bootstrap (ARCHIVADO)
 
-Located in `archive/00_bootstrap/01_legacy_collection.ipynb`. This pipeline generated the historical `traffic_data` table and **never runs again**.
+Ubicado en `archive/00_bootstrap/01_legacy_collection.ipynb`. Este pipeline generó la tabla histórica `traffic_data` y **no se ejecuta nunca más**.
 
 ```
 Video MP4
-  |
-  +-- [1] Name validation -------- Rejects if format doesn't match
-  |
-  +-- [2] Frame extraction ------- OpenCV VideoCapture @ 30fps
-  |
-  +-- [3] YOLO 11 detection ------ Per frame:
-  |     |                            Input: BGR frame (numpy array)
-  |     |                            Output: list of (bbox, class, confidence)
-  |     |                            Filters: conf > 0.5, NMS IoU < 0.4
-  |     +-- Only vehicular classes: car, truck, bus, motorcycle, bicycle
-  |
-  +-- [4] SORT tracking --------- Matching by Euclidean distance
-  |     |                            Input: current frame detections
-  |     |                            Output: track_id for each detection
-  |     |                            Threshold: 100px, same vehicle type
-  |     +-- Stores centroid history in deque(30)
-  |
-  +-- [5] Hybrid speed ---------- Per active track:
-  |     |   [5a] Optical Flow (Lucas-Kanade) -> global motion vector
-  |     |   [5b] Camera compensation -> subtract global motion
-  |     |   [5c] Euclidean displacement -> distance in pixels
-  |     |   [5d] Perspective correction -> factor by Y zone
-  |     |   [5e] Conversion -> pixels/meter x factor -> km/h
-  |     |   [5f] MLP prediction -> 10 features -> smoothed speed
-  |     |   [5g] Fusion -> 0.7 x physics + 0.3 x MLP
-  |     |   [5h] Plausibility filter -> [2, 120] km/h
-  |     +-- Speeds outside range silently discarded
-  |
-  +-- [6] Stationary classification -- AND of 6 statistical criteria
-  |     |                                If stationary -> speed = 0
-  |     +-- Requires minimum 200 frames of observation
-  |
-  +-- [7] Visual annotation ------ Draw on frame:
-  |     |   Bounding boxes, type + ID, speed, informational HUD
-  |     +-- Write frame to output video (OpenCV VideoWriter)
-  |
-  +-- [8] Persistence (every 60s) -- INSERT into PostgreSQL:
-        |   clip_id, record_time, avg_speed, count_* by type, total
-        +-- Optional — silent failure if no DB configured
+  │
+  ├── [1] Validación de nombre ──── Rechaza si el formato no coincide
+  │
+  ├── [2] Extracción de frames ──── OpenCV VideoCapture @ 30fps
+  │
+  ├── [3] Detección YOLO 11 ─────── Por frame:
+  │     │                             Entrada: frame BGR (numpy array)
+  │     │                             Salida: lista de (bbox, clase, confianza)
+  │     │                             Filtros: conf > 0.5, NMS IoU < 0.4
+  │     └── Solo clases vehiculares
+  │
+  ├── [4] Tracking SORT ─────────── Matching por distancia euclidiana
+  │     │                             Umbral: 100px, mismo tipo de vehículo
+  │     └── Almacena historial de centroides en deque(30)
+  │
+  ├── [5] Velocidad híbrida ─────── Por track activo:
+  │     │   [5a] Flujo Óptico (Lucas-Kanade) → vector de movimiento global
+  │     │   [5b] Compensación de cámara → restar movimiento global
+  │     │   [5c] Desplazamiento euclidiano → distancia en píxeles
+  │     │   [5d] Corrección de perspectiva → factor por zona Y
+  │     │   [5e] Conversión → píxeles/metro × factor → km/h
+  │     │   [5f] Predicción MLP → 10 features → velocidad suavizada
+  │     │   [5g] Fusión → 0.7 × física + 0.3 × MLP
+  │     │   [5h] Filtro de plausibilidad → [2, 120] km/h
+  │     └── Velocidades fuera de rango descartadas silenciosamente
+  │
+  ├── [6] Clasificación estacionarios ── AND de 6 criterios estadísticos
+  │     │                                  Si estacionario → velocidad = 0
+  │     └── Requiere mínimo 200 frames (~6.5s) de observación
+  │
+  ├── [7] Anotación visual ─────── Bounding boxes, tipo + ID, velocidad, HUD
+  │
+  └── [8] Persistencia (c/60s) ─── INSERT en PostgreSQL:
+        │   clip_id, record_time, avg_speed, count_* por tipo, total
+        └── Opcional — fallo silencioso si no hay BD
 ```
 
 ---
 
-## 3. MLP Speed Smoother Training Data
+## 3. Datos de Entrenamiento del MLP Suavizador de Velocidad
 
-| Attribute | Value |
+| Atributo | Valor |
 |---|---|
-| **Type** | Random synthetic data |
-| **Generation** | `np.random.rand(100, 10)` for features, `np.random.rand(100) * 80 + 20` for targets |
-| **Seed** | Not fixed — each execution generates different data |
-| **Purpose** | Scaffold to initialize MLPRegressor. NOT real training |
-| **Impact** | MLP acts as a regularizer toward the mean (~60 km/h); contribution capped at 30% |
+| **Tipo** | Datos sintéticos aleatorios |
+| **Generación** | `np.random.rand(100, 10)` para features, `np.random.rand(100) * 80 + 20` para targets |
+| **Semilla** | No fija — cada ejecución genera datos diferentes |
+| **Propósito** | Scaffold para inicializar MLPRegressor. NO es entrenamiento real |
+| **Impacto** | El MLP actúa como regularizador hacia la media (~60 km/h); contribución limitada al 30% |
 
-See [ADR-004](adr/ADR-004-mlp-como-suavizador.md) for the rationale.
+Ver [ADR-004](adr/ADR-004-mlp-como-suavizador.md) para la justificación.
 
 ---
 
-## 4. Module 0 Output Data
+## 4. Datos de Salida del Módulo 0
 
-### Annotated Video
+### Video Anotado
 
-| Attribute | Value |
+| Atributo | Valor |
 |---|---|
-| **Format** | MP4 (mp4v codec) |
-| **Content** | Original frames + bounding boxes + type/ID + speed + HUD |
-| **Destination** | Auto-download to user device (Colab) |
-| **Retention** | Ephemeral — lost when Colab session closes |
+| **Formato** | MP4 (codec mp4v) |
+| **Contenido** | Frames originales + bounding boxes + tipo/ID + velocidad + HUD |
+| **Destino** | Descarga automática al dispositivo del usuario (Colab) |
+| **Retención** | Efímera — se pierde al cerrar la sesión de Colab |
 
-### Database Records (`traffic_data`)
+### Registros de Base de Datos (`traffic_data`)
 
-| Field | Type | Description |
+| Campo | Tipo | Descripción |
 |---|---|---|
-| `clip_id` | TEXT | Identifier derived from video filename |
-| `record_time` | TIMESTAMP | Timestamp of the recorded minute |
-| `avg_speed` | NUMERIC(5,2) | Average speed of moving vehicles (km/h) |
-| `count_car` | INTEGER | Cars detected in the minute |
-| `count_truck` | INTEGER | Trucks detected in the minute |
-| `count_bus` | INTEGER | Buses detected in the minute |
-| `count_motorcycle` | INTEGER | Motorcycles detected in the minute |
-| `count_bicycle` | INTEGER | Bicycles detected in the minute |
-| `total_vehicles` | INTEGER | Total vehicles in the minute |
+| `clip_id` | TEXT | Identificador derivado del nombre del video |
+| `record_time` | TIMESTAMP | Marca temporal del minuto registrado |
+| `avg_speed` | NUMERIC(5,2) | Velocidad promedio de vehículos en movimiento (km/h) |
+| `count_car` | INTEGER | Autos detectados en el minuto |
+| `count_truck` | INTEGER | Camiones detectados |
+| `count_bus` | INTEGER | Colectivos detectados |
+| `count_motorcycle` | INTEGER | Motocicletas detectadas |
+| `count_bicycle` | INTEGER | Bicicletas detectadas |
+| `total_vehicles` | INTEGER | Total de vehículos en el minuto |
 
-**Frequency**: One record every 60 seconds of processed video.
-**Destination**: `traffic_data` table in PostgreSQL (AWS RDS).
-**Retention**: Indefinite (depends on RDS instance policy).
+**Frecuencia**: Un registro cada 60 segundos de video procesado.
+**Destino**: Tabla `traffic_data` en PostgreSQL (AWS RDS).
 
 ---
 
-## 5. Module 1 — Data Preparation Pipeline
+## 5. Módulo 1 — Pipeline de Preparación de Datos
 
-`notebooks/01_data_prep/data_preparation.ipynb` — Runs once to train the traffic classifier.
+`notebooks/01_data_prep/data_preparation.ipynb` — Se ejecuta una vez para entrenar el clasificador.
 
 ```
 traffic_data (PostgreSQL)
-  |
-  +-- [1] SQL query ----------- SELECT 9 fields + id, ordered by record_time
-  |
-  +-- [2] DataFrame ----------- ~2000 records x 10 columns (pandas)
-  |
-  +-- [3] Feature Engineering -- 9 raw fields -> 14 features via src/features.py:
-  |     |   heavy_vehicle_ratio, delta_speed, delta_count,
-  |     |   transition_flag, speed_variance, hour_of_day, weather_condition
-  |     +-- Drop first rows with NaN from diff()
-  |
-  +-- [4] Auto-Labeling ------- Engineering rules -> 4 states via src/labeling.py:
-  |     |   Accident(3) -> Congested(2) -> Reduced(1) -> Normal(0)
-  |     +-- NOT human ground truth. Engineering proxy.
-  |
-  +-- [5] SMOTE --------------- Balance training set (train only)
-  |     |   StandardScaler fit on train, transform on both
-  |     +-- Test set retains original distribution
-  |
-  +-- [6] MLP Training -------- Dense(64) -> Dense(32) -> Softmax(4)
-  |     |   EarlyStopping + ReduceLROnPlateau, seed=42
-  |     +-- Exports: traffic_classifier.keras, feature_scaler.joblib
-  |
-  +-- [7] Evaluation ---------- F1-macro, confusion matrix, recall per class
-  |
-  +-- [8] Persistence --------- 2 new tables:
-        |   telemetry_raw: 14 features + FK to traffic_data(id)
-        |   traffic_classifications: prediction + confidence + HITL
-        +-- Optional — silent failure if no DB
+  │
+  ├── [1] Consulta SQL ─────── SELECT 9 campos + id, ordenados por record_time
+  │
+  ├── [2] DataFrame ─────────── ~2.000 registros × 10 columnas (pandas)
+  │
+  ├── [3] Inyección sintética ── Accidentes + congestión vía src/synthetic.py
+  │     └── IDs ≥ 50.001 para trazabilidad
+  │
+  ├── [4] Feature Engineering ── 9 campos crudos → 19 features vía src/features.py:
+  │     │   heavy_vehicle_ratio, delta_speed, delta_count,
+  │     │   transition_flag, speed_variance, cumulative_delta_speed,
+  │     │   low_speed_persistence, speed_measurement_quality,
+  │     │   near_zero_motion_ratio, stationary_confirmed_ratio,
+  │     │   hour_of_day, weather_condition
+  │     └── Elimina filas iniciales con NaN de diff()
+  │
+  ├── [5] Auto-etiquetado ───── Reglas de ingeniería → 4 estados vía src/labeling.py:
+  │     │   Accidente(3) → Congestionado(2) → Reducido(1) → Normal(0)
+  │     └── NO es ground truth humano. Es un proxy de ingeniería.
+  │
+  ├── [6] SMOTE ──────────────── Balanceo del conjunto de entrenamiento (solo train)
+  │     │   StandardScaler fit en train, transform en ambos
+  │     └── El conjunto de test mantiene la distribución original
+  │
+  ├── [7] Entrenamiento MLP ─── Dense(64) → Dense(32) → Softmax(4)
+  │     │   EarlyStopping + ReduceLROnPlateau, seed=42
+  │     └── Exporta: traffic_classifier.keras, feature_scaler.joblib
+  │
+  ├── [8] Evaluación ────────── F1-macro, matriz de confusión, recall por clase
+  │
+  └── [9] Persistencia ──────── 2 tablas:
+        │   telemetry_raw: 19 features + FK a traffic_data(id)
+        │   traffic_classifications: predicción + confianza + HITL
+        └── Opcional — fallo silencioso si no hay BD
 ```
 
-### Module 1 Artifacts
+### Artefactos del Módulo 1
 
-| Artifact | Path | Format | Gitignored |
+| Artefacto | Ruta | Formato | Gitignored |
 |---|---|---|---|
-| Trained model | `models/intelligence/traffic_classifier.keras` | Keras native | Yes |
-| Scaler | `models/intelligence/feature_scaler.joblib` | joblib | Yes |
-| Label mapping | `models/intelligence/label_mapping.joblib` | joblib | Yes |
-| Feature dataset | `data/processed/traffic_telemetry.csv` | CSV | Yes |
-
-### Training Data
-
-| Attribute | Value |
-|---|---|
-| **Source** | Real telemetry from `traffic_data` (~2000 records) |
-| **Backup** | `data/raw/traffic_data.backup` (pg_dump binary) |
-| **Labels** | Auto-labeling with engineering rules (NOT ground truth) |
-| **Balancing** | SMOTE on training set |
-| **Partition** | 80/20 stratified, seed=42 |
+| Modelo entrenado | `models/intelligence/traffic_classifier.keras` | Keras nativo | Sí |
+| Scaler | `models/intelligence/feature_scaler.joblib` | joblib | Sí |
+| Mapeo de etiquetas | `models/intelligence/label_mapping.joblib` | joblib | Sí |
 
 ---
 
-## 6. Module 2 — Production Pipeline
+## 6. Módulo 2 — Pipeline de Producción
 
-`notebooks/02_production/traffic_analyzer.ipynb` — Runs for ongoing traffic analysis with feedback loop.
+`notebooks/02_production/traffic_analyzer.ipynb` — Se ejecuta continuamente para análisis de tráfico.
 
 ```
-Video MP4 (new clip)
-  |
-  +-- [1] Perception pipeline -- YOLODetector + SORTTracker + speed estimation
-  |     |   via src/perception/ modules
-  |     +-- Produces telemetry DataFrame (9 raw fields per minute)
-  |
-  +-- [2] Feature engineering -- 9 -> 14 features via src/features.py
-  |
-  +-- [3] Classification ------- Load trained model + scaler from models/intelligence/
-  |     |   Scale features, predict state + confidence
-  |     +-- 4 states: Normal(0), Reduced(1), Congested(2), Accident(3)
-  |
-  +-- [4] Persistence ---------- INSERT into telemetry_raw + traffic_classifications
-  |     +-- Optional — silent failure if no DB
-  |
-  +-- [5] HITL Feedback -------- SISE operator corrections
-        |   Updates is_human_validated, human_override_state
-        +-- Retraining with corrected labels (self-improving loop)
+Video MP4 (clip nuevo)
+  │
+  ├── [1] Pipeline de percepción ── YOLODetector + SORTTracker + estimación de velocidad
+  │     │   vía módulos src/perception/
+  │     └── Produce DataFrame de telemetría (9 campos crudos por minuto)
+  │
+  ├── [2] Feature engineering ────── 9 → 19 features vía src/features.py
+  │
+  ├── [3] Clasificación ──────────── Cargar modelo + scaler de models/intelligence/
+  │     │   Escalar features, predecir estado + confianza
+  │     │   Aplicar gate conservador de accidentes
+  │     └── 4 estados: Normal(0), Reducido(1), Congestionado(2), Accidente(3)
+  │
+  ├── [4] Persistencia ──────────── INSERT en telemetry_raw + traffic_classifications
+  │     └── Opcional — fallo silencioso si no hay BD
+  │
+  └── [5] Scaffold HITL ────────── Correcciones de operadores SISE
+        │   Actualiza is_human_validated, human_override_state
+        └── Experimental — no es un bucle productivo validado
 ```
 
 ---
 
-## 7. Privacy and Data Security
+## 7. Privacidad y Seguridad de Datos
 
-### Potentially Sensitive Data
+### Datos Potencialmente Sensibles
 
-- **License plates**: SISE camera videos may capture plates. VAAET does NOT extract, store, or process individual plates
-- **Individual frames**: NOT stored in DB. Only aggregated per-minute data
-- **Temporal location**: Timestamps in tables enable traffic pattern inference by hour
+- **Patentes**: Los videos SISE pueden capturar patentes. VAAET NO extrae, almacena ni procesa patentes individuales
+- **Frames individuales**: NO se almacenan en BD. Solo datos agregados por minuto
+- **Ubicación temporal**: Los timestamps en las tablas permiten inferir patrones de tráfico por hora
 
-### Credentials
+### Credenciales
 
-- AWS RDS credentials obtained via environment variables or `getpass`
-- NEVER printed in cell outputs
-- NEVER hardcoded in code
-- NEVER versioned in Git (`.gitignore` excludes `.env`)
+- Credenciales de AWS RDS obtenidas vía variables de entorno o `getpass`
+- NUNCA impresas en outputs de celdas
+- NUNCA hardcodeadas en código
+- NUNCA versionadas en Git (`.gitignore` excluye `.env`)
 
-### Data NOT Collected
+### Datos NO Recolectados
 
-- Driver identity
-- Individual license plates
-- Images of people
-- Individual tracking data outside the processed video
+- Identidad de conductores
+- Patentes individuales
+- Imágenes de personas
+- Datos de tracking individual fuera del video procesado

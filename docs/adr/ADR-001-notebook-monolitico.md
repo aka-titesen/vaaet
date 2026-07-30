@@ -1,5 +1,5 @@
-<!-- context: VAAET/Docs/adr/ADR-001 — Decisión de usar notebook monolítico. 
-Referenciado por AGENTS.md y DDS.md. -->
+<!-- context: VAAET/docs/adr/ADR-001 — Decisión de usar notebook monolítico. 
+Referenciado por AGENTS.md y SAD.md. -->
 
 # ADR-001: Notebook Monolítico sobre Módulos Python
 

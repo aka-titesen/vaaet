@@ -26,7 +26,7 @@ ruff check src tests scripts
 pytest
 ```
 
-Cada notebook tiene una sola celda de preparación: clona o actualiza `https://github.com/zgfnicolas/vaaet` en `/content/vaaet`, resuelve `REPO_ROOT`, instala sus extras y ejecuta `pip check`. No usa `requirements.txt`, `sys.path` ni instaladores ad hoc.
+Cada notebook tiene una sola celda de preparación: clona o actualiza `https://github.com/zgfnicolas/vaaet` en `/content/vaaet`, resuelve `REPO_ROOT`, instala sus extras y muestra el diagnóstico de `pip check` sin bloquear por inconsistencias preexistentes de Colab. Los imports del workflow siguen siendo obligatorios y CI mantiene `pip check` estricto. No se usan `requirements.txt`, `sys.path` ni instaladores ad hoc.
 
 ## Contrato del modelo
 

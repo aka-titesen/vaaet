@@ -32,6 +32,29 @@ def test_notebook_has_one_editable_install_and_no_import_hacks(path: Path) -> No
     assert "install_if_missing" not in code
 
 
+@pytest.mark.parametrize("path", NOTEBOOKS.values())
+def test_notebook_pip_check_is_visible_but_non_blocking(path: Path) -> None:
+    code = _code(path)
+    assert code.count('"pip", "check"') == 1
+    assert 'check_call([sys.executable, "-m", "pip", "check"])' not in code
+    assert "capture_output=True" in code
+    assert "check=False" in code
+    assert "pip_check.returncode" in code
+    assert "print(pip_check_output" in code
+
+
+def test_notebooks_keep_workflow_smoke_imports() -> None:
+    expected_imports = {
+        "collection": ("cv2", "numpy", "pandas", "psycopg2", "sqlalchemy", "torch", "ultralytics"),
+        "training": ("imblearn", "joblib", "numpy", "pandas", "psycopg2", "sqlalchemy", "tensorflow"),
+        "inference": ("cv2", "joblib", "numpy", "pandas", "psycopg2", "sqlalchemy", "tensorflow", "ultralytics"),
+    }
+    for workflow, import_names in expected_imports.items():
+        code = _code(NOTEBOOKS[workflow])
+        for import_name in import_names:
+            assert import_name in code
+
+
 def test_collection_uses_shared_analysis_and_data_contracts() -> None:
     code = _code(NOTEBOOKS["collection"])
     assert "from vaaet.vision.analysis import analyze_video" in code

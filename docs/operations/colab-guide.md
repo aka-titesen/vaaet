@@ -34,9 +34,9 @@ Después de aprobar un modelo, ejecutá localmente `dvc add artifacts/traffic-st
 - Entrenamiento: CSV/BD → dataset procesado + bundle de cuatro archivos.
 - Inferencia: MP4 + bundle → MP4 anotado + DataFrames + PostgreSQL opcional.
 
-Descargá los outputs antes de cerrar la sesión. Cuando se carga `traffic_data.backup`, el notebook de entrenamiento instala automáticamente `postgresql-client` si `pg_restore` no está disponible y muestra su versión antes de continuar. Esta dependencia pertenece al sistema operativo y por eso no forma parte de `pyproject.toml`.
+Descargá los outputs antes de cerrar la sesión. El backup canónico usa el formato de archivo `1.16`, que requiere PostgreSQL 17 o posterior. Cuando debe procesarlo, el notebook de entrenamiento configura de forma visible el repositorio APT oficial PGDG, instala únicamente `postgresql-client-17` y ejecuta directamente `/usr/lib/postgresql/17/bin/pg_restore`. La clave, URL, codename y arquitectura del repositorio se declaran explícitamente en la celda; no se instala el servidor PostgreSQL.
 
-Ubuntu puede incluir una versión de PostgreSQL fijada por la distribución. Si el backup fue creado con una versión posterior, el notebook conserva el diagnóstico de incompatibilidad: usá `traffic_data_raw.csv` o instalá manualmente un cliente igual o posterior. El workflow no agrega repositorios APT externos de forma silenciosa.
+El cliente es una dependencia del sistema operativo y por eso no forma parte de `pyproject.toml`. Si PGDG no está disponible o la instalación falla, cargá `traffic_data_raw.csv`; el notebook conserva el diagnóstico original y no continúa con datos vacíos.
 
 ## Checklist manual
 

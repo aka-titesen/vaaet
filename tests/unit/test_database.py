@@ -162,6 +162,68 @@ class TestRestoreBackupToSql:
         with pytest.raises(FileNotFoundError, match="pg_restore not found"):
             restore_backup_to_sql(backup)
 
+    def test_missing_explicit_pg_restore(self, tmp_path: Path) -> None:
+        from vaaet.data.database import restore_backup_to_sql
+
+        backup = tmp_path / "test.backup"
+        backup.write_bytes(b"PGDMP")
+
+        with pytest.raises(FileNotFoundError, match="Explicit pg_restore binary not found"):
+            restore_backup_to_sql(
+                backup,
+                pg_restore_path=tmp_path / "missing-pg_restore",
+            )
+
+    def test_rejects_non_executable_explicit_pg_restore(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from vaaet.data.database import restore_backup_to_sql
+
+        backup = tmp_path / "test.backup"
+        backup.write_bytes(b"PGDMP")
+        pg_restore = tmp_path / "pg_restore"
+        pg_restore.write_text("binary", encoding="utf-8")
+        monkeypatch.setattr("vaaet.data.database.os.access", lambda *_: False)
+
+        with pytest.raises(ValueError, match="not executable"):
+            restore_backup_to_sql(backup, pg_restore_path=pg_restore)
+
+    def test_uses_explicit_pg_restore_binary(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from unittest.mock import MagicMock
+
+        from vaaet.data.database import restore_backup_to_sql
+
+        backup = tmp_path / "test.backup"
+        backup.write_bytes(b"PGDMP")
+        pg_restore = tmp_path / "pg_restore-17"
+        pg_restore.write_text("binary", encoding="utf-8")
+        output = tmp_path / "dump.sql"
+        calls: list[list[str]] = []
+
+        monkeypatch.setattr("vaaet.data.database.os.access", lambda *_: True)
+
+        def fake_run(command, **_kwargs):
+            calls.append(command)
+            if "--version" in command:
+                return MagicMock(returncode=0, stdout="pg_restore (PostgreSQL) 17.6", stderr="")
+            output.write_text("-- restored", encoding="utf-8")
+            return MagicMock(returncode=0, stdout="", stderr="")
+
+        monkeypatch.setattr("vaaet.data.database.subprocess.run", fake_run)
+
+        result = restore_backup_to_sql(
+            backup,
+            output_path=output,
+            pg_restore_path=pg_restore,
+        )
+
+        expected = str(pg_restore.resolve())
+        assert result == output
+        assert calls[0][0] == expected
+        assert calls[1][0] == expected
+
     def test_version_mismatch_detected(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
@@ -193,8 +255,30 @@ class TestRestoreBackupToSql:
             return run_result  # actual pg_restore call
 
         with patch("vaaet.data.database.subprocess.run", side_effect=fake_run):
-            with pytest.raises(RuntimeError, match="version mismatch"):
+            with pytest.raises(RuntimeError, match=r"version mismatch .*binary="):
                 restore_backup_to_sql(backup)
+
+
+def test_load_from_backup_propagates_explicit_pg_restore_path(tmp_path: Path) -> None:
+    from unittest.mock import patch
+
+    from vaaet.data.database import load_from_backup
+
+    backup = tmp_path / "traffic_data.backup"
+    backup.write_bytes(b"PGDMP")
+    sql_path = tmp_path / "traffic_data.sql"
+    sql_path.write_text("-- restored", encoding="utf-8")
+    pg_restore = tmp_path / "pg_restore-17"
+
+    expected = pd.DataFrame({"id": [1]})
+    with (
+        patch("vaaet.data.database.restore_backup_to_sql", return_value=sql_path) as restore,
+        patch("vaaet.data.database.parse_sql_dump", return_value=expected),
+    ):
+        result = load_from_backup(backup, pg_restore_path=pg_restore)
+
+    restore.assert_called_once_with(backup, pg_restore_path=pg_restore)
+    pd.testing.assert_frame_equal(result, expected)
 
 
 class TestParseSqlDump:

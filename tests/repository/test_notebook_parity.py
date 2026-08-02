@@ -124,15 +124,17 @@ def test_training_uses_shared_feature_contracts() -> None:
 
 def test_training_prepares_postgres_backup_reader_in_colab() -> None:
     code = _code(NOTEBOOKS["training"])
-    condition = (
-        'IN_COLAB and os.path.exists(_backup_dest) and not os.path.exists(_csv_dest)'
-    )
+    condition = 'os.path.exists(_backup_dest) and not os.path.exists(_csv_dest)'
     assert condition in code
-    assert 'shutil.which("pg_restore") is None' in code
+    assert 'Path("/usr/lib/postgresql/17/bin/pg_restore")' in code
     assert '["apt-get", "update", "-qq"]' in code
-    assert '["apt-get", "install", "-y", "-qq", "postgresql-client"]' in code
+    assert '"postgresql-client-17"' in code
+    assert "https://apt.postgresql.org/pub/repos/apt" in code
+    assert "https://www.postgresql.org/media/keys/ACCC4CF8.asc" in code
+    assert "pg_restore_path=PG_RESTORE_PATH" in code
     assert "Backup reader ready" in code
     assert "!apt-get" not in code
+    assert "shell=True" not in code
 
 
 def test_training_augmentation_requires_loaded_dataframe() -> None:

@@ -19,7 +19,11 @@ import pandas as pd
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
 
-from vaaet.exceptions import ArtifactNotFoundError, DatabaseNotConfiguredError
+from vaaet.exceptions import (
+    ArtifactNotFoundError,
+    ArtifactValidationError,
+    DatabaseNotConfiguredError,
+)
 from vaaet.logging import get_logger
 from vaaet.settings import DB_ENV_VARS, DEFAULT_DB_PORT
 
@@ -164,23 +168,40 @@ def load_telemetry(
 def restore_backup_to_sql(
     backup_path: str | Path,
     output_path: str | Path | None = None,
+    pg_restore_path: str | Path | None = None,
 ) -> Path:
-    """Convert a binary ``pg_dump`` backup to a plain SQL text file."""
+    """Convert a binary ``pg_dump`` backup to a plain SQL text file.
+
+    ``pg_restore_path`` selects an exact client binary when multiple PostgreSQL
+    versions coexist. When omitted, the executable is discovered from ``PATH``.
+    """
     backup_path = Path(backup_path)
     if not backup_path.is_file():
         raise ArtifactNotFoundError(f"Backup file not found: {backup_path}")
 
-    pg_restore_path = shutil.which("pg_restore")
     if pg_restore_path is None:
-        raise ArtifactNotFoundError(
-            "pg_restore not found. Install postgresql-client:\n"
-            "  Colab/Ubuntu: !apt-get install -y postgresql-client\n"
-            "  macOS:        brew install libpq\n"
-            "  Windows:      install PostgreSQL or add bin/ to PATH"
-        )
+        discovered_path = shutil.which("pg_restore")
+        if discovered_path is None:
+            raise ArtifactNotFoundError(
+                "pg_restore not found. Install a PostgreSQL client compatible "
+                "with the backup format and add it to PATH."
+            )
+        resolved_pg_restore = Path(discovered_path).resolve()
+    else:
+        resolved_pg_restore = Path(pg_restore_path).expanduser().resolve()
+        if not resolved_pg_restore.is_file():
+            raise ArtifactNotFoundError(
+                f"Explicit pg_restore binary not found: {resolved_pg_restore}"
+            )
+        if not os.access(resolved_pg_restore, os.X_OK):
+            raise ArtifactValidationError(
+                f"Explicit pg_restore path is not executable: {resolved_pg_restore}"
+            )
+
+    pg_restore_command = str(resolved_pg_restore)
 
     ver_result = subprocess.run(
-        [pg_restore_path, "--version"],
+        [pg_restore_command, "--version"],
         capture_output=True,
         text=True,
         check=False,
@@ -194,7 +215,7 @@ def restore_backup_to_sql(
 
     result = subprocess.run(
         [
-            pg_restore_path,
+            pg_restore_command,
             "--no-owner",
             "--no-acl",
             "--no-comments",
@@ -215,7 +236,7 @@ def restore_backup_to_sql(
     ]
     if any(pattern in stderr.lower() for pattern in version_error_patterns):
         raise RuntimeError(
-            f"pg_restore version mismatch ({pg_version}).\n"
+            f"pg_restore version mismatch ({pg_version}, binary={pg_restore_command}).\n"
             "The backup was created with a newer PostgreSQL version.\n"
             "Install a newer postgresql-client (e.g. postgresql-client-17).\n"
             f"stderr: {stderr}"
@@ -327,10 +348,14 @@ def parse_sql_dump(sql_path: str | Path) -> pd.DataFrame:
 def load_from_backup(
     backup_path: str | Path,
     cache_csv: str | Path | None = None,
+    pg_restore_path: str | Path | None = None,
 ) -> pd.DataFrame:
     """End-to-end: restore a binary backup → parse → return DataFrame."""
     backup_path = Path(backup_path)
-    sql_path = restore_backup_to_sql(backup_path)
+    sql_path = restore_backup_to_sql(
+        backup_path,
+        pg_restore_path=pg_restore_path,
+    )
 
     try:
         df = parse_sql_dump(sql_path)

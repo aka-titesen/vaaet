@@ -44,7 +44,7 @@ La Web App futura vive en otro repositorio y sólo consume el bundle definido po
 - `inference/`: clasificación tabular del tráfico.
 - `evaluation/`: calibración y reporting.
 
-La lógica de negocio vive en `src/vaaet/`. Los notebooks importan `vaaet.*` después de una única instalación editable y nunca modifican `sys.path`.
+La lógica de negocio vive en `src/vaaet/`. Los notebooks importan `vaaet.*` después de una única instalación: wheel local en el runtime efímero de Colab y modo editable en desarrollo local. Nunca modifican `sys.path`.
 
 ## Validación
 

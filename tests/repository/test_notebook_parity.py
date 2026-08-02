@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import ast
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -30,6 +32,53 @@ def test_notebook_has_one_editable_install_and_no_import_hacks(path: Path) -> No
     assert code.count('"-e"') == 1
     assert "sys.path.insert" not in code
     assert "install_if_missing" not in code
+
+
+@pytest.mark.parametrize("path", NOTEBOOKS.values())
+def test_colab_uses_wheel_and_local_uses_editable_install(path: Path) -> None:
+    code = _code(path)
+    assert "install_command.append" in code
+    assert "install_command.extend" in code
+    assert code.count('"-e"') == 1
+    assert code.index("if IN_COLAB:") < code.index("install_command.append")
+
+
+@pytest.mark.parametrize("path", NOTEBOOKS.values())
+def test_notebook_clears_cache_and_validates_package_origin(path: Path) -> None:
+    code = _code(path)
+    assert 'module_name == "vaaet"' in code
+    assert 'module_name.startswith("vaaet.")' in code
+    assert "importlib.invalidate_caches()" in code
+    assert "def validate_vaaet_origin(" in code
+    assert "VAAET_PACKAGE_FILE = validate_vaaet_origin" in code
+
+
+def _load_origin_validator() -> object:
+    tree = ast.parse(_code(NOTEBOOKS["collection"]))
+    function = next(
+        node
+        for node in tree.body
+        if isinstance(node, ast.FunctionDef) and node.name == "validate_vaaet_origin"
+    )
+    module = ast.Module(body=[function], type_ignores=[])
+    namespace: dict[str, object] = {"Path": Path}
+    exec(compile(module, "validate_vaaet_origin", "exec"), namespace)
+    return namespace["validate_vaaet_origin"]
+
+
+def test_origin_validator_rejects_namespace_package(tmp_path: Path) -> None:
+    validate = _load_origin_validator()
+    package = SimpleNamespace(__file__=None, __path__=[str(tmp_path / "vaaet")])
+    with pytest.raises(ImportError, match="namespace package"):
+        validate(package, tmp_path / "repository", True)  # type: ignore[operator]
+
+
+def test_origin_validator_accepts_wheel_in_colab(tmp_path: Path) -> None:
+    validate = _load_origin_validator()
+    package_file = tmp_path / "site-packages/vaaet/__init__.py"
+    package = SimpleNamespace(__file__=str(package_file), __path__=[str(package_file.parent)])
+    result = validate(package, tmp_path / "repository", True)  # type: ignore[operator]
+    assert result == package_file.resolve()
 
 
 @pytest.mark.parametrize("path", NOTEBOOKS.values())

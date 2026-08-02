@@ -83,16 +83,12 @@ Ver la [guía de Colab](colab-guide.md) para Secrets, Drive y recuperación ante
 
 ## 4. Procedimiento de Setup en Google Colab
 
-### Celda 0 — Setup del Entorno
+### Primera celda — Setup del entorno
 
-```python
-# Clonar repositorio
-!git clone https://github.com/zgfnicolas/vaaet.git
-%cd vaaet
-
-# Instalar como paquete
-!pip install -e ".[perception,intelligence]"
-```
+Ejecutá la primera celda del notebook sin añadir comandos manuales. Esta clona o
+actualiza `/content/vaaet`, instala un wheel local con los extras del workflow,
+limpia imports anteriores y valida que `vaaet` provenga del paquete instalado.
+El modo editable se reserva para desarrollo local.
 
 ### Celda 1 — Configuración de BD (Opcional)
 

@@ -12,7 +12,9 @@ Referencias oficiales: [versiones del runtime de Colab](https://research.google.
 2. Ejecutá entrenamiento cuando cambie el dataset aprobado y conservá el bundle completo.
 3. Ejecutá inferencia con un clip y un bundle validado.
 
-Cada notebook clona o actualiza el repositorio en `/content/vaaet`, define un único `REPO_ROOT`, instala una sola vez en modo editable y ejecuta `pip check`. En el runtime administrado, este diagnóstico puede informar inconsistencias globales ajenas a VAAET —por ejemplo, `ipython` sin el paquete opcional `jedi`—; la advertencia se muestra, pero no bloquea los imports explícitos del workflow. En CI, donde el entorno es limpio, `pip check` continúa siendo estricto.
+Cada notebook clona o actualiza el repositorio en `/content/vaaet`, define un único `REPO_ROOT` e instala una vez un wheel local con sus extras. La instalación no es editable en Colab porque el nombre `/content/vaaet` puede interpretarse como un paquete namespace y ocultar `src/vaaet`; después de instalar se limpia el caché de módulos y se valida el origen real del paquete. El desarrollo local sí conserva `pip install -e`.
+
+El diagnóstico `pip check` puede informar inconsistencias globales ajenas a VAAET —por ejemplo, `ipython` sin el paquete opcional `jedi`—; la advertencia se muestra, pero no bloquea los imports explícitos del workflow. En CI, donde el entorno es limpio, `pip check` continúa siendo estricto.
 
 Si el runtime se reinicia, volvé a ejecutar desde la primera celda; los archivos de `/content` son efímeros.
 

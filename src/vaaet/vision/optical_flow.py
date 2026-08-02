@@ -5,10 +5,7 @@ estimate global camera motion, then applies a running mean for temporal
 smoothing.  This compensates for pan/tilt/zoom of the SISE cameras on the
 General Manuel Belgrano bridge.
 
-References:
-    - Legacy implementation: ``archive/00_bootstrap/01_legacy_collection.ipynb``
-      (``VAAETHybrid.calculate_global_motion()``)
-    - ADR-009 §Perception
+See ADR-0009 for the decision context.
 """
 
 from __future__ import annotations
@@ -19,7 +16,7 @@ from typing import Any
 import cv2
 import numpy as np
 
-from src.config import (
+from vaaet.settings import (
     OPTICAL_FLOW_BORDER_MARGIN,
     OPTICAL_FLOW_GRID_STEP,
     OPTICAL_FLOW_MAX_LEVEL,
@@ -178,9 +175,7 @@ class OpticalFlowEstimator:
         good_mask = status.ravel() == 1
         self.last_total_points = len(pts)
         self.last_good_points = int(np.count_nonzero(good_mask))
-        self.last_tracking_ratio = self.last_good_points / max(
-            self.last_total_points, 1
-        )
+        self.last_tracking_ratio = self.last_good_points / max(self.last_total_points, 1)
         if not np.any(good_mask):
             return np.zeros(2, dtype=float)
         if self.last_tracking_ratio < self.min_tracking_ratio:

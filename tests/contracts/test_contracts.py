@@ -1,11 +1,11 @@
-"""Tests for src/contracts.py — validated internal schemas."""
+"""Tests for vaaet.contracts — validated internal schemas."""
 
 from __future__ import annotations
 
 import pandas as pd
 import pytest
 
-from src.contracts import (
+from vaaet.contracts import (
     ClassificationRecord,
     EngineeredTelemetryRecord,
     TelemetryRecord,

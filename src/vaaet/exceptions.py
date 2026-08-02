@@ -11,6 +11,10 @@ class ArtifactNotFoundError(FileNotFoundError, VAAETError):
     """Raised when a required file or external artifact is missing."""
 
 
+class ArtifactValidationError(ValueError, VAAETError):
+    """Raised when a model artifact bundle violates the serving contract."""
+
+
 class VideoValidationError(ValueError, VAAETError):
     """Raised when a video cannot be validated or inspected safely."""
 

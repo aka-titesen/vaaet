@@ -5,6 +5,14 @@
 **Supersedes:** ADR-001 (Monolithic Notebook)  
 **Decisors:** VAAET Team
 
+> Nota de vigencia (2026-08-01): la separación modular continúa vigente; los
+> nombres y límites actuales de los workflows se precisan en [ADR-0013](0013-on-demand-data-collection-workflow.md).
+
+> **Current applicability (2026-08-01):** this ADR preserves the original
+> three-stage rationale. Active paths use `src/vaaet/`, `notebooks/training/`
+> and `notebooks/inference/`; ADR-0010 and ADR-0012 govern the 19-feature
+> contract, multi-repo boundary and portable bundle.
+
 ## Context
 
 VAAET originally followed a monolithic notebook pattern (ADR-001) where all code lived inside a single `.ipynb` file. This decision was appropriate for Phase 1 (Perception), which was a self-contained video-processing pipeline.
@@ -26,7 +34,7 @@ The monolithic pattern creates several problems:
 Adopt a **three-module architecture** with shared Python modules in `src/`:
 
 ```
-archive/00_bootstrap/        → Module 0: Bootstrap (archived, never runs again)
+archive/bootstrap-v1/        → Module 0: Bootstrap (archived, never runs again)
 notebooks/01_data_prep/      → Module 1: Data Preparation (runs once)
 notebooks/02_production/     → Module 2: Production (runs always)
 src/                         → Shared Python modules (imported by notebooks 1 & 2)
@@ -48,9 +56,9 @@ src/                         → Shared Python modules (imported by notebooks 1 
 
 | Module | Notebook | Runs | Input | Output |
 |---|---|---|---|---|
-| **0 — Bootstrap** | `archive/00_bootstrap/01_legacy_collection.ipynb` | Never again | Video .mp4 | `traffic_data` (DB) |
-| **1 — Data Prep** | `notebooks/01_data_prep/data_preparation.ipynb` | Once | `traffic_data.backup` | `.keras` + `.joblib` artifacts |
-| **2 — Production** | `notebooks/02_production/traffic_analyzer.ipynb` | Always | Video .mp4 + trained model | `telemetry_raw` + `traffic_classifications` (DB) |
+| **0 — Bootstrap** | `archive/bootstrap-v1/01_legacy_collection.ipynb` | Never again | Video .mp4 | `traffic_data` (DB) |
+| **1 — Data Prep** | `notebooks/training/train_traffic_state_classifier.ipynb` | Once | `traffic_data.backup` | `.keras` + `.joblib` artifacts |
+| **2 — Production** | `notebooks/inference/analyze_traffic_video.ipynb` | Always | Video .mp4 + trained model | `telemetry_raw` + `traffic_classifications` (DB) |
 
 ### Feedback loop
 

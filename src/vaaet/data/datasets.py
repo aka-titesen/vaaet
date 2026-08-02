@@ -3,16 +3,19 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
-from src.config import RANDOM_SEED
+from vaaet.settings import RANDOM_SEED
 
 __all__ = [
     "GroupedSplit",
+    "RAW_TELEMETRY_COLUMNS",
     "build_group_ids",
     "group_aware_train_test_split",
+    "merge_raw_telemetry_csv",
 ]
 
 
@@ -158,3 +161,44 @@ def group_aware_train_test_split(
         test_idx=np.asarray(test_idx),
         groups=groups,
     )
+RAW_TELEMETRY_COLUMNS: tuple[str, ...] = (
+    "clip_id",
+    "record_time",
+    "avg_speed",
+    "count_car",
+    "count_truck",
+    "count_bus",
+    "count_motorcycle",
+    "count_bicycle",
+    "total_vehicles",
+)
+
+
+def merge_raw_telemetry_csv(
+    telemetry: pd.DataFrame,
+    destination: str | Path,
+) -> pd.DataFrame:
+    """Merge telemetry into the canonical CSV and deduplicate idempotently.
+
+    The acquisition contract uses ``(clip_id, record_time)`` as its natural
+    key. Extended quality columns are preserved for future feature engineering.
+    """
+    destination = Path(destination)
+    missing = set(RAW_TELEMETRY_COLUMNS) - set(telemetry.columns)
+    if missing:
+        raise ValueError(f"Raw telemetry is missing required columns: {sorted(missing)}")
+
+    frames = [telemetry.copy()]
+    if destination.is_file():
+        frames.insert(0, pd.read_csv(destination))
+
+    merged = pd.concat(frames, ignore_index=True)
+    merged["record_time"] = pd.to_datetime(merged["record_time"], errors="raise")
+    merged = (
+        merged.drop_duplicates(subset=["clip_id", "record_time"], keep="last")
+        .sort_values(["record_time", "clip_id"])
+        .reset_index(drop=True)
+    )
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    merged.to_csv(destination, index=False)
+    return merged

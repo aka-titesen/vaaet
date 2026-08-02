@@ -1,11 +1,11 @@
-"""Tests for src/perception/pipeline.py — shared telemetry extraction helpers."""
+"""Tests for the shared telemetry accumulator."""
 
 from __future__ import annotations
 
 from datetime import datetime
 
-from src.perception.pipeline import MinuteTelemetryAccumulator
-from src.perception.tracker import Track
+from vaaet.vision.telemetry import MinuteTelemetryAccumulator
+from vaaet.vision.tracking import Track
 
 
 class TestMinuteTelemetryAccumulator:
@@ -21,6 +21,7 @@ class TestMinuteTelemetryAccumulator:
             near_zero_motion=False,
             stationary_confirmed=False,
             recovered_gap=0,
+            flow_tracking_ratio=1.0,
         )
         accumulator.observe_track(
             track,
@@ -29,6 +30,7 @@ class TestMinuteTelemetryAccumulator:
             near_zero_motion=False,
             stationary_confirmed=False,
             recovered_gap=0,
+            flow_tracking_ratio=1.0,
         )
 
         record = accumulator.build_record(datetime(2025, 5, 1, 8, 0, 0))
@@ -52,6 +54,7 @@ class TestMinuteTelemetryAccumulator:
             near_zero_motion=True,
             stationary_confirmed=True,
             recovered_gap=0,
+            flow_tracking_ratio=1.0,
         )
         accumulator.observe_track(
             rejected_track,
@@ -60,6 +63,7 @@ class TestMinuteTelemetryAccumulator:
             near_zero_motion=True,
             stationary_confirmed=False,
             recovered_gap=1,
+            flow_tracking_ratio=0.5,
         )
         accumulator.observe_track(
             accepted_track,
@@ -68,6 +72,7 @@ class TestMinuteTelemetryAccumulator:
             near_zero_motion=False,
             stationary_confirmed=False,
             recovered_gap=0,
+            flow_tracking_ratio=1.0,
         )
 
         record = accumulator.build_record(datetime(2025, 5, 1, 8, 0, 0))
@@ -90,6 +95,7 @@ class TestMinuteTelemetryAccumulator:
             near_zero_motion=False,
             stationary_confirmed=False,
             recovered_gap=0,
+            flow_tracking_ratio=1.0,
         )
         accumulator.rollover_minute()
 

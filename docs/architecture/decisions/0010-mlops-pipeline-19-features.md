@@ -9,7 +9,8 @@
 
 El clasificador MLP fue diseñado originalmente con 14 features (ADR-008, columna Input(14,)). Durante la evolución del pipeline de percepción en el Módulo 2, se identificó que las señales de calidad de medición de velocidad, el movimiento cercano a cero, y los estacionarios confirmados aportan información valiosa para la clasificación del tráfico.
 
-Simultáneamente, el pipeline se formalizó como un sistema CT/CI (Continuous Training / Continuous Inference) de MLOps Nivel 1, requiriendo documentación explícita de:
+Simultáneamente, el pipeline se formalizó como una base para CT/CI de Nivel 1,
+con ejecución y promoción todavía manuales, requiriendo documentación explícita de:
 - El contrato canónico de features
 - La estrategia de proveniencia de datos (real vs sintético)
 - El versionado de artefactos del modelo
@@ -31,7 +32,7 @@ Las 5 nuevas features son señales de calidad de la percepción:
 
 ### 2. Implementar contratos de datos tipados
 
-`src/contracts.py` define dataclasses frozen con validación en `__post_init__`:
+`src/vaaet/contracts.py` define dataclasses frozen con validación en `__post_init__`:
 - `TelemetryRecord`: Registro crudo validado
 - `EngineeredTelemetryRecord`: Registro con las 19 features validadas
 - `ClassificationRecord`: Resultado de clasificación validado
@@ -46,7 +47,7 @@ Columnas `data_origin` ("real"/"synthetic") y `synthetic_scenario` ("observed"/"
 
 ### 4. Versionado de modelo
 
-`MODEL_VERSION = "mlp-v1.1"` en `src/config.py` identifica la versión del modelo que generó cada clasificación. La tabla `traffic_classifications` tiene constraint UNIQUE(telemetry_id, model_version) para soportar múltiples versiones.
+`MODEL_VERSION = "mlp-v1.1"` en `src/vaaet/settings.py` identifica la versión del modelo que generó cada clasificación. La tabla `traffic_classifications` tiene constraint UNIQUE(telemetry_id, model_version) para soportar múltiples versiones.
 
 ## Justificación
 
@@ -65,10 +66,10 @@ Columnas `data_origin` ("real"/"synthetic") y `synthetic_scenario` ("observed"/"
 
 ### Negativas
 - Los artefactos de modelo de la versión anterior (14 features) son incompatibles y deben regenerarse
-- La documentación existente que referenciaba "14 features" requiere actualización (SAD.md, ADR-008)
+- Las menciones de 14 features se conservan únicamente como historia en ADR-008 y este ADR
 - La complejidad del esquema de BD aumenta (27 columnas en `telemetry_raw`)
 
 ### Deuda técnica
-- No hay Model Registry formal (los artefactos se almacenan en Google Drive o localmente)
+- DVC y el bundle portable fueron incorporados posteriormente por ADR-0011 y ADR-0012
 - No hay experiment tracking (MLflow/W&B)
 - No hay monitoreo de data drift en producción

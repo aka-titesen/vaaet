@@ -1,11 +1,10 @@
-"""Tests for src.perception.optical_flow — OpticalFlowEstimator."""
+"""Tests for vaaet.vision.optical_flow — OpticalFlowEstimator."""
 
 from __future__ import annotations
 
 import numpy as np
-import pytest
 
-from src.perception.optical_flow import OpticalFlowEstimator
+from vaaet.vision.optical_flow import OpticalFlowEstimator
 
 
 class TestOpticalFlowEstimator:

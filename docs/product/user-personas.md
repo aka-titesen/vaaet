@@ -1,4 +1,4 @@
-<!-- context: VAAET/docs/USER_PERSONAS.md — Perfiles de usuario.
+<!-- context: VAAET/docs/product/user-personas.md — Perfiles de usuario.
 Complementa PRD.md y USE_CASES.md. -->
 
 # Perfiles de Usuario (User Personas) — VAAET
@@ -8,7 +8,7 @@ Complementa PRD.md y USE_CASES.md. -->
 | Campo | Detalles |
 |---|---|
 | **Nombre del Proyecto** | VAAET — Video Advanced Analysis of Traffic |
-| **Versión** | 3.0.0 |
+| **Versión** | 4.0.0 |
 | **Estado** | Aprobado |
 | **Responsable Técnico** | Facundo Nicolás González |
 | **Última Revisión** | 2026-07-23 |
@@ -26,7 +26,7 @@ Complementa PRD.md y USE_CASES.md. -->
 | **Objetivo principal** | Monitorear el estado del tráfico en tiempo real y detectar incidentes |
 | **Frustraciones** | Videos largos sin poder ver rápidamente el estado del tráfico; faltas de alertas tempranas ante accidentes |
 | **Necesidades** | Dashboard claro, alertas visuales, clasificación automática de estados, video anotado descargable |
-| **Interacción con VAAET** | Usa el Módulo 2 en Colab: sube video → obtiene estado del tráfico + video anotado. En el futuro, usará la Web App. |
+| **Interacción con VAAET** | Usa inferencia en Colab: sube video → obtiene estado del tráfico + video anotado. En el futuro, usará la Web App. |
 | **Métrica de éxito** | Tiempo de detección de incidentes < 2 minutos de procesamiento |
 
 ---
@@ -42,7 +42,7 @@ Complementa PRD.md y USE_CASES.md. -->
 | **Objetivo principal** | Analizar patrones de tráfico históricos para publicaciones académicas |
 | **Frustraciones** | Falta de datos cuantitativos sobre el puente; conteo manual es lento y propenso a errores |
 | **Necesidades** | Datos tabulares exportables (CSV/BD), métricas por minuto, reproducibilidad de resultados |
-| **Interacción con VAAET** | Usa ambos módulos: Módulo 1 para entender el modelo, Módulo 2 para procesar clips y exportar datos |
+| **Interacción con VAAET** | Usa adquisición, entrenamiento e inferencia para estudiar el pipeline completo |
 | **Métrica de éxito** | Datos con granularidad por minuto y velocidades con MAE < 5 km/h |
 
 ---
@@ -81,7 +81,7 @@ Complementa PRD.md y USE_CASES.md. -->
 
 ## Matriz Persona × Módulo
 
-| Persona | Módulo 0 | Módulo 1 | Módulo 2 | Web App (futuro) |
+| Persona | Adquisición | Entrenamiento | Inferencia | Web App (futuro) |
 |---|---|---|---|---|
 | Operador SISE | ❌ | ❌ | ✅ (uso directo) | ✅ (uso directo) |
 | Investigador | 📖 (referencia) | ✅ (uso directo) | ✅ (uso directo) | 📊 (consulta datos) |

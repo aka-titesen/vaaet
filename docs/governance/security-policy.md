@@ -1,4 +1,4 @@
-<!-- context: VAAET/docs/SECURITY_POLICY.md — Política de seguridad y privacidad detallada.
+<!-- context: VAAET/docs/governance/security-policy.md — Política de seguridad y privacidad detallada.
 Complementa SECURITY.md (raíz) y DATA_LINEAGE.md. -->
 
 # Política de Seguridad y Privacidad — VAAET
@@ -8,7 +8,7 @@ Complementa SECURITY.md (raíz) y DATA_LINEAGE.md. -->
 | Campo | Detalles |
 |---|---|
 | **Nombre del Proyecto** | VAAET — Video Advanced Analysis of Traffic |
-| **Versión** | 3.0.0 |
+| **Versión** | 4.0.0 |
 | **Estado** | Aprobado |
 | **Responsable Técnico** | Facundo Nicolás González |
 | **Última Revisión** | 2026-07-23 |
@@ -31,16 +31,16 @@ VAAET adopta el principio de **Seguridad por Diseño (Security by Design)**:
 
 | Regla | Implementación |
 |---|---|
-| Credenciales por variables de entorno | `src/db.py` lee `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` |
+| Credenciales por variables de entorno | `src/vaaet/data/database.py` lee `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` |
 | Nunca hardcodear | Verificado por `test_repo_hygiene.py` |
-| Nunca imprimir en outputs | `src/db.py` no logea valores de credenciales |
+| Nunca imprimir en outputs | `src/vaaet/data/database.py` no logea credenciales |
 | `.env` en `.gitignore` | Configurado |
 | Template documentado | `.env.example` disponible |
 
 ### 2.2 Flujo de Credenciales en Colab
 
 ```
-Usuario → getpass() → os.environ → src/db.py → SQLAlchemy Engine → AWS RDS
+Usuario → getpass() → os.environ → vaaet.data.database → SQLAlchemy Engine → AWS RDS
                          ↑
                     Nunca persiste en disco
                     Nunca aparece en outputs
@@ -128,7 +128,7 @@ Dado que VAAET **no recolecta datos personales identificables**, los derechos AR
 
 - Todas las consultas usan **parámetros con nombre** via SQLAlchemy (`text()` + bind parameters)
 - **No hay concatenación de strings** en consultas SQL
-- Las consultas están definidas como constantes en `src/persistence.py`
+- Las consultas están definidas como constantes en `src/vaaet/data/persistence.py`
 
 ### 5.2 Dependencias
 

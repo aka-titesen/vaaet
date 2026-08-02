@@ -1,4 +1,4 @@
-"""Tests for src/perception/ — detector, tracker, and speed modules.
+"""Tests for vaaet.vision detector, tracker, and speed modules.
 
 These tests exercise pure logic only. YOLO model loading is NOT tested
 (requires downloading weights). The YOLODetector.detect() method is
@@ -12,10 +12,9 @@ from collections import deque
 import numpy as np
 import pytest
 
-from src.perception.detector import Detection, select_model_variant
-from src.perception.optical_flow import OpticalFlowEstimator
-from src.perception.tracker import SORTTracker, Track
-from src.perception.speed import (
+from vaaet.vision.detector import Detection, select_model_variant
+from vaaet.vision.optical_flow import OpticalFlowEstimator
+from vaaet.vision.speed import (
     SmoothedSpeedTracker,
     TrackMotionStateTracker,
     compensate_camera_motion,
@@ -27,7 +26,7 @@ from src.perception.speed import (
     is_stationary,
     robust_speed_summary,
 )
-
+from vaaet.vision.tracking import SORTTracker, Track
 
 # Detection dataclass
 
@@ -112,7 +111,7 @@ class TestSORTTracker:
         # 3 frames with no detections → track should be pruned
         tracker.update([])
         tracker.update([])
-        active = tracker.update([])
+        tracker.update([])
         # After 3 empty frames with max_lost=2, the track is pruned
         assert len(tracker._tracks) == 0
 
@@ -191,7 +190,7 @@ class TestOpticalFlowEstimator:
             return new_pts, status, None
 
         monkeypatch.setattr(
-            "src.perception.optical_flow.cv2.calcOpticalFlowPyrLK", fake_lk
+            "vaaet.vision.optical_flow.cv2.calcOpticalFlowPyrLK", fake_lk
         )
 
         motion = estimator.update(frame)
@@ -213,7 +212,7 @@ class TestOpticalFlowEstimator:
             return new_pts, status, None
 
         monkeypatch.setattr(
-            "src.perception.optical_flow.cv2.calcOpticalFlowPyrLK", fake_lk
+            "vaaet.vision.optical_flow.cv2.calcOpticalFlowPyrLK", fake_lk
         )
 
         motion = estimator.update(frame)

@@ -1,4 +1,4 @@
-<!-- context: VAAET/docs/DATA_MODEL.md — Modelo de datos y diccionario.
+<!-- context: VAAET/docs/architecture/data-model.md — Modelo de datos y diccionario.
 Complementa SAD.md (arquitectura) y DATA_LINEAGE.md (linaje). -->
 
 # Modelo de Datos y Diccionario — VAAET
@@ -8,7 +8,7 @@ Complementa SAD.md (arquitectura) y DATA_LINEAGE.md (linaje). -->
 | Campo | Detalles |
 |---|---|
 | **Nombre del Proyecto** | VAAET — Video Advanced Analysis of Traffic |
-| **Versión** | 3.0.0 |
+| **Versión** | 4.0.0 |
 | **Fecha de Creación** | 2025-03-06 |
 | **Estado** | Aprobado |
 | **Responsable Técnico** | Facundo Nicolás González |
@@ -20,9 +20,9 @@ Complementa SAD.md (arquitectura) y DATA_LINEAGE.md (linaje). -->
 
 ## 1. Diccionario de Datos
 
-### Tabla: `traffic_data` (Legado — Módulo 0)
+### Tabla: `traffic_data` (adquisición cruda)
 
-**Descripción:** Almacena telemetría cruda generada por el pipeline bootstrap histórico. Es la fuente de datos para el entrenamiento del clasificador en el Módulo 1. **No recibe nuevos registros.**
+**Descripción:** Almacena telemetría cruda generada por el workflow opcional de adquisición. Es una fuente de datos del entrenamiento y acepta nuevos registros idempotentes.
 
 | Campo | Tipo de Dato | Restricciones | Descripción | Ejemplo |
 |---|---|---|---|---|
@@ -41,7 +41,7 @@ Complementa SAD.md (arquitectura) y DATA_LINEAGE.md (linaje). -->
 
 ---
 
-### Tabla: `telemetry_raw` (Activa — Módulos 1 y 2)
+### Tabla: `telemetry_raw` (entrenamiento, inferencia y feedback)
 
 **Descripción:** Almacena telemetría enriquecida con 19 features de calidad, señales de proveniencia (real/sintético), y contadores de calidad de medición. Fuente de verdad para el clasificador.
 
@@ -142,7 +142,7 @@ erDiagram
 
 | Relación (Origen → Destino) | Cardinalidad | ON DELETE | ON UPDATE | Justificación |
 |---|---|---|---|---|
-| `telemetry_raw.source_record_id` → `traffic_data.id` | 1:1 (lógica) | N/A (no FK formal) | N/A | Trazabilidad hacia datos legados. No es FK formal porque `source_record_id` puede ser NULL para datos nuevos del Módulo 2. |
+| `telemetry_raw.source_record_id` → `traffic_data.id` | 1:1 (lógica) | N/A (no FK formal) | N/A | Trazabilidad hacia adquisición cruda. Puede ser NULL para inferencias sin origen persistido. |
 | `traffic_classifications.telemetry_id` → `telemetry_raw.id` | N:1 | CASCADE implícito | CASCADE implícito | Cada clasificación referencia exactamente una fila de telemetría. Múltiples versiones de modelo pueden clasificar el mismo registro. |
 
 ---
@@ -169,7 +169,7 @@ VAAET utiliza `ON CONFLICT ... DO UPDATE` (upsert) para garantizar idempotencia 
 
 ### Sin Triggers ni Stored Procedures
 
-El proyecto no utiliza lógica programable en la BD por diseño (ver [ADR-005](adr/ADR-005-postgresql-aws-rds.md)). Toda la lógica de negocio reside en `src/` para mantener la portabilidad y testabilidad.
+El proyecto no utiliza lógica programable en la BD por diseño (ver [ADR-0005](decisions/0005-postgresql-aws-rds.md)). Toda la lógica de negocio reside en `src/vaaet/` para mantener la portabilidad y testabilidad.
 
 ---
 
@@ -188,7 +188,7 @@ El proyecto no utiliza lógica programable en la BD por diseño (ver [ADR-005](a
 ## 6. Referencias de Modelado
 
 - **Diagrama ERD**: [docs/diagrams/erd.md](diagrams/erd.md), [docs/diagrams/erd-phase2.md](diagrams/erd-phase2.md)
-- **Fuente de verdad del esquema**: [src/persistence.py](../src/persistence.py)
+- **Fuente de verdad del esquema**: [persistence.py](../../src/vaaet/data/persistence.py)
 - **Convención de nomenclatura**: `snake_case` para tablas y columnas
 
 ---

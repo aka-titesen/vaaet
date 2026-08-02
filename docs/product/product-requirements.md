@@ -1,4 +1,4 @@
-<!-- context: VAAET/docs/PRD.md — Requisitos del producto.
+<!-- context: VAAET/docs/product/product-requirements.md — Requisitos del producto.
 Complementa SAD.md (arquitectura) y KPIs/KPIs.md (métricas). -->
 
 # Documento de Requisitos del Producto (PRD) — VAAET
@@ -8,7 +8,7 @@ Complementa SAD.md (arquitectura) y KPIs/KPIs.md (métricas). -->
 | Campo | Detalles |
 |---|---|
 | **Nombre del Proyecto** | VAAET — Video Advanced Analysis of Traffic |
-| **Versión** | 3.0.0 |
+| **Versión** | 4.0.0 |
 | **Fecha de Creación** | 2025-03-06 |
 | **Estado** | Aprobado |
 | **Responsable Técnico** | Facundo Nicolás González |
@@ -47,7 +47,7 @@ VAAET es un sistema de análisis vehicular automatizado que procesa video de vig
 | **ID Switches de tracking** | Cambios de identidad por video | Minimizar (sin umbral formal) |
 | **Disponibilidad del pipeline** | Capacidad de procesar un video exitosamente | > 95% (sesiones de Colab) |
 
-Ver [KPIs/KPIs.md](KPIs/KPIs.md) para la guía completa de validación.
+Ver [KPIs](../quality/kpis.md) para la guía completa de validación.
 
 ---
 
@@ -88,7 +88,7 @@ Ver [KPIs/KPIs.md](KPIs/KPIs.md) para la guía completa de validación.
 
 **Criterios de Aceptación:**
 - **Dado** un video con formato `bridge_YYYY-MM-DD_HH-MM-SS_to_HH-MM-SS.mp4`
-- **Cuando** el operador lo procesa en el Módulo 2
+- **Cuando** el operador lo procesa en el workflow de inferencia
 - **Entonces** obtiene telemetría por minuto con conteos, velocidad promedio, y estado del tráfico
 
 #### US-002: Clasificar Estado del Tráfico — P0
@@ -127,7 +127,7 @@ Ver [KPIs/KPIs.md](KPIs/KPIs.md) para la guía completa de validación.
 - Pipeline CT/CI de MLOps Nivel 1 con 3 módulos secuenciales
 - Código compartido en `src/` (13 módulos Python)
 - Notebooks como orquestadores (Colab)
-- Ver [SAD.md](SAD.md) para el diseño completo
+- Ver [arquitectura](../architecture/software-architecture.md) para el diseño completo
 
 ### 5.2 Seguridad
 
@@ -151,7 +151,7 @@ Ver [KPIs/KPIs.md](KPIs/KPIs.md) para la guía completa de validación.
 | M1: Percepción | Pipeline YOLO 11 + SORT + velocidad | 2025-03-15 | ✅ |
 | M2: Inteligencia | Clasificador MLP + auto-etiquetado | 2025-07-14 | ✅ |
 | M3: Persistencia | PostgreSQL + upsert idempotente | 2025-07-14 | ✅ |
-| M4: Testing | 19 archivos de test | 2026-06-30 | ✅ |
+| M4: Testing | Suite ampliada a 20 archivos Python | 2026-06-30 | ✅ |
 | M5: Documentación | 25+ documentos (estándares 2026) | 2026-07-23 | ✅ |
 | M6: Web App MVP | Dashboard de tráfico | TBD | 📋 Planificado |
 
@@ -159,7 +159,7 @@ Ver [KPIs/KPIs.md](KPIs/KPIs.md) para la guía completa de validación.
 
 ## 7. Análisis de Riesgos
 
-Ver [RISK_MATRIX.md](RISK_MATRIX.md) para la matriz completa de 10 riesgos identificados.
+Ver [matriz de riesgos](../quality/risk-matrix.md) para la matriz completa de 10 riesgos identificados.
 
 Riesgos principales:
 - **R-005**: Clases Accidente/Congestionado nunca observadas en datos reales (Severidad: Crítica)
@@ -178,4 +178,4 @@ Riesgos principales:
 
 Responsable del documento: Facundo Nicolás González
 Fecha de revisión: 2026-07-23
-Documentos de referencia: [SAD.md](SAD.md), [SRS.md](SRS.md), [KPIs/KPIs.md](KPIs/KPIs.md)
+Documentos de referencia: [arquitectura](../architecture/software-architecture.md), [SRS](software-requirements.md), [KPIs](../quality/kpis.md)

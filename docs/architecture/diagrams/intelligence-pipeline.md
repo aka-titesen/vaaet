@@ -1,9 +1,9 @@
-<!-- context: VAAET/docs/diagrams/intelligence-pipeline.md — Module 1 Intelligence Pipeline.
-Referenced by SAD.md, ADR-008, notebook 01_data_prep/data_preparation.ipynb. -->
+<!-- context: VAAET/docs/architecture/diagrams/intelligence-pipeline.md — Training pipeline.
+Referenced by software architecture, ADR-0008 and the training notebook. -->
 
-# Intelligence Pipeline — Module 1
+# Pipeline de entrenamiento
 
-Complete flow from Module 0 telemetry to traffic state classification and persistence.
+Flujo completo desde telemetría cruda hasta clasificación y persistencia.
 
 ```mermaid
 flowchart TD
@@ -11,7 +11,7 @@ flowchart TD
 
     B --> C[Feature Engineering]
     C --> C1[heavy_vehicle_ratio<br/>delta_speed / delta_count<br/>transition_flag<br/>speed_variance<br/>hour_of_day / weather_condition]
-    C1 --> D[DataFrame<br/>14 features]
+    C1 --> D[DataFrame<br/>19 features]
 
     D --> E[Auto-Labeling]
     E --> E1{Engineering rules}
@@ -48,7 +48,7 @@ flowchart TD
 
     L --> O[Persistence]
     D --> O
-    O --> P[(telemetry_raw<br/>14 features + FK)]
+    O --> P[(telemetry_raw<br/>19 features + FK)]
     O --> Q[(traffic_classifications<br/>prediction + HITL)]
 ```
 
@@ -56,7 +56,7 @@ flowchart TD
 
 | Artifact | Path | Purpose |
 |---|---|---|
-| Keras model | `models/intelligence/traffic_classifier.keras` | Trained classifier |
-| Scaler | `models/intelligence/feature_scaler.joblib` | Normalization for inference |
-| Label mapping | `models/intelligence/label_mapping.joblib` | Code-to-state-name mapping |
+| Keras model | `artifacts/traffic-state/traffic_classifier.keras` | Trained classifier |
+| Scaler | `artifacts/traffic-state/feature_scaler.joblib` | Normalization for inference |
+| Label mapping | `artifacts/traffic-state/label_mapping.joblib` | Code-to-state-name mapping |
 | Features CSV | `data/processed/traffic_telemetry.csv` | Feature dataset for reproducibility |

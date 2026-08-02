@@ -1,9 +1,9 @@
-<!-- context: VAAET/docs/diagrams/erd.md — Entity-Relationship diagram.
+<!-- context: VAAET/docs/architecture/diagrams/erd.md — Entity-Relationship diagram.
 Referenced by SAD.md, ADR-005, README.md. -->
 
 # Database Schema (ERD)
 
-Table `traffic_data` (Module 0 — legacy) with Module 1 extensions: `telemetry_raw` and `traffic_classifications`.
+La tabla `traffic_data` conserva adquisición cruda; `telemetry_raw` y `traffic_classifications` soportan inferencia y feedback.
 
 For the complete ERD with all 3 tables, see [erd-phase2.md](erd-phase2.md).
 

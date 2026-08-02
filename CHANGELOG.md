@@ -13,6 +13,26 @@ Todos los cambios relevantes del proyecto VAAET se documentan en este archivo, s
 
 ---
 
+## [4.0.0] - 2026-08-01
+
+### Cambiado
+
+- Adoptado source layout `src/vaaet/` y distribución Python `vaaet-ml`.
+- Formalizados tres workflows: adquisición bajo demanda, entrenamiento e inferencia.
+- Extraído el análisis de video anotado a `vaaet.vision.analysis` y reemplazado
+  el notebook monolítico por `collect_traffic_telemetry.ipynb`.
+- Añadidas deduplicación CSV, persistencia idempotente en `traffic_data`, Secrets
+  de Colab, procedencia temporal y ADR-0013.
+- Definido bundle portable de cuatro archivos, validado y versionado como unidad con DVC.
+- Establecido el límite multi-repo ML/Web mediante ADR-0012.
+- Sincronizada CI para Python 3.10–3.12, todos los extras, `pip check`, Ruff,
+  pytest, tres notebooks, enlaces, DVC y control de binarios ML.
+
+### Incompatible
+
+- Eliminados imports `src.*`, hacks de `sys.path` y rutas activas heredadas.
+- Las rutas y referencias previas sólo se conservan como registro histórico.
+
 ## [3.1.0] - 2026-07-23
 
 **Hito:** Estandarización de Documentación 2026
@@ -45,7 +65,7 @@ Todos los cambios relevantes del proyecto VAAET se documentan en este archivo, s
   - `AGENTS.md` — Contexto de ejecución para agentes de IA
   - `llms.txt` — Resumen optimizado para RAG/LLMs
 - **ADR:** ADR-010 — Pipeline MLOps con 19 features y señales de calidad
-- **Directorios:** `models/perception/`, `models/intelligence/`, `data/raw/`, `data/processed/`, `data/samples/`
+- **Directorios:** `models/perception/`, `artifacts/traffic-state/`, `data/raw/`, `data/processed/`, `data/sample/`
 
 ### 🛠️ Cambiado
 
@@ -87,15 +107,15 @@ Todos los cambios relevantes del proyecto VAAET se documentan en este archivo, s
 - `src/synthetic.py` — Generador de datos sintéticos para clases raras
 - `src/persistence.py` — Persistencia en BD con upsert idempotente
 - `src/perception/` — Pipeline de percepción: detector, tracker, velocidad, flujo óptico
-- Módulo 2 de producción: `notebooks/02_production/traffic_analyzer.ipynb`
+- Módulo 2 de producción: `notebooks/inference/analyze_traffic_video.ipynb`
 - Scaffold experimental de feedback loop HITL
 - Suite de tests: 19 archivos, ~2.556 líneas
 - ADR-009: Arquitectura modular de tres etapas
 
 ### 🛠️ Cambiado
 
-- Módulo 0 (bootstrap) archivado en `archive/00_bootstrap/`
-- Módulo 1 movido a `notebooks/01_data_prep/data_preparation.ipynb`
+- Módulo 0 (bootstrap) archivado en `archive/bootstrap-v1/`
+- Módulo 1 movido a `notebooks/training/train_traffic_state_classifier.ipynb`
 - ADR-001 a ADR-007 supersedidos por ADR-009
 - ADR-008: Input(13,) corregido a Input(14,) (14 features canónicas, luego 19)
 - Estructura del proyecto reorganizada según principios SOLID, YAGNI, KISS

@@ -1,4 +1,4 @@
-<!-- context: VAAET/docs/NDA.md — Acuerdo de Confidencialidad.
+<!-- context: VAAET/docs/governance/non-disclosure-agreement.md — Acuerdo de Confidencialidad.
 Preparado para uso futuro cuando el proyecto escale a contexto corporativo. -->
 
 # Acuerdo de Confidencialidad (NDA) — VAAET
@@ -47,7 +47,7 @@ El presente acuerdo establece las obligaciones de confidencialidad para las part
 | **Código fuente** | Todo el contenido del repositorio público (licencia MIT) |
 | **Documentación** | Todos los archivos `.md` del repositorio |
 | **Arquitectura** | Diagramas, ADRs, plantillas |
-| **Datos sintéticos** | Generados por `src/synthetic.py` |
+| **Datos sintéticos** | Generados por `src/vaaet/features/synthetic.py` |
 | **Información pública** | Publicaciones académicas derivadas |
 
 ---
@@ -66,7 +66,7 @@ El presente acuerdo establece las obligaciones de confidencialidad para las part
 
 1. **Identificar claramente** qué información es confidencial
 2. **Proporcionar acceso** seguro a los datos necesarios para el trabajo
-3. **Mantener actualizada** la política de seguridad ([SECURITY_POLICY.md](SECURITY_POLICY.md))
+3. **Mantener actualizada** la [política de seguridad](security-policy.md)
 
 ---
 
@@ -96,4 +96,4 @@ La obligación de confidencialidad no aplica cuando:
 
 Responsable del documento: Facundo Nicolás González
 Fecha de revisión: 2026-07-23
-Documentos de referencia: [SECURITY.md](../SECURITY.md), [SECURITY_POLICY.md](SECURITY_POLICY.md)
+Documentos de referencia: [SECURITY.md](../../SECURITY.md), [política de seguridad](security-policy.md)

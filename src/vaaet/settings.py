@@ -10,7 +10,6 @@ from __future__ import annotations
 import os
 from types import MappingProxyType
 
-
 # Reproducibility
 
 RANDOM_SEED: int = 42
@@ -96,7 +95,7 @@ STATIONARY_CONFIRMED_RATIO_MIN: float = 0.10
 
 # Artifact paths (relative to repository root)
 
-MODEL_DIR: str = os.path.join("models", "intelligence")
+MODEL_DIR: str = os.path.join("artifacts", "traffic-state")
 DATA_PROCESSED_DIR: str = os.path.join("data", "processed")
 DATA_RAW_DIR: str = os.path.join("data", "raw")
 
@@ -107,7 +106,7 @@ LABEL_MAP_PATH: str = os.path.join(MODEL_DIR, "label_mapping.joblib")
 # Google Drive artifact bridge (Colab persistence across sessions)
 # Mount point: /content/drive/ — artefacts copied here after M1 training
 # so M2 can load them even after a runtime reset.
-DRIVE_ARTIFACT_DIR: str = os.path.join("MyDrive", "vaaet", "models", "intelligence")
+DRIVE_ARTIFACT_DIR: str = os.path.join("MyDrive", "vaaet-ml", "artifacts", "traffic-state")
 
 
 # Database
@@ -148,7 +147,7 @@ SPEED_RANGE: tuple[float, float] = (2.0, 120.0)
 # YOLO model variant selection by video duration (seconds)
 # Logic: shorter clips can afford heavier models (higher accuracy, fewer frames).
 # Longer clips require lighter models to finish in reasonable time.
-# Matches ADR-002 adaptive selection strategy from legacy pipeline.
+# Implements the adaptive selection strategy in ADR-0002.
 YOLO_MODEL_VARIANTS: dict[str, dict[str, int | str]] = MappingProxyType(
     {  # type: ignore[assignment]
         "yolo11x": {"max_duration": 300, "label": "xlarge — clips < 5 min"},
@@ -209,7 +208,7 @@ SPEED_ROBUST_OUTLIER_SIGMA: float = 3.5
 # Minimum track length (frames) before speed estimation is reliable
 SPEED_MIN_TRACK_LENGTH: int = 8
 
-# Rolling window (frames) for speed calculation (~1 s at 30 fps, matches legacy)
+# Rolling window for speed calculation (approximately 1 s at 30 FPS).
 SPEED_ESTIMATION_WINDOW: int = 30
 
 # Per-frame displacement noise floor (px). Displacements below this are

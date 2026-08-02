@@ -23,7 +23,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from src.config import (
+from vaaet.settings import (
     DATA_ORIGIN_COL,
     LABELING_THRESHOLDS,
     RANDOM_SEED,
@@ -227,11 +227,13 @@ def augment_with_synthetic(
     )
 
     all_cols = list(
-        dict.fromkeys([
-            *tagged_real.columns,
-            *accidents.columns,
-            *congestion.columns,
-        ])
+        dict.fromkeys(
+            [
+                *tagged_real.columns,
+                *accidents.columns,
+                *congestion.columns,
+            ]
+        )
     )
     result = pd.concat(
         [

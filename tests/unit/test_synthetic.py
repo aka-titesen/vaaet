@@ -5,17 +5,17 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from src.config import (
-    DATA_ORIGIN_COL,
-    LABELING_THRESHOLDS,
-    RANDOM_SEED,
-    SYNTHETIC_SCENARIO_COL,
-)
-from src.synthetic import (
+from vaaet.features.synthetic import (
     SYNTHETIC_ID_OFFSET,
     augment_with_synthetic,
     generate_accident_sequences,
     generate_congestion_sequences,
+)
+from vaaet.settings import (
+    DATA_ORIGIN_COL,
+    LABELING_THRESHOLDS,
+    RANDOM_SEED,
+    SYNTHETIC_SCENARIO_COL,
 )
 
 _RAW_COLS = {

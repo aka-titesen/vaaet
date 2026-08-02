@@ -1,25 +1,18 @@
 """Lightweight SORT tracker for the VAAET production pipeline.
 
 Implements a simplified SORT (Simple Online and Realtime Tracking) algorithm
-based on Euclidean distance matching between centroids.  This mirrors the
-tracking approach used in the archived bootstrap module but is extracted into
-a clean, testable class.
-
-References:
-    - Legacy: ``VAAETHybrid._find_or_create_track()`` and
-      ``VAAETHybrid.update_tracking()`` in ``archive/00_bootstrap/``
-    - ADR-003, ADR-009 §Perception
+based on Euclidean distance matching between centroids. See ADR-0003 and
+ADR-0009 for the decision context.
 """
 
 from __future__ import annotations
 
 from collections import deque
 from dataclasses import dataclass, field
-from typing import Any
 
 import numpy as np
 
-from src.config import (
+from vaaet.settings import (
     TRACKER_HISTORY_MAXLEN,
     TRACKER_MAX_DISTANCE,
     TRACKER_MAX_LOST,
@@ -169,8 +162,6 @@ class SORTTracker:
 
     def _prune(self) -> None:
         """Remove tracks that have been lost for too long."""
-        pruned = [
-            t.track_id for t in self._tracks if t.frames_since_seen > self.max_lost
-        ]
+        pruned = [t.track_id for t in self._tracks if t.frames_since_seen > self.max_lost]
         self.last_pruned_track_ids = pruned
         self._tracks = [t for t in self._tracks if t.frames_since_seen <= self.max_lost]

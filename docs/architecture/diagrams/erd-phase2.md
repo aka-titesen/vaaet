@@ -1,7 +1,7 @@
-<!-- context: VAAET/docs/diagrams/erd-phase2.md — Complete ERD with all 3 tables.
+<!-- context: VAAET/docs/architecture/diagrams/erd-phase2.md — Complete ERD with all 3 tables.
 Referenced by SAD.md, ADR-008, DATA_LINEAGE.md. -->
 
-# Database Schema — Module 0 + Module 1
+# Esquema de base de datos — adquisición, entrenamiento e inferencia
 
 Three tables with FK chain: `traffic_data` → `telemetry_raw` → `traffic_classifications`.
 
@@ -71,7 +71,7 @@ erDiagram
 
 ## HITL (Human-in-the-Loop) Fields
 
-Designed for Module 2 feedback loop. Initially all records have:
+Diseñada para el feedback de inferencia. Inicialmente los registros tienen:
 - `is_human_validated = FALSE`
 - `human_override_state = NULL`
 - `validated_at = NULL`

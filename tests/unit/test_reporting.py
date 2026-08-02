@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pandas as pd
 
-from src.reporting import (
+from vaaet.evaluation.reporting import (
     build_class_support_notes,
     summarize_data_origin,
     summarize_resampled_balance,

@@ -1,4 +1,4 @@
-"""Tests for src/db.py — database utilities.
+"""Tests for vaaet.data.database utilities.
 
 Only pure functions are tested. Actual DB connections require credentials
 and are marked with ``@pytest.mark.db`` (skipped by default).
@@ -6,14 +6,37 @@ and are marked with ``@pytest.mark.db`` (skipped by default).
 
 from __future__ import annotations
 
-import os
+import sys
 import textwrap
+import types
 from pathlib import Path
 
 import pandas as pd
 import pytest
 
-from src.db import _build_connection_string
+from vaaet.data.database import _build_connection_string
+
+
+def test_hydrate_db_environment_from_colab(monkeypatch: pytest.MonkeyPatch) -> None:
+    from vaaet.data.database import hydrate_db_environment_from_colab
+
+    class Secrets:
+        @staticmethod
+        def get(name: str) -> str:
+            return f"secret-{name.lower()}"
+
+    google = types.ModuleType("google")
+    colab = types.ModuleType("google.colab")
+    colab.userdata = Secrets()
+    google.colab = colab
+    monkeypatch.setitem(sys.modules, "google", google)
+    monkeypatch.setitem(sys.modules, "google.colab", colab)
+    for name in ("DB_HOST", "DB_PORT", "DB_NAME", "DB_USER", "DB_PASSWORD"):
+        monkeypatch.delenv(name, raising=False)
+
+    loaded = hydrate_db_environment_from_colab()
+
+    assert loaded == ("DB_HOST", "DB_PORT", "DB_NAME", "DB_USER", "DB_PASSWORD")
 
 
 class TestBuildConnectionString:
@@ -57,7 +80,7 @@ class TestGetDbConfig:
     """Test get_db_config() when environment variables are set."""
 
     def test_reads_from_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        from src.db import get_db_config
+        from vaaet.data.database import get_db_config
 
         monkeypatch.setenv("DB_HOST", "test-host")
         monkeypatch.setenv("DB_PORT", "5433")
@@ -73,8 +96,8 @@ class TestGetDbConfig:
         assert config["password"] == "test-pass"
 
     def test_default_port(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        from src.config import DEFAULT_DB_PORT
-        from src.db import get_db_config
+        from vaaet.data.database import get_db_config
+        from vaaet.settings import DEFAULT_DB_PORT
 
         monkeypatch.setenv("DB_HOST", "host")
         monkeypatch.setenv("DB_NAME", "db")
@@ -89,7 +112,7 @@ class TestGetDbConfig:
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """interactive=False must raise RuntimeError when env vars are missing."""
-        from src.db import get_db_config
+        from vaaet.data.database import get_db_config
 
         for var in ("DB_HOST", "DB_PORT", "DB_NAME", "DB_USER", "DB_PASSWORD"):
             monkeypatch.delenv(var, raising=False)
@@ -101,7 +124,7 @@ class TestGetDbConfig:
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """interactive=False must succeed when env vars are set."""
-        from src.db import get_db_config
+        from vaaet.data.database import get_db_config
 
         monkeypatch.setenv("DB_HOST", "h")
         monkeypatch.setenv("DB_NAME", "d")
@@ -119,7 +142,7 @@ class TestRestoreBackupToSql:
     """Test restore_backup_to_sql() error handling (no pg_restore needed)."""
 
     def test_missing_backup_file(self, tmp_path: Path) -> None:
-        from src.db import restore_backup_to_sql
+        from vaaet.data.database import restore_backup_to_sql
 
         with pytest.raises(FileNotFoundError, match="Backup file not found"):
             restore_backup_to_sql(tmp_path / "nonexistent.backup")
@@ -127,7 +150,7 @@ class TestRestoreBackupToSql:
     def test_missing_pg_restore(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        from src.db import restore_backup_to_sql
+        from vaaet.data.database import restore_backup_to_sql
 
         # Create a dummy backup file
         backup = tmp_path / "test.backup"
@@ -143,14 +166,15 @@ class TestRestoreBackupToSql:
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """pg_restore stderr with 'unsupported version' must raise RuntimeError."""
-        from unittest.mock import patch, MagicMock
-        from src.db import restore_backup_to_sql
+        from unittest.mock import MagicMock, patch
+
+        from vaaet.data.database import restore_backup_to_sql
 
         backup = tmp_path / "test.backup"
         backup.write_bytes(b"\x00" * 100)
 
         # Mock shutil.which to return a fake pg_restore path
-        monkeypatch.setattr("src.db.shutil.which", lambda _: "/usr/bin/pg_restore")
+        monkeypatch.setattr("vaaet.data.database.shutil.which", lambda _: "/usr/bin/pg_restore")
 
         # Mock subprocess.run to simulate version mismatch
         ver_result = MagicMock(returncode=0, stdout="pg_restore (PostgreSQL) 14.0")
@@ -168,7 +192,7 @@ class TestRestoreBackupToSql:
                 return ver_result
             return run_result  # actual pg_restore call
 
-        with patch("src.db.subprocess.run", side_effect=fake_run):
+        with patch("vaaet.data.database.subprocess.run", side_effect=fake_run):
             with pytest.raises(RuntimeError, match="version mismatch"):
                 restore_backup_to_sql(backup)
 
@@ -198,13 +222,13 @@ class TestParseSqlDump:
         return sql_file
 
     def test_parses_correct_row_count(self, sample_sql: Path) -> None:
-        from src.db import parse_sql_dump
+        from vaaet.data.database import parse_sql_dump
 
         df = parse_sql_dump(sample_sql)
         assert len(df) == 3
 
     def test_parses_correct_columns(self, sample_sql: Path) -> None:
-        from src.db import parse_sql_dump
+        from vaaet.data.database import parse_sql_dump
 
         df = parse_sql_dump(sample_sql)
         expected = {
@@ -222,7 +246,7 @@ class TestParseSqlDump:
         assert set(df.columns) == expected
 
     def test_numeric_types(self, sample_sql: Path) -> None:
-        from src.db import parse_sql_dump
+        from vaaet.data.database import parse_sql_dump
 
         df = parse_sql_dump(sample_sql)
         assert pd.api.types.is_numeric_dtype(df["avg_speed"])
@@ -230,26 +254,26 @@ class TestParseSqlDump:
         assert pd.api.types.is_numeric_dtype(df["total_vehicles"])
 
     def test_datetime_parsing(self, sample_sql: Path) -> None:
-        from src.db import parse_sql_dump
+        from vaaet.data.database import parse_sql_dump
 
         df = parse_sql_dump(sample_sql)
         assert pd.api.types.is_datetime64_any_dtype(df["record_time"])
 
     def test_speed_values(self, sample_sql: Path) -> None:
-        from src.db import parse_sql_dump
+        from vaaet.data.database import parse_sql_dump
 
         df = parse_sql_dump(sample_sql)
         assert df["avg_speed"].iloc[0] == pytest.approx(55.3)
         assert df["avg_speed"].iloc[2] == pytest.approx(12.1)
 
     def test_missing_file(self, tmp_path: Path) -> None:
-        from src.db import parse_sql_dump
+        from vaaet.data.database import parse_sql_dump
 
         with pytest.raises(FileNotFoundError, match="SQL file not found"):
             parse_sql_dump(tmp_path / "nonexistent.sql")
 
     def test_no_copy_block(self, tmp_path: Path) -> None:
-        from src.db import parse_sql_dump
+        from vaaet.data.database import parse_sql_dump
 
         sql_file = tmp_path / "empty.sql"
         sql_file.write_text("-- empty dump\nSELECT 1;\n", encoding="utf-8")
@@ -258,7 +282,7 @@ class TestParseSqlDump:
 
     def test_null_handling(self, tmp_path: Path) -> None:
         """Postgres NULL (\\N) should be parsed as NaN/NA."""
-        from src.db import parse_sql_dump
+        from vaaet.data.database import parse_sql_dump
 
         content = textwrap.dedent("""\
             COPY public.traffic_data (id, clip_id, record_time, avg_speed, count_car, count_truck, count_bus, count_motorcycle, count_bicycle, total_vehicles) FROM stdin;

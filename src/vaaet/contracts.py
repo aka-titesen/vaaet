@@ -12,7 +12,7 @@ from typing import Literal, Mapping
 
 import pandas as pd
 
-from src.config import (
+from vaaet.settings import (
     DATA_ORIGINS,
     STATE_LABELS,
     SYNTHETIC_SCENARIOS,
@@ -53,9 +53,7 @@ def _validate_origin(origin: str, scenario: str) -> None:
     if origin not in DATA_ORIGINS:
         raise ValueError(f"data_origin must be one of {DATA_ORIGINS}")
     if scenario not in SYNTHETIC_SCENARIOS:
-        raise ValueError(
-            f"synthetic_scenario must be one of {SYNTHETIC_SCENARIOS}"
-        )
+        raise ValueError(f"synthetic_scenario must be one of {SYNTHETIC_SCENARIOS}")
     if origin == "real" and scenario != "observed":
         raise ValueError("real records must use synthetic_scenario='observed'")
     if origin == "synthetic" and scenario == "observed":
@@ -238,10 +236,7 @@ class ClassificationRecord:
         if self.model_confidence is not None:
             _validate_ratio(self.model_confidence, "model_confidence")
         _validate_ratio(self.accident_evidence_score, "accident_evidence_score")
-        if (
-            self.human_override_state is not None
-            and self.human_override_state not in STATE_LABELS
-        ):
+        if self.human_override_state is not None and self.human_override_state not in STATE_LABELS:
             raise ValueError("human_override_state must be a valid traffic state")
         _validate_origin(self.data_origin, self.synthetic_scenario)
 

@@ -1,4 +1,4 @@
-<!-- context: VAAET/docs/KPIs/KPIs.md — Métricas de rendimiento y guía de validación.
+<!-- context: VAAET/docs/quality/kpis.md — Métricas de rendimiento y guía de validación.
 Complementa PRD.md (requisitos) y BIAS_AND_LIMITATIONS.md (limitaciones). -->
 
 # Métricas de Rendimiento (KPIs) y Guía de Validación — VAAET
@@ -84,7 +84,7 @@ F1-Score ≥ 0.97 valida el objetivo de 97% de precisión. Si está por debajo, 
 | Cambios de ID | Minimizar | Sin medición formal. Requiere ground truth con IDs consistentes |
 | FPS Procesamiento | Variable | No publicado. Depende del modelo YOLO y GPU de Colab |
 | Precisión Estacionarios | Alta | Sin evaluación cuantitativa. Validado cualitativamente con demos sintéticos |
-| F1-macro Clasificación | ≥ 0.85 | Pendiente primera ejecución del Módulo 1 |
+| F1-macro Clasificación | ≥ 0.85 | Registrado en el manifiesto de cada bundle |
 | Recall clase Accidente | > 0 | Pendiente. Clase extremadamente rara |
 
 ### Prerrequisitos de Validación
@@ -96,7 +96,7 @@ F1-Score ≥ 0.97 valida el objetivo de 97% de precisión. Si está por debajo, 
 
 ### Limitaciones Conocidas
 
-Ver [BIAS_AND_LIMITATIONS.md](../BIAS_AND_LIMITATIONS.md) para el análisis completo de sesgos que afectan los KPIs.
+Ver [sesgos y limitaciones](../ml/bias-and-limitations.md) para el análisis completo de sesgos que afectan los KPIs.
 
 ---
 

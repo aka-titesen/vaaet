@@ -4,10 +4,7 @@ Provides physics-based speed calculation from tracked vehicle centroids,
 with perspective correction, camera-motion compensation, stationary
 detection, and optional MLP 70/30 fusion smoothing.
 
-References:
-    - Legacy: ``VAAETHybrid.calculate_enhanced_speed()``,
-      ``VAAETHybrid.is_stationary()`` in ``archive/00_bootstrap/``
-    - ADR-009 §Perception, ADR-004
+See ADR-0004, ADR-0006 and ADR-0009 for the decision context.
 """
 
 from __future__ import annotations
@@ -17,7 +14,7 @@ from typing import Any
 
 import numpy as np
 
-from src.config import (
+from vaaet.settings import (
     NEAR_ZERO_AVG_FRAME_MAX,
     NEAR_ZERO_MAX_FRAME_MAX,
     NEAR_ZERO_MAX_SEGMENT_MAX,
@@ -101,9 +98,7 @@ def get_perspective_factor(
     far_factor: float | None = None,
 ) -> float:
     """Return a perspective correction factor based on vertical position."""
-    _near = (
-        near_factor if near_factor is not None else PERSPECTIVE_ZONES["near"]["factor"]
-    )
+    _near = near_factor if near_factor is not None else PERSPECTIVE_ZONES["near"]["factor"]
     _mid = mid_factor if mid_factor is not None else PERSPECTIVE_ZONES["mid"]["factor"]
     _far = far_factor if far_factor is not None else PERSPECTIVE_ZONES["far"]["factor"]
 
@@ -386,9 +381,7 @@ class TrackMotionStateTracker:
             self._exit_votes[track_id] = 0
         else:
             self._enter_votes[track_id] = 0
-            moving_vote = (
-                candidate_speed is not None and candidate_speed >= self.exit_speed_min
-            )
+            moving_vote = candidate_speed is not None and candidate_speed >= self.exit_speed_min
             self._exit_votes[track_id] = self._exit_votes.get(track_id, 0) + (
                 1 if moving_vote else 0
             )

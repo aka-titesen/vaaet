@@ -1,10 +1,10 @@
-<!-- context: VAAET/docs/adr/ADR-004 — Decisión de usar MLP como suavizador con datos dummy.
+<!-- context: VAAET/docs/architecture/decisions/0004-mlp-speed-smoother.md — MLP como suavizador.
 Referenciado por AGENTS.md, SAD.md §2.2, BIAS_AND_LIMITATIONS.md. -->
 
 # ADR-004: MLP como Suavizador (No Estimador Primario)
 
-**Status:** Superseded by [ADR-009](ADR-009-modular-three-stage-architecture.md)  
-> This ADR applies to the archived bootstrap module (`archive/00_bootstrap/`) only.
+**Status:** Superseded by [ADR-0009](0009-modular-three-stage-architecture.md)
+> This ADR applies to the archived bootstrap module (`archive/bootstrap-v1/`) only.
 > The speed-smoothing MLP is part of the perception pipeline. See ADR-009.  
 **Fecha:** 2026-03-06  
 **Decisores:** Equipo VAAET

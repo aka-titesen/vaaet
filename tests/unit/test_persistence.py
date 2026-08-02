@@ -3,8 +3,37 @@
 from __future__ import annotations
 
 import pandas as pd
+from sqlalchemy import create_engine, text
 
-from src.persistence import _prepare_classification_row, _prepare_telemetry_row
+from vaaet.data.persistence import (
+    _prepare_classification_row,
+    _prepare_telemetry_row,
+    persist_raw_telemetry,
+)
+
+
+def test_persist_raw_telemetry_is_idempotent() -> None:
+    engine = create_engine("sqlite+pysqlite:///:memory:")
+    telemetry = pd.DataFrame(
+        [
+            {
+                "clip_id": "bridge_test",
+                "record_time": pd.Timestamp("2025-05-01 08:01:00"),
+                "avg_speed": 12.5,
+                "count_car": 1,
+                "count_truck": 0,
+                "count_bus": 0,
+                "count_motorcycle": 0,
+                "count_bicycle": 0,
+                "total_vehicles": 1,
+            }
+        ]
+    )
+
+    assert persist_raw_telemetry(telemetry, engine=engine) == 1
+    assert persist_raw_telemetry(telemetry, engine=engine) == 0
+    with engine.connect() as connection:
+        assert connection.execute(text("SELECT COUNT(*) FROM traffic_data")).scalar_one() == 1
 
 
 class TestPrepareTelemetryRow:

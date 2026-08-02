@@ -6,11 +6,11 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from src.classification import (
+from vaaet.inference.traffic_state import (
     apply_conservative_accident_gate,
     classify_telemetry_dataframe,
 )
-from src.config import FEATURE_COLS
+from vaaet.settings import FEATURE_COLS
 
 
 class _DummyScaler:

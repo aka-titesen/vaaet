@@ -1,0 +1,66 @@
+"""Tests for the shared annotated-video workflow."""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+import cv2
+import numpy as np
+
+from vaaet.vision import analysis
+from vaaet.vision.analysis import TrafficStatePrediction, analyze_video
+from vaaet.vision.detector import Detection
+
+
+class _FakeDetector:
+    def __init__(self, **_: object) -> None:
+        self.frame = 0
+
+    def load(self) -> None:
+        return None
+
+    def detect(self, _frame: object) -> list[Detection]:
+        self.frame += 1
+        x = 20 + self.frame * 3
+        return [Detection((x, 30, x + 20, 50), "car", 0.9)]
+
+
+class _FakeFlow:
+    last_tracking_ratio = 1.0
+    last_total_points = 10
+
+    def update(self, _frame: object) -> np.ndarray:
+        return np.zeros(2, dtype=float)
+
+
+def _make_video(path: Path) -> None:
+    writer = cv2.VideoWriter(str(path), cv2.VideoWriter_fourcc(*"mp4v"), 5.0, (96, 64))
+    for _ in range(12):
+        writer.write(np.zeros((64, 96, 3), dtype=np.uint8))
+    writer.release()
+
+
+def test_analyze_video_with_and_without_prediction_provider(tmp_path, monkeypatch) -> None:
+    source = tmp_path / "bridge_2025-05-01_08-00-00_to_08-00-03.mp4"
+    _make_video(source)
+    monkeypatch.setattr(analysis, "YOLODetector", _FakeDetector)
+    monkeypatch.setattr(analysis, "OpticalFlowEstimator", _FakeFlow)
+
+    collection = analyze_video(source, tmp_path / "collection.mp4", max_frames=12)
+    assert collection.video_path.is_file()
+    assert not collection.telemetry.empty
+    assert collection.classifications is None
+
+    def provider(_telemetry: object) -> TrafficStatePrediction:
+        return TrafficStatePrediction(0, "Normal", 0.9)
+
+    inference = analyze_video(
+        source,
+        tmp_path / "inference.mp4",
+        prediction_provider=provider,
+        max_frames=12,
+        status_every_seconds=0.2,
+    )
+    assert inference.video_path.is_file()
+    assert inference.classifications is not None
+    assert inference.classifications.iloc[-1]["state_label"] == "Normal"

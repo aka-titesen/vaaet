@@ -5,9 +5,9 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from src.config import DATA_ORIGIN_COL, FEATURE_COLS, SYNTHETIC_SCENARIO_COL
-from src.features import engineer_features
-from src.synthetic import augment_with_synthetic
+from vaaet.features.engineering import engineer_features
+from vaaet.features.synthetic import augment_with_synthetic
+from vaaet.settings import DATA_ORIGIN_COL, FEATURE_COLS, SYNTHETIC_SCENARIO_COL
 
 
 class TestEngineerFeatures:

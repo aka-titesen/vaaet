@@ -1,5 +1,5 @@
-<!-- context: VAAET/docs/adr/ADR-011-dvc-model-registry.md
-Referenciado por AGENTS.md, DVC_GUIDE.md, PROJECT_PLAN.md. -->
+<!-- context: VAAET/docs/architecture/decisions/0011-dvc-model-registry.md
+Referenciado por AGENTS.md, docs/ml/dvc-guide.md y ADR-0012. -->
 
 # ADR-011: DVC como Model Registry
 
@@ -20,6 +20,7 @@ El pipeline VAAET genera artefactos binarios pesados que Git no puede versionar 
 | Clasificador MLP | `.keras` | ~500 KB – 2 MB |
 | Feature scaler | `.joblib` | ~10 KB |
 | Label mapping | `.joblib` | ~5 KB |
+| Manifiesto del bundle | `.json` | ~5 KB |
 | Modelos YOLO | `.pt` | ~50 MB (descargados, no versionados) |
 | Backups de BD | `.csv` | ~500 KB – 5 MB |
 
@@ -55,6 +56,10 @@ Estos artefactos estaban en `.gitignore` sin ningún sistema de versionado. Al r
 
 **Adoptar DVC con Google Drive como storage remoto por defecto**, con remotes alternativos pre-configurados (S3, local) para permitir migración sin fricción.
 
+El directorio `artifacts/traffic-state/` se registra como una única unidad DVC;
+no se crean pointers separados por binario. El bundle incluye obligatoriamente
+los tres binarios y `model-manifest.json`, conforme a ADR-0012.
+
 ### Configuración Adoptada
 
 ```
@@ -72,7 +77,7 @@ Estos artefactos estaban en `.gitignore` sin ningún sistema de versionado. Al r
 
 ### Positivas
 
-1. Cada commit de Git tiene asociado un modelo específico (reproducibilidad)
+1. Cada commit de Git tiene asociado un bundle completo y específico (reproducibilidad)
 2. `dvc pull` en Colab descarga exactamente los artefactos correctos
 3. Cambiar de Google Drive a S3 requiere una sola línea (`dvc remote default s3`)
 4. Compatible con el pipeline CI/CD existente (GitHub Actions)
@@ -86,12 +91,13 @@ Estos artefactos estaban en `.gitignore` sin ningún sistema de versionado. Al r
 
 ### Neutrales
 
-1. Los archivos `.dvc` se commitean en Git (metadata liviana ~200 bytes cada uno)
+1. `artifacts/traffic-state.dvc` se commitea en Git como metadata liviana del directorio
 2. El cache local de DVC puede crecer; se limpia con `dvc gc --workspace`
 
 ## Referencias
 
 - [DVC Documentation](https://dvc.org/doc)
 - [DVC con Google Drive](https://dvc.org/doc/user-guide/data-management/remote-storage/google-drive)
-- [ADR-009: Arquitectura modular de tres módulos](ADR-009-modular-three-stage-architecture.md)
-- [ADR-010: Pipeline MLOps 19 features](ADR-010-mlops-pipeline-19-features.md)
+- [ADR-0009: Arquitectura modular de tres módulos](0009-modular-three-stage-architecture.md)
+- [ADR-0010: Pipeline MLOps 19 features](0010-mlops-pipeline-19-features.md)
+- [ADR-0012: Límite ML/Web y bundle portable](0012-ml-web-boundary-and-artifact-contract.md)

@@ -10,7 +10,7 @@ This script focuses on three robustness goals:
 
 Expected input files are CSVs produced from real clip processing runs.
 Each CSV should contain at least telemetry columns required by
-``src.features.engineer_features``:
+``vaaet.features.engineering.engineer_features``:
     - avg_speed
     - total_vehicles
     - count_car
@@ -43,19 +43,13 @@ import argparse
 import json
 from dataclasses import dataclass
 from pathlib import Path
-import sys
 
 import numpy as np
 import pandas as pd
 
-# Ensure repository root is importable when running from scripts/.
-REPO_ROOT = Path(__file__).resolve().parents[1]
-if str(REPO_ROOT) not in sys.path:
-    sys.path.insert(0, str(REPO_ROOT))
-
-from src.config import STATE_LABELS
-from src.features import engineer_features
-from src.labeling import assign_traffic_state
+from vaaet.features.engineering import engineer_features
+from vaaet.features.labeling import assign_traffic_state
+from vaaet.settings import STATE_LABELS
 
 LABEL_TO_STATE = {name.lower(): code for code, name in STATE_LABELS.items()}
 DEFAULT_JOIN_KEYS = ["clip_id", "minute_index"]

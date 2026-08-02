@@ -1,4 +1,4 @@
-<!-- context: VAAET/docs/SOW.md — Declaración de Trabajo.
+<!-- context: VAAET/docs/governance/statement-of-work.md — Declaración de Trabajo.
 Preparado para uso futuro en contexto corporativo/contractual. -->
 
 # Declaración de Trabajo (SOW) — VAAET
@@ -40,9 +40,9 @@ VAAET es un sistema de análisis vehicular avanzado que procesa video de vigilan
 |---|---|---|---|---|
 | E-01 | Pipeline de percepción | YOLO 11 + SORT + estimación de velocidad | Notebooks + `src/` | Procesa video de 1h en < 30min (GPU T4) |
 | E-02 | Clasificador de tráfico | MLP entrenado con 19 features | `.keras` + `.joblib` | F1-macro ≥ 0.85 |
-| E-03 | Persistencia de datos | Telemetría en PostgreSQL | DDL + `src/persistence.py` | Upsert idempotente funcional |
+| E-03 | Persistencia de datos | Telemetría en PostgreSQL | DDL + `src/vaaet/data/persistence.py` | Upsert idempotente funcional |
 | E-04 | Documentación completa | 25+ documentos técnicos y de negocio | Markdown | 100% de plantillas cubiertas |
-| E-05 | Suite de tests | 19 archivos de test | pytest | 100% pass rate en CI |
+| E-05 | Suite de tests | 20 archivos Python de soporte y tests | pytest | 100% pass rate en CI |
 | E-06 | CI/CD | GitHub Actions pipeline | YAML | Tests automáticos en PRs |
 
 ---

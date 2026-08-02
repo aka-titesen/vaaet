@@ -1,4 +1,4 @@
-<!-- context: VAAET/docs/BUSINESS_CANVAS.md — Business Model Canvas.
+<!-- context: VAAET/docs/product/business-model-canvas.md — Business Model Canvas.
 Proyección comercial futura del proyecto. -->
 
 # Business Model Canvas — VAAET
@@ -8,7 +8,7 @@ Proyección comercial futura del proyecto. -->
 | Campo | Detalles |
 |---|---|
 | **Nombre del Proyecto** | VAAET — Video Advanced Analysis of Traffic |
-| **Versión** | 3.0.0 |
+| **Versión** | 4.0.0 |
 | **Estado** | Borrador (visión futura) |
 | **Responsable Técnico** | Facundo Nicolás González |
 | **Última Revisión** | 2026-07-23 |

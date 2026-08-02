@@ -1,15 +1,30 @@
-"""Tests for src.video — filename validation, duration extraction, video opening."""
+"""Tests for vaaet.vision.video — filename validation, duration extraction, video opening."""
 
 from __future__ import annotations
 
 import os
 import tempfile
 
+import cv2
 import numpy as np
 import pytest
-import cv2
 
-from src.video import extract_duration, open_video, validate_filename
+from vaaet.vision.video import (
+    extract_duration,
+    extract_recording_start,
+    open_video,
+    validate_filename,
+)
+
+
+def test_extract_recording_start_from_bridge_filename() -> None:
+    result = extract_recording_start("bridge_2024-01-15_23-55-00_to_00-05-00.mp4")
+    assert result is not None
+    assert result.isoformat() == "2024-01-15T23:55:00"
+
+
+def test_extract_recording_start_rejects_free_form_filename() -> None:
+    assert extract_recording_start("camera-export.mp4") is None
 
 
 class TestValidateFilename:

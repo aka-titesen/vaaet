@@ -7,7 +7,7 @@ from collections.abc import Sequence
 import numpy as np
 import pandas as pd
 
-from src.config import (
+from vaaet.settings import (
     DATA_ORIGIN_COL,
     STATE_LABELS,
     SYNTHETIC_SCENARIO_COL,
@@ -53,11 +53,7 @@ def summarize_state_balance(
     _require_columns(df, (state_col,))
 
     if DATA_ORIGIN_COL in df.columns:
-        counts = (
-            df.groupby([state_col, DATA_ORIGIN_COL], dropna=False)
-            .size()
-            .unstack(fill_value=0)
-        )
+        counts = df.groupby([state_col, DATA_ORIGIN_COL], dropna=False).size().unstack(fill_value=0)
     else:
         counts = pd.DataFrame(index=sorted(df[state_col].dropna().unique()))
 

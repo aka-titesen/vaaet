@@ -1,14 +1,14 @@
 [build-system]
-requires = ["setuptools>=68.0", "wheel"]
-build-backend = "setuptools.backends._legacy:_Backend"
+requires = ["setuptools>=77.0", "wheel"]
+build-backend = "setuptools.build_meta"
 
 [project]
-name = "vaaet"
-version = "3.0.0"
+name = "vaaet-ml"
+version = "4.0.0"
 description = "Video Advanced Analysis of Traffic — Sistema de análisis vehicular avanzado para el Puente Gral. Manuel Belgrano"
 readme = "README.md"
-license = {text = "MIT"}
-requires-python = ">=3.8"
+license = "MIT"
+requires-python = ">=3.10,<3.13"
 authors = [
     {name = "Facundo Nicolás González"},
 ]
@@ -16,57 +16,65 @@ keywords = ["traffic-analysis", "computer-vision", "yolo", "mlops", "colab"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Science/Research",
-    "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
     "Topic :: Scientific/Engineering :: Image Recognition",
 ]
 
 dependencies = [
-    "numpy>=1.24.0",
-    "pandas>=2.0.0",
-    "sqlalchemy>=2.0.0",
-    "psycopg2-binary>=2.9.0",
-    "joblib>=1.3.0",
-    "scikit-learn>=1.3.0",
+    "numpy>=1.26,<2.2",
+    "pandas>=2.2,<3",
+    "joblib>=1.4,<2",
+    "scikit-learn>=1.5,<2",
 ]
 
 [project.optional-dependencies]
-perception = [
-    "ultralytics>=8.0.0",
-    "opencv-python>=4.8.0",
+vision = [
+    "ultralytics-opencv-headless>=8.3,<9",
 ]
-intelligence = [
-    "tensorflow>=2.15.0",
-    "imbalanced-learn>=0.11.0",
+training = [
+    "tensorflow>=2.19,<2.21",
+    "imbalanced-learn>=0.13,<1",
 ]
-viz = [
-    "matplotlib>=3.7.0",
-    "seaborn>=0.12.0",
+database = [
+    "sqlalchemy>=2,<3",
+    "psycopg2-binary>=2.9,<3",
+]
+visualization = [
+    "matplotlib>=3.8,<4",
+    "seaborn>=0.13,<1",
 ]
 dev = [
     "pytest>=7.4.0",
     "pytest-cov>=4.1.0",
+    "ruff>=0.12.0",
 ]
 dvc = [
     "dvc>=3.50.0",
     "dvc-gdrive>=3.0.0",
-]
-# Instalar todo: pip install -e ".[perception,intelligence,viz,dev,dvc]"
-all = [
-    "vaaet[perception,intelligence,viz,dev,dvc]",
 ]
 
 [project.urls]
 Repository = "https://github.com/zgfnicolas/vaaet"
 
 [tool.setuptools.packages.find]
-include = ["src*"]
+where = ["src"]
+include = ["vaaet*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["."]
 addopts = "-v --tb=short"
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+ignore = ["E501"]
 
 [tool.setuptools.package-data]
 "*" = ["*.md"]

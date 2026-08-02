@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import pandas as pd
 
-from src.config import FEATURE_COLS, LABELING_THRESHOLDS
+from vaaet.settings import FEATURE_COLS, LABELING_THRESHOLDS
 
 __all__ = [
     "engineer_features",
@@ -118,9 +118,12 @@ def engineer_features(df: pd.DataFrame) -> pd.DataFrame:
     out["hour_of_day"] = out["record_time"].dt.hour
     out["weather_condition"] = (~out["hour_of_day"].between(6, 18)).astype(int)
 
-    out["delta_speed"] = out["delta_speed"].fillna(0.0)
-    out["delta_count"] = out["delta_count"].fillna(0.0)
-    out = out.reset_index(drop=True)
+    # Delta-based features are undefined for the first record. Preserve the
+    # established training/inference contract by removing that row instead of
+    # silently fabricating zero deltas.
+    out = out.dropna(
+        subset=["delta_speed", "delta_count", "cumulative_delta_speed"]
+    ).reset_index(drop=True)
 
     for col in FEATURE_COLS:
         if col not in out.columns:

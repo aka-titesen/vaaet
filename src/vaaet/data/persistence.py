@@ -9,17 +9,47 @@ import pandas as pd
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
 
-from src.config import MODEL_VERSION, STATE_LABELS
-from src.db import get_engine
-from src.logging_utils import get_logger
+from vaaet.data.database import get_engine
+from vaaet.logging import get_logger
+from vaaet.settings import MODEL_VERSION, STATE_LABELS
 
 logger = get_logger(__name__)
 
 __all__ = [
     "PersistResult",
     "ensure_persistence_tables",
+    "ensure_raw_telemetry_table",
     "persist_classified_telemetry",
+    "persist_raw_telemetry",
 ]
+
+
+DDL_TRAFFIC_DATA = """
+CREATE TABLE IF NOT EXISTS traffic_data (
+    id SERIAL PRIMARY KEY,
+    clip_id TEXT NOT NULL,
+    record_time TIMESTAMP NOT NULL,
+    avg_speed NUMERIC(5,2) NOT NULL,
+    count_car INTEGER NOT NULL,
+    count_truck INTEGER NOT NULL,
+    count_bus INTEGER NOT NULL,
+    count_motorcycle INTEGER NOT NULL,
+    count_bicycle INTEGER NOT NULL,
+    total_vehicles INTEGER NOT NULL,
+    UNIQUE (clip_id, record_time)
+);
+"""
+
+INSERT_RAW_TELEMETRY_SQL = """
+INSERT INTO traffic_data (
+    clip_id, record_time, avg_speed, count_car, count_truck, count_bus,
+    count_motorcycle, count_bicycle, total_vehicles
+) VALUES (
+    :clip_id, :record_time, :avg_speed, :count_car, :count_truck, :count_bus,
+    :count_motorcycle, :count_bicycle, :total_vehicles
+)
+ON CONFLICT (clip_id, record_time) DO NOTHING;
+"""
 
 
 DDL_TELEMETRY_RAW = """
@@ -183,6 +213,66 @@ class PersistResult:
     classification_rows: int
 
 
+def ensure_raw_telemetry_table(engine: Engine) -> None:
+    """Create the original ``traffic_data`` acquisition table when absent."""
+    with engine.begin() as conn:
+        conn.execute(text(DDL_TRAFFIC_DATA))
+
+
+def persist_raw_telemetry(
+    df: pd.DataFrame,
+    *,
+    config: dict[str, str] | None = None,
+    engine: Engine | None = None,
+) -> int:
+    """Persist raw acquisition records idempotently into ``traffic_data``."""
+    if df.empty:
+        return 0
+
+    required = {
+        "clip_id",
+        "record_time",
+        "avg_speed",
+        "count_car",
+        "count_truck",
+        "count_bus",
+        "count_motorcycle",
+        "count_bicycle",
+        "total_vehicles",
+    }
+    missing = required - set(df.columns)
+    if missing:
+        raise ValueError(f"Raw telemetry is missing required columns: {sorted(missing)}")
+
+    owns_engine = engine is None
+    active_engine = engine or get_engine(config)
+    ensure_raw_telemetry_table(active_engine)
+    inserted = 0
+    try:
+        with active_engine.begin() as conn:
+            for row in df.itertuples(index=False):
+                record_time = row.record_time
+                if isinstance(record_time, pd.Timestamp):
+                    record_time = record_time.to_pydatetime()
+                payload = {
+                    "clip_id": str(row.clip_id),
+                    "record_time": record_time,
+                    "avg_speed": float(row.avg_speed),
+                    "count_car": int(row.count_car),
+                    "count_truck": int(row.count_truck),
+                    "count_bus": int(row.count_bus),
+                    "count_motorcycle": int(row.count_motorcycle),
+                    "count_bicycle": int(row.count_bicycle),
+                    "total_vehicles": int(row.total_vehicles),
+                }
+                result = conn.execute(text(INSERT_RAW_TELEMETRY_SQL), payload)
+                inserted += max(result.rowcount, 0)
+    finally:
+        if owns_engine:
+            active_engine.dispose()
+    return inserted
+
+
 def ensure_persistence_tables(engine: Engine) -> None:
     """Create the academic persistence tables if they do not exist."""
     with engine.begin() as conn:
@@ -199,28 +289,68 @@ def _prepare_telemetry_row(row: pd.Series) -> dict[str, Any]:
         "source_record_id": int(source_record_id) if source_record_id is not None else None,
         "clip_id": row.get("clip_id"),
         "record_time": row.get("record_time"),
-        "avg_speed": float(row.get("avg_speed", 0.0)) if pd.notna(row.get("avg_speed", 0.0)) else None,
-        "total_vehicles": int(row.get("total_vehicles", 0)) if pd.notna(row.get("total_vehicles", 0)) else None,
+        "avg_speed": float(row.get("avg_speed", 0.0))
+        if pd.notna(row.get("avg_speed", 0.0))
+        else None,
+        "total_vehicles": int(row.get("total_vehicles", 0))
+        if pd.notna(row.get("total_vehicles", 0))
+        else None,
         "count_car": int(row.get("count_car", 0)) if pd.notna(row.get("count_car", 0)) else None,
-        "count_truck": int(row.get("count_truck", 0)) if pd.notna(row.get("count_truck", 0)) else None,
+        "count_truck": int(row.get("count_truck", 0))
+        if pd.notna(row.get("count_truck", 0))
+        else None,
         "count_bus": int(row.get("count_bus", 0)) if pd.notna(row.get("count_bus", 0)) else None,
-        "count_motorcycle": int(row.get("count_motorcycle", 0)) if pd.notna(row.get("count_motorcycle", 0)) else None,
-        "count_bicycle": int(row.get("count_bicycle", 0)) if pd.notna(row.get("count_bicycle", 0)) else None,
-        "heavy_vehicle_ratio": float(row.get("heavy_vehicle_ratio", 0.0)) if pd.notna(row.get("heavy_vehicle_ratio", 0.0)) else None,
-        "delta_speed": float(row.get("delta_speed", 0.0)) if pd.notna(row.get("delta_speed", 0.0)) else None,
-        "delta_count": int(row.get("delta_count", 0)) if pd.notna(row.get("delta_count", 0)) else None,
-        "transition_flag": int(row.get("transition_flag", 0)) if pd.notna(row.get("transition_flag", 0)) else 0,
-        "speed_variance": float(row.get("speed_variance", 0.0)) if pd.notna(row.get("speed_variance", 0.0)) else None,
-        "cumulative_delta_speed": float(row.get("cumulative_delta_speed", 0.0)) if pd.notna(row.get("cumulative_delta_speed", 0.0)) else None,
-        "low_speed_persistence": float(row.get("low_speed_persistence", 0.0)) if pd.notna(row.get("low_speed_persistence", 0.0)) else None,
-        "speed_measurement_quality": float(row.get("speed_measurement_quality", 1.0)) if pd.notna(row.get("speed_measurement_quality", 1.0)) else None,
-        "near_zero_motion_ratio": float(row.get("near_zero_motion_ratio", 0.0)) if pd.notna(row.get("near_zero_motion_ratio", 0.0)) else None,
-        "stationary_confirmed_ratio": float(row.get("stationary_confirmed_ratio", 0.0)) if pd.notna(row.get("stationary_confirmed_ratio", 0.0)) else None,
-        "near_zero_motion_count": int(row.get("near_zero_motion_count", 0)) if pd.notna(row.get("near_zero_motion_count", 0)) else 0,
-        "stationary_confirmed_count": int(row.get("stationary_confirmed_count", 0)) if pd.notna(row.get("stationary_confirmed_count", 0)) else 0,
-        "rejected_speed_count": int(row.get("rejected_speed_count", 0)) if pd.notna(row.get("rejected_speed_count", 0)) else 0,
-        "recovered_track_count": int(row.get("recovered_track_count", 0)) if pd.notna(row.get("recovered_track_count", 0)) else 0,
-        "speed_sample_count": int(row.get("speed_sample_count", 0)) if pd.notna(row.get("speed_sample_count", 0)) else 0,
+        "count_motorcycle": int(row.get("count_motorcycle", 0))
+        if pd.notna(row.get("count_motorcycle", 0))
+        else None,
+        "count_bicycle": int(row.get("count_bicycle", 0))
+        if pd.notna(row.get("count_bicycle", 0))
+        else None,
+        "heavy_vehicle_ratio": float(row.get("heavy_vehicle_ratio", 0.0))
+        if pd.notna(row.get("heavy_vehicle_ratio", 0.0))
+        else None,
+        "delta_speed": float(row.get("delta_speed", 0.0))
+        if pd.notna(row.get("delta_speed", 0.0))
+        else None,
+        "delta_count": int(row.get("delta_count", 0))
+        if pd.notna(row.get("delta_count", 0))
+        else None,
+        "transition_flag": int(row.get("transition_flag", 0))
+        if pd.notna(row.get("transition_flag", 0))
+        else 0,
+        "speed_variance": float(row.get("speed_variance", 0.0))
+        if pd.notna(row.get("speed_variance", 0.0))
+        else None,
+        "cumulative_delta_speed": float(row.get("cumulative_delta_speed", 0.0))
+        if pd.notna(row.get("cumulative_delta_speed", 0.0))
+        else None,
+        "low_speed_persistence": float(row.get("low_speed_persistence", 0.0))
+        if pd.notna(row.get("low_speed_persistence", 0.0))
+        else None,
+        "speed_measurement_quality": float(row.get("speed_measurement_quality", 1.0))
+        if pd.notna(row.get("speed_measurement_quality", 1.0))
+        else None,
+        "near_zero_motion_ratio": float(row.get("near_zero_motion_ratio", 0.0))
+        if pd.notna(row.get("near_zero_motion_ratio", 0.0))
+        else None,
+        "stationary_confirmed_ratio": float(row.get("stationary_confirmed_ratio", 0.0))
+        if pd.notna(row.get("stationary_confirmed_ratio", 0.0))
+        else None,
+        "near_zero_motion_count": int(row.get("near_zero_motion_count", 0))
+        if pd.notna(row.get("near_zero_motion_count", 0))
+        else 0,
+        "stationary_confirmed_count": int(row.get("stationary_confirmed_count", 0))
+        if pd.notna(row.get("stationary_confirmed_count", 0))
+        else 0,
+        "rejected_speed_count": int(row.get("rejected_speed_count", 0))
+        if pd.notna(row.get("rejected_speed_count", 0))
+        else 0,
+        "recovered_track_count": int(row.get("recovered_track_count", 0))
+        if pd.notna(row.get("recovered_track_count", 0))
+        else 0,
+        "speed_sample_count": int(row.get("speed_sample_count", 0))
+        if pd.notna(row.get("speed_sample_count", 0))
+        else 0,
         "data_origin": row.get("data_origin", "real"),
         "synthetic_scenario": row.get("synthetic_scenario", "observed"),
     }

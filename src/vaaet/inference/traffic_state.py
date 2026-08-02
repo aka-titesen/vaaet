@@ -7,15 +7,15 @@ from typing import Any, Mapping
 import numpy as np
 import pandas as pd
 
-from src.config import (
+from vaaet.features.engineering import engineer_features
+from vaaet.features.labeling import assign_instant_state, build_accident_signal_frame
+from vaaet.settings import (
     ACCIDENT_GATE_LOW_CONFIDENCE_MAX,
     ACCIDENT_GATE_MIN_EVIDENCE_SCORE,
     FEATURE_COLS,
     MODEL_VERSION,
     STATE_LABELS,
 )
-from src.features import engineer_features
-from src.labeling import assign_instant_state, build_accident_signal_frame
 
 __all__ = [
     "apply_conservative_accident_gate",
@@ -41,7 +41,7 @@ def _ensure_feature_compatibility(
     if expected is not None and int(expected) != len(feature_cols):
         raise ValueError(
             "Scaler feature count does not match FEATURE_COLS. "
-            "Re-run Module 1 so the artifacts are regenerated with the current schema."
+            "Re-run the training workflow so artifacts use the current schema."
         )
 
 
@@ -59,20 +59,18 @@ def apply_conservative_accident_gate(
     signals = build_accident_signal_frame(out)
     out = pd.concat([out, signals], axis=1)
 
-    allowed_override = (
-        out[predicted_state_col].isin([2, 3])
-        | pd.to_numeric(out[confidence_col], errors="coerce")
-        .fillna(0.0)
-        .le(ACCIDENT_GATE_LOW_CONFIDENCE_MAX)
-    )
+    allowed_override = out[predicted_state_col].isin([2, 3]) | pd.to_numeric(
+        out[confidence_col], errors="coerce"
+    ).fillna(0.0).le(ACCIDENT_GATE_LOW_CONFIDENCE_MAX)
     strong_evidence = out["accident_evidence_score"] >= ACCIDENT_GATE_MIN_EVIDENCE_SCORE
-    gate = strong_evidence & allowed_override & (
-        out["accident_persistent_low_speed"]
+    gate = (
+        strong_evidence
+        & allowed_override
         & (
-            out["accident_recent_braking"]
-            | out["accident_cumulative_braking"]
+            out["accident_persistent_low_speed"]
+            & (out["accident_recent_braking"] | out["accident_cumulative_braking"])
+            & out["accident_motion_evidence"]
         )
-        & out["accident_motion_evidence"]
     )
 
     out["accident_rule_triggered"] = strong_evidence
@@ -120,7 +118,9 @@ def classify_telemetry_dataframe(
     confidences = proba.max(axis=1).astype(float)
 
     out["traffic_state"] = pred_codes
-    out["state_label"] = [labels.get(code, STATE_LABELS.get(code, "Unknown")) for code in pred_codes]
+    out["state_label"] = [
+        labels.get(code, STATE_LABELS.get(code, "Unknown")) for code in pred_codes
+    ]
     out["confidence"] = np.round(confidences, 4)
     out["model_version"] = model_version
 

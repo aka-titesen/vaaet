@@ -4,12 +4,8 @@ Provides a thin, testable interface around Ultralytics YOLO for vehicle
 detection.  The wrapper handles model loading, inference, and post-processing
 (NMS filtering, class filtering to vehicles only).
 
-Also includes adaptive model variant selection based on video duration,
-mirroring the legacy ``VAAETHybrid.select_optimal_model()`` logic.
-
-References:
-    - Legacy: ``VAAETHybrid.select_optimal_model()`` in ``archive/00_bootstrap/``
-    - ADR-002, ADR-009 §Perception
+Also includes adaptive model variant selection based on video duration. See
+ADR-0002 and ADR-0009 for the decision context.
 """
 
 from __future__ import annotations
@@ -19,7 +15,7 @@ from typing import Any
 
 import numpy as np
 
-from src.config import VEHICLE_TYPES, YOLO_CONFIDENCE, YOLO_MODEL_VARIANTS, YOLO_NMS_IOU
+from vaaet.settings import YOLO_CONFIDENCE, YOLO_MODEL_VARIANTS, YOLO_NMS_IOU
 
 __all__ = [
     "Detection",

@@ -1,9 +1,9 @@
-<!-- context: VAAET/docs/adr/ADR-007 — Decisión de usar Google Colab como runtime principal.
+<!-- context: VAAET/docs/architecture/decisions/0007-google-colab-runtime.md — Google Colab como runtime.
 Referenciado por AGENTS.md, PRD.md, ADR-001. -->
 
 # ADR-007: Google Colab como Entorno de Ejecución Principal
 
-**Status:** Superseded by [ADR-009](ADR-009-modular-three-stage-architecture.md)  
+**Status:** Superseded by [ADR-0009](0009-modular-three-stage-architecture.md)
 > Google Colab remains the primary runtime for all notebooks.
 > See ADR-009 for the current three-module architecture.  
 **Fecha:** 2026-03-06  

@@ -1,32 +1,9 @@
-# VAAET — Video Advanced Analysis of Traffic
-> Sistema de análisis vehicular avanzado para el Puente Gral. Manuel Belgrano (Corrientes, Argentina)
+# VAAET ML 4.0.0
 
-## Resumen
-VAAET es un pipeline CT/CI (Continuous Training / Continuous Inference) de MLOps Nivel 1 que procesa video de vigilancia SISE para:
-- Detectar y clasificar vehículos (auto, camión, colectivo, moto, bicicleta) con YOLO 11
-- Estimar velocidades individuales mediante óptica computacional con compensación de movimiento de cámara
-- Clasificar el estado del tráfico (Normal, Reducido, Congestionado, Accidente) con un MLP de TensorFlow/Keras
-- Persistir telemetría y clasificaciones en PostgreSQL (AWS RDS)
+Repositorio ML para análisis vehicular del Puente General Manuel Belgrano. Distribución: `vaaet-ml`; paquete: `vaaet`; URL: https://github.com/zgfnicolas/vaaet.
 
-## Arquitectura
-Pipeline de tres módulos secuenciales con código compartido en src/:
-- Módulo 0 (Bootstrap, archivado): Generó los datos históricos iniciales. Congelado.
-- Módulo 1 (Preparación de Datos): Feature engineering de 19 columnas, auto-etiquetado, SMOTE, entrenamiento MLP. Ejecución única.
-- Módulo 2 (Producción): YOLO 11 + SORT + estimación de velocidad + clasificador MLP + persistencia DB + scaffold HITL. Ejecución continua.
+Tres workflows Colab: adquisición opcional en `notebooks/data-collection/collect_traffic_telemetry.ipynb`, entrenamiento en `notebooks/training/train_traffic_state_classifier.ipynb` e inferencia en `notebooks/inference/analyze_traffic_video.ipynb`. La lógica vive en `src/vaaet/`; `vision/analysis.py` comparte el procesamiento anotado.
 
-## Stack
-Python 3.8+ | YOLO 11 | OpenCV | TensorFlow/Keras | scikit-learn | SORT | PostgreSQL | Google Colab
+Invariantes: 19 `FEATURE_COLS` en orden exacto, cuatro estados, umbrales, esquema PostgreSQL y MLP. El bundle DVC tiene modelo Keras, scaler, mapping y manifiesto; validar antes de deserializar.
 
-## Documentación
-- docs/PRD.md — Requisitos del producto
-- docs/SAD.md — Arquitectura de software
-- docs/SRS.md — Especificación de requisitos
-- docs/MODEL_CARD.md — Model Card del clasificador MLP
-- docs/DATA_MODEL.md — Modelo de datos y diccionario
-- docs/DATA_LINEAGE.md — Linaje de datos
-- docs/USER_GUIDE.md — Guía de usuario
-- docs/BIAS_AND_LIMITATIONS.md — Sesgos y limitaciones
-- docs/KPIs/KPIs.md — Métricas y validación
-- docs/adr/ — 10 Architecture Decision Records
-- AGENTS.md — Contexto para agentes de IA
-- CONTRIBUTING.md — Guía de contribución
+Validación: Ruff, pytest, compileall, `ast.parse()` de los tres notebooks, enlaces y `git diff --check`. La prueba real de GPU, Drive, PostgreSQL, YOLO y DVC remoto es manual en Colab. Leer `AGENTS.md`, `docs/index.md`, ADR-0012 y ADR-0013.

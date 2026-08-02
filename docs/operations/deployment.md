@@ -1,4 +1,4 @@
-<!-- context: VAAET/docs/DEPLOYMENT.md — Manual de despliegue.
+<!-- context: VAAET/docs/operations/deployment.md — Manual de despliegue.
 Complementa USER_GUIDE.md y SAD.md. -->
 
 # Manual de Despliegue (DevOps Playbook) — VAAET
@@ -8,7 +8,7 @@ Complementa USER_GUIDE.md y SAD.md. -->
 | Campo | Detalles |
 |---|---|
 | **Nombre del Proyecto** | VAAET — Video Advanced Analysis of Traffic |
-| **Versión** | 3.0.0 |
+| **Versión** | 4.0.0 |
 | **Estado** | Aprobado |
 | **Responsable Técnico** | Facundo Nicolás González |
 | **Última Revisión** | 2026-07-23 |
@@ -49,7 +49,7 @@ flowchart LR
 
 | Entorno | Plataforma | Propósito | Datos |
 |---|---|---|---|
-| **Desarrollo local** | Python 3.8+ local | Desarrollo y testing de `src/` | Datos sintéticos, sin GPU |
+| **Desarrollo local** | Python 3.10–3.12 | Desarrollo y testing de `src/vaaet/` | Datos sintéticos, sin GPU |
 | **Google Colab** | Colab Free/Pro | Ejecución de notebooks (entorno principal) | Videos reales, GPU disponible |
 | **CI** | GitHub Actions | Validación automática | Tests unitarios, sin GPU ni BD |
 
@@ -63,18 +63,21 @@ Se activa mediante **push** o **pull request** a `main`.
 
 Pipeline definido en `.github/workflows/ci.yml`:
 
-1. **Instalación**: `pip install -e ".[all]"`
-2. **Tests**: `pytest tests/ -v --tb=short -x`
-3. **Compilación de notebooks**: Verificación sintáctica con `ast.parse()`
-4. **Verificación de enlaces**: Detección de enlaces rotos en documentación
+1. **Instalación**: `pip install -e ".[vision,training,visualization,database,dev]"`
+2. **Consistencia**: `pip check` y smoke imports
+3. **Calidad**: Ruff y `pytest tests/ -v --tb=short`
+4. **Notebooks**: compilación de adquisición, entrenamiento e inferencia
+5. **Repositorio**: enlaces, DVC y ausencia de binarios ML en Git
 
 ### 3.2 Despliegue (Manual)
 
 VAAET no tiene despliegue automatizado porque el runtime es Google Colab. El "despliegue" consiste en:
 
 1. El usuario abre el notebook en Colab desde GitHub
-2. La Celda 0 instala dependencias y clona el repo
-3. La Celda 1 carga artefactos del modelo
+2. La primera celda clona o actualiza el repo, instala una vez y ejecuta `pip check`
+3. Entrenamiento genera el bundle; inferencia lo valida antes de cargarlo
+
+Ver la [guía de Colab](colab-guide.md) para Secrets, Drive y recuperación ante reinicios.
 
 ---
 
@@ -129,7 +132,7 @@ Las tablas se crean automáticamente con `CREATE TABLE IF NOT EXISTS` al ejecuta
 ### Backups
 
 - Backup manual vía `pg_dump` almacenado en `data/raw/` (gitignored)
-- Script de conversión: `scripts/convert_backup.py`
+- Script de conversión: `scripts/convert-postgres-backup.py`
 - **Recomendación:** Configurar backups automáticos en AWS RDS (diarios, retención 7 días)
 
 ---
@@ -149,7 +152,7 @@ Las tablas se crean automáticamente con `CREATE TABLE IF NOT EXISTS` al ejecuta
 En caso de error en los artefactos del modelo:
 1. Restaurar artefactos previos desde Google Drive
 2. Verificar F1-macro con el dataset de test
-3. Si no hay backup, re-ejecutar Módulo 1 completo
+3. Si no hay backup, re-ejecutar el workflow de entrenamiento completo
 
 ---
 

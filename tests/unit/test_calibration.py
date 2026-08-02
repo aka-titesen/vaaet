@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from src.calibration import (
+from vaaet.evaluation.calibration import (
     CalibrationSegment,
     aggregate_pixels_per_meter,
     build_calibration_table,

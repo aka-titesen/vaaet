@@ -1,9 +1,9 @@
-<!-- context: VAAET/docs/adr/ADR-005 — Decisión de usar PostgreSQL en AWS RDS.
+<!-- context: VAAET/docs/architecture/decisions/0005-postgresql-aws-rds.md — PostgreSQL en AWS RDS.
 Referenciado por AGENTS.md, PRD.md, README.md. -->
 
 # ADR-005: PostgreSQL (AWS RDS) sobre SQLite/Local
 
-**Status:** Superseded by [ADR-009](ADR-009-modular-three-stage-architecture.md)  
+**Status:** Superseded by [ADR-0009](0009-modular-three-stage-architecture.md)
 > PostgreSQL on AWS RDS remains the persistence layer across all modules.
 > See ADR-009 for the current three-table schema.  
 **Fecha:** 2026-03-06  

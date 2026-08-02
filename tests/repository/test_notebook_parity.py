@@ -1,162 +1,59 @@
-"""Parity tests — verify that notebooks import from src/ (no duplication).
-
-These tests read the notebook JSON and confirm that key functions and
-constants are imported, not redefined inline.
-"""
+"""Verify that all notebooks orchestrate shared package APIs."""
 
 from __future__ import annotations
 
 import json
-import re
 from pathlib import Path
 
 import pytest
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
-MODULE_1_PATH = REPO_ROOT / "notebooks" / "01_data_prep" / "data_preparation.ipynb"
-MODULE_2_PATH = REPO_ROOT / "notebooks" / "02_production" / "traffic_analyzer.ipynb"
+REPO_ROOT = Path(__file__).resolve().parents[2]
+NOTEBOOKS = {
+    "collection": REPO_ROOT / "notebooks/data-collection/collect_traffic_telemetry.ipynb",
+    "training": REPO_ROOT / "notebooks/training/train_traffic_state_classifier.ipynb",
+    "inference": REPO_ROOT / "notebooks/inference/analyze_traffic_video.ipynb",
+}
 
 
-def _get_all_code(notebook_path: Path) -> str:
-    """Concatenate all code cells from a notebook into one string."""
-    with open(notebook_path, "r", encoding="utf-8") as f:
-        nb = json.load(f)
-    code_cells = [
-        "".join(cell["source"]) for cell in nb["cells"] if cell["cell_type"] == "code"
-    ]
-    return "\n".join(code_cells)
+def _code(path: Path) -> str:
+    notebook = json.loads(path.read_text(encoding="utf-8"))
+    return "\n".join(
+        "".join(cell["source"])
+        for cell in notebook["cells"]
+        if cell["cell_type"] == "code"
+    )
 
 
-class TestModule1Parity:
-    """Module 1 (data_preparation) must use shared src/ modules."""
-
-    @pytest.fixture(autouse=True)
-    def _load_code(self) -> None:
-        self.code = _get_all_code(MODULE_1_PATH)
-
-    def test_imports_feature_cols_from_config(self) -> None:
-        # Match actual import statements (not comments) with multi-line support
-        match = re.search(
-            r"^from src\.config import \((.+?)\)",
-            self.code,
-            re.MULTILINE | re.DOTALL,
-        )
-        assert match is not None, "No 'from src.config import (...)' found"
-        assert "FEATURE_COLS" in match.group(1)
-
-    def test_imports_state_labels_from_config(self) -> None:
-        match = re.search(
-            r"^from src\.config import \((.+?)\)",
-            self.code,
-            re.MULTILINE | re.DOTALL,
-        )
-        assert match is not None
-        assert "STATE_LABELS" in match.group(1)
-
-    def test_imports_engineer_features(self) -> None:
-        assert "from src.features import engineer_features" in self.code
-
-    def test_imports_assign_traffic_state(self) -> None:
-        assert "from src.labeling import assign_traffic_state" in self.code
-
-    def test_imports_db_functions(self) -> None:
-        assert "from src.db import" in self.code
-
-    def test_no_inline_engineer_features(self) -> None:
-        """Should NOT redefine engineer_features() locally."""
-        assert "def engineer_features(" not in self.code
-
-    def test_no_inline_assign_traffic_state(self) -> None:
-        """Should NOT redefine assign_traffic_state() locally."""
-        assert "def assign_traffic_state(" not in self.code
-
-    def test_no_inline_get_db_config(self) -> None:
-        """Should NOT redefine get_db_config() locally."""
-        assert "def get_db_config(" not in self.code
-
-    def test_no_inline_load_telemetry(self) -> None:
-        """Should NOT redefine load_telemetry() locally."""
-        assert "def load_telemetry(" not in self.code
-
-    def test_sys_path_insert(self) -> None:
-        """Cell 0 must add the repo root to sys.path."""
-        assert "sys.path.insert" in self.code
-
-    def test_imports_load_from_backup(self) -> None:
-        """Module 1 must import load_from_backup for Tier 3 fallback."""
-        assert "load_from_backup" in self.code
-
-    def test_three_tier_fallback(self) -> None:
-        """Cell 2 must reference all three tiers of data loading."""
-        assert "Tier 1" in self.code
-        assert "Tier 2" in self.code
-        assert "Tier 3" in self.code
+@pytest.mark.parametrize("path", NOTEBOOKS.values())
+def test_notebook_has_one_editable_install_and_no_import_hacks(path: Path) -> None:
+    code = _code(path)
+    assert code.count('"-e"') == 1
+    assert "sys.path.insert" not in code
+    assert "install_if_missing" not in code
 
 
-class TestModule2Parity:
-    """Module 2 (traffic_analyzer) must use shared src/ modules."""
+def test_collection_uses_shared_analysis_and_data_contracts() -> None:
+    code = _code(NOTEBOOKS["collection"])
+    assert "from vaaet.vision.analysis import analyze_video" in code
+    assert "merge_raw_telemetry_csv" in code
+    assert "persist_raw_telemetry" in code
+    assert "class VAAET" not in code
 
-    @pytest.fixture(autouse=True)
-    def _load_code(self) -> None:
-        self.code = _get_all_code(MODULE_2_PATH)
 
-    def test_imports_from_src_config(self) -> None:
-        assert "from src.config import" in self.code
+def test_training_uses_shared_feature_contracts() -> None:
+    code = _code(NOTEBOOKS["training"])
+    assert "FEATURE_COLS" in code
+    assert "from vaaet.features.engineering import engineer_features" in code
+    assert "from vaaet.features.labeling import assign_traffic_state" in code
+    assert "from vaaet.data.database import" in code
+    assert "def engineer_features(" not in code
+    assert "def assign_traffic_state(" not in code
 
-    def test_imports_from_src_features(self) -> None:
-        assert "from src.features import engineer_features" in self.code
 
-    def test_imports_from_src_labeling(self) -> None:
-        assert "from src.labeling import assign_traffic_state" in self.code
-
-    def test_sys_path_insert(self) -> None:
-        assert "sys.path.insert" in self.code
-
-    def test_imports_yolo_detector(self) -> None:
-        assert "from src.perception.detector import" in self.code
-
-    def test_imports_sort_tracker(self) -> None:
-        assert "from src.perception.tracker import SORTTracker" in self.code
-
-    def test_imports_speed_estimation(self) -> None:
-        assert "from src.perception.speed import" in self.code
-
-    def test_imports_optical_flow(self) -> None:
-        assert (
-            "from src.perception.optical_flow import OpticalFlowEstimator" in self.code
-        )
-
-    def test_imports_shared_telemetry_pipeline(self) -> None:
-        assert "from src.perception.pipeline import process_clip_telemetry" in self.code
-
-    def test_imports_video_utils(self) -> None:
-        assert "from src.video import" in self.code
-
-    def test_imports_select_model_variant(self) -> None:
-        assert "select_model_variant" in self.code
-
-    def test_imports_is_stationary(self) -> None:
-        assert "is_stationary" in self.code
-
-    def test_imports_smoothed_speed_tracker(self) -> None:
-        assert "SmoothedSpeedTracker" in self.code
-
-    def test_no_inline_engineer_features(self) -> None:
-        assert "def engineer_features(" not in self.code
-
-    def test_no_inline_assign_traffic_state(self) -> None:
-        assert "def assign_traffic_state(" not in self.code
-
-    def test_no_inline_estimate_speed(self) -> None:
-        assert "def estimate_speed(" not in self.code
-
-    def test_no_inline_get_perspective_factor(self) -> None:
-        assert "def get_perspective_factor(" not in self.code
-
-    def test_no_inline_process_clip(self) -> None:
-        assert "def process_clip(" not in self.code
-
-    def test_model_existence_guard(self) -> None:
-        """Module 2 Cell 1 must guard against missing .keras file."""
-        assert "Missing trained artifacts" in self.code or "os.path.isfile" in self.code
-
+def test_inference_uses_shared_analysis_and_validates_bundle() -> None:
+    code = _code(NOTEBOOKS["inference"])
+    assert "from vaaet.vision.analysis import TrafficStatePrediction, analyze_video" in code
+    assert "validate_manifest(_model_dir_abs)" in code
+    assert "from sqlalchemy import text as sa_text" in code
+    assert "def estimate_speed(" not in code
+    assert "def generate_annotated_video(" not in code

@@ -1,2 +1,3 @@
-# VAAET — Video Advanced Analysis of Traffic
-# Shared modules for the intelligence layer.
+"""VAAET ML package."""
+
+__version__ = "4.0.0"

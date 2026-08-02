@@ -19,9 +19,9 @@ import pandas as pd
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
 
-from src.config import DB_ENV_VARS, DEFAULT_DB_PORT
-from src.exceptions import ArtifactNotFoundError, DatabaseNotConfiguredError
-from src.logging_utils import get_logger
+from vaaet.exceptions import ArtifactNotFoundError, DatabaseNotConfiguredError
+from vaaet.logging import get_logger
+from vaaet.settings import DB_ENV_VARS, DEFAULT_DB_PORT
 
 logger = get_logger(__name__)
 
@@ -29,12 +29,38 @@ __all__ = [
     "get_db_config",
     "get_engine",
     "get_optional_db_config",
+    "hydrate_db_environment_from_colab",
     "load_from_backup",
     "load_telemetry",
     "parse_sql_dump",
     "restore_backup_to_sql",
     "test_connection",
 ]
+
+
+def hydrate_db_environment_from_colab() -> tuple[str, ...]:
+    """Copy available Colab Secrets into missing database environment variables.
+
+    Outside Colab this is a no-op. Environment variables remain a supported
+    fallback, and existing values always win.
+    """
+    try:
+        from google.colab import userdata
+    except ImportError:
+        return ()
+
+    loaded: list[str] = []
+    for name in DB_ENV_VARS:
+        if os.environ.get(name):
+            continue
+        try:
+            value = userdata.get(name)
+        except Exception:  # Colab raises when a secret is absent or inaccessible.
+            continue
+        if value:
+            os.environ[name] = str(value)
+            loaded.append(name)
+    return tuple(loaded)
 
 
 # Credential helpers
@@ -203,8 +229,7 @@ def restore_backup_to_sql(
 
     if not output_path.is_file() or output_path.stat().st_size == 0:
         raise RuntimeError(
-            f"pg_restore produced an empty or missing file: {output_path}\n"
-            f"stderr: {stderr}"
+            f"pg_restore produced an empty or missing file: {output_path}\nstderr: {stderr}"
         )
 
     logger.info(

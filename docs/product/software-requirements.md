@@ -1,4 +1,4 @@
-<!-- context: VAAET/docs/SRS.md — Especificación de Requisitos de Software.
+<!-- context: VAAET/docs/product/software-requirements.md — Especificación de Requisitos de Software.
 Sigue el estándar IEEE Std 830-1998. Complementa PRD.md (requisitos de producto)
 y SAD.md (arquitectura). -->
 
@@ -9,7 +9,7 @@ y SAD.md (arquitectura). -->
 | Campo | Detalles |
 |---|---|
 | **Nombre del Proyecto** | VAAET — Video Advanced Analysis of Traffic |
-| **Versión** | 3.0.0 |
+| **Versión** | 4.0.0 |
 | **Fecha de Creación** | 2025-03-06 |
 | **Estado** | Aprobado |
 | **Responsable Técnico** | Facundo Nicolás González |
@@ -72,20 +72,20 @@ El sistema realiza cuatro funciones principales:
 
 | ID | Requisito Funcional | Descripción Detallada | Prioridad |
 |---|---|---|---|
-| RF-001 | Validación de video | El sistema debe validar que el nombre del archivo cumpla el formato `bridge_YYYY-MM-DD_HH-MM-SS_to_HH-MM-SS.mp4`. Archivos con formato inválido se rechazan con error descriptivo. | P0 |
+| RF-001 | Procedencia temporal | El sistema debe extraer captura de `bridge_YYYY-MM-DD_HH-MM-SS_to_HH-MM-SS.mp4`; para nombres libres usa hora de procesamiento y advierte menor trazabilidad. | P0 |
 | RF-002 | Selección adaptativa de modelo | El sistema debe seleccionar automáticamente la variante YOLO 11 (n/s/m/l/x) según la duración del video extraída del nombre de archivo. | P0 |
 | RF-003 | Detección de vehículos | El sistema debe detectar vehículos en cada frame usando YOLO 11 con umbral de confianza ≥ 0.5 y NMS IoU ≤ 0.4, clasificándolos en: auto, camión, colectivo, motocicleta, bicicleta. | P0 |
 | RF-004 | Tracking persistente | El sistema debe mantener IDs únicos por vehículo usando SORT con distancia euclidiana máxima de 100px y mismo tipo de vehículo. | P0 |
 | RF-005 | Estimación de velocidad | El sistema debe estimar velocidad individual por vehículo usando: compensación de flujo óptico, corrección de perspectiva por zona Y, filtros de plausibilidad por tipo de vehículo, y agregación robusta por minuto. | P0 |
 | RF-006 | Detección de estacionarios | El sistema debe clasificar vehículos como estacionarios mediante conjunción AND de 6 criterios estadísticos con histéresis de entrada/salida. | P1 |
-| RF-007 | Feature engineering | El sistema debe transformar 9 campos crudos de telemetría en 19 features de calidad según `src/config.py:FEATURE_COLS`. | P0 |
+| RF-007 | Feature engineering | El sistema debe transformar la telemetría cruda en 19 features según `src/vaaet/settings.py:FEATURE_COLS`. | P0 |
 | RF-008 | Clasificación de tráfico | El sistema debe clasificar cada minuto en uno de 4 estados (Normal, Reducido, Congestionado, Accidente) usando el MLP entrenado + gate conservador de accidentes. | P0 |
-| RF-009 | Persistencia en BD | El sistema debe persistir telemetría y clasificaciones en PostgreSQL via `src/persistence.py` con upsert idempotente. Opcional — degradación silenciosa si no hay BD. | P1 |
+| RF-009 | Persistencia en BD | El sistema debe persistir mediante `src/vaaet/data/persistence.py` con upsert idempotente y degradación limpia sin BD. | P1 |
 | RF-010 | Video anotado | El sistema debe generar un video de salida con bounding boxes, tipo + ID, velocidad, y HUD informativo. | P1 |
 | RF-011 | Soporte multi-cámara | El sistema debe detectar automáticamente layouts de 1, 2 o 4 cámaras y procesar cada ROI independientemente. | P1 |
-| RF-012 | Auto-etiquetado | El sistema debe asignar etiquetas de estado del tráfico usando reglas de ingeniería calibradas al Puente Belgrano (ver `src/config.py:LABELING_THRESHOLDS`). | P0 |
+| RF-012 | Auto-etiquetado | El sistema debe asignar etiquetas usando reglas calibradas (ver `src/vaaet/settings.py:LABELING_THRESHOLDS`). | P0 |
 | RF-013 | Generación de datos sintéticos | El sistema debe generar secuencias sintéticas de Accidente y Congestión para compensar la ausencia de estas clases en datos reales. IDs sintéticos ≥ 50.001. | P1 |
-| RF-014 | Scaffold HITL | El Módulo 2 debe incluir una celda experimental para correcciones humanas y re-entrenamiento, sin ser parte del flujo validado. | P2 |
+| RF-014 | Scaffold HITL | El workflow de inferencia debe incluir una celda experimental para correcciones humanas y reentrenamiento, fuera del flujo validado. | P2 |
 
 **Detalle técnico del requisito RF-005 (Estimación de velocidad):**
 
@@ -140,10 +140,10 @@ El sistema realiza cuatro funciones principales:
 
 ### 4.2 Referencias
 
-- [PRD.md](PRD.md) — Requisitos del producto
-- [SAD.md](SAD.md) — Arquitectura de software
-- [DATA_MODEL.md](DATA_MODEL.md) — Modelo de datos
-- [docs/adr/](adr/) — Architecture Decision Records
+- [Requisitos de producto](product-requirements.md)
+- [Arquitectura](../architecture/software-architecture.md)
+- [Modelo de datos](../architecture/data-model.md)
+- [ADRs](../architecture/decisions/)
 
 ---
 

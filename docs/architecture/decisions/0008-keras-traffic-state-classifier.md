@@ -1,4 +1,4 @@
-<!-- context: VAAET/docs/adr/ADR-008 — Decisión de usar TensorFlow/Keras para clasificación de estado de tráfico.
+<!-- context: VAAET/docs/architecture/decisions/0008-keras-traffic-state-classifier.md — Clasificador Keras.
 Referenciado por AGENTS.md, SAD.md §8, README.md, notebook 02_traffic_state_classifier.ipynb.
 Introduce la Etapa 2 (Inteligencia) del pipeline VAAET. -->
 
@@ -6,7 +6,15 @@ Introduce la Etapa 2 (Inteligencia) del pipeline VAAET. -->
 
 **Estado:** Aceptado  
 **Fecha:** 2026-03-07  
+
+> Nota de vigencia (2026-08-01): Keras y las 19 features siguen vigentes bajo
+> ADR-0010; la adquisición actual se define en [ADR-0013](0013-on-demand-data-collection-workflow.md).
 **Decisores:** Equipo VAAET
+
+> **Nota de vigencia (2026-08-01):** este ADR conserva la narrativa histórica
+> de la etapa de 14 features. El contrato actual de 19 features se rige por
+> [ADR-0010](0010-mlops-pipeline-19-features.md) y el layout/bundle por
+> [ADR-0012](0012-ml-web-boundary-and-artifact-contract.md).
 
 ## Contexto
 

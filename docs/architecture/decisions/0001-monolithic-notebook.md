@@ -1,11 +1,11 @@
-<!-- context: VAAET/docs/adr/ADR-001 — Decisión de usar notebook monolítico. 
+<!-- context: VAAET/docs/architecture/decisions/0001-monolithic-notebook.md — Decisión histórica de notebook monolítico.
 Referenciado por AGENTS.md y SAD.md. -->
 
 # ADR-001: Notebook Monolítico sobre Módulos Python
 
-**Status:** Superseded by [ADR-009](ADR-009-modular-three-stage-architecture.md)  
-> This ADR applies to the archived bootstrap module (`archive/00_bootstrap/`) only.
-> The current architecture uses shared `src/` modules. See ADR-009 for details.  
+**Status:** Superseded by [ADR-0009](0009-modular-three-stage-architecture.md)
+> Nota de vigencia (2026-08-01): este documento conserva la decisión histórica.
+> La adquisición activa usa módulos compartidos según [ADR-0013](0013-on-demand-data-collection-workflow.md).
 **Fecha:** 2026-03-06  
 **Decisores:** Equipo VAAET
 

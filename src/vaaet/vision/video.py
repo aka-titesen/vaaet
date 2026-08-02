@@ -3,10 +3,7 @@
 Handles strict filename validation (bridge camera naming convention),
 duration extraction from filenames, and safe video capture opening.
 
-References:
-    - Legacy: ``VAAETHybrid.validate_filename()`` and
-      ``extract_duration_from_filename()`` in ``archive/00_bootstrap/``
-    - ADR-009 §Video I/O
+See ADR-0009 and ADR-0013 for the filename and acquisition decisions.
 """
 
 from __future__ import annotations
@@ -17,12 +14,13 @@ from datetime import datetime, timedelta
 
 import cv2
 
-from src.config import VIDEO_FILENAME_PATTERN
-from src.exceptions import ArtifactNotFoundError, VideoOpenError, VideoValidationError
+from vaaet.exceptions import ArtifactNotFoundError, VideoOpenError, VideoValidationError
+from vaaet.settings import VIDEO_FILENAME_PATTERN
 
 __all__ = [
     "validate_filename",
     "extract_duration",
+    "extract_recording_start",
     "open_video",
 ]
 
@@ -35,6 +33,25 @@ def validate_filename(path: str) -> bool:
     return bool(_FILENAME_RE.match(basename))
 
 
+def extract_recording_start(path: str) -> datetime | None:
+    """Return the recording start encoded in a bridge filename, if present.
+
+    Free-form filenames deliberately return ``None``. Callers can then use one
+    explicit processing timestamp and report the reduced provenance instead of
+    silently pretending that processing time is capture time.
+    """
+    basename = os.path.basename(path)
+    match = _FILENAME_RE.match(basename)
+    if not match:
+        return None
+
+    parts = basename.removesuffix(".mp4").split("_")
+    return datetime.strptime(
+        f"{parts[1]} {parts[2].replace('-', ':')}",
+        "%Y-%m-%d %H:%M:%S",
+    )
+
+
 def extract_duration(path: str) -> float:
     """Extract video duration in seconds from a bridge-format filename."""
     basename = os.path.basename(path)
@@ -42,13 +59,10 @@ def extract_duration(path: str) -> float:
     if match:
         parts = basename.replace(".mp4", "").split("_")
         date_str = parts[1]
-        start_time_str = parts[2]
         end_time_str = parts[4]
 
-        start_dt = datetime.strptime(
-            f"{date_str} {start_time_str.replace('-', ':')}",
-            "%Y-%m-%d %H:%M:%S",
-        )
+        start_dt = extract_recording_start(path)
+        assert start_dt is not None
         end_dt = datetime.strptime(
             f"{date_str} {end_time_str.replace('-', ':')}",
             "%Y-%m-%d %H:%M:%S",

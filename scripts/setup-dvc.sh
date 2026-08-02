@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ─────────────────────────────────────────────────────────────
 # VAAET — Script de configuración inicial de DVC
-# Uso: bash scripts/dvc_setup.sh
+# Uso: bash scripts/setup-dvc.sh
 #
 # Este script prepara DVC para el primer uso. Solo necesitás
 # ejecutarlo una vez por máquina/entorno.
@@ -68,11 +68,11 @@ echo "Remotes configurados:"
 dvc remote list
 echo ""
 echo "Próximos pasos:"
-echo "  1. Entrenar el modelo (Módulo 1 en Colab)"
-echo "  2. dvc add models/intelligence/traffic_classifier.keras"
-echo "  3. dvc add models/intelligence/feature_scaler.joblib"
-echo "  4. dvc add models/intelligence/label_mapping.joblib"
-echo "  5. git add models/intelligence/*.dvc && git commit -m 'feat(models): registrar artefactos'"
+echo "  1. Entrenar el modelo (training workflow en Colab)"
+echo "  2. Verificar los cuatro archivos, incluido model-manifest.json"
+echo "  3. Eliminar artifacts/traffic-state/.gitkeep"
+echo "  4. dvc add artifacts/traffic-state"
+echo "  5. git add artifacts/traffic-state.dvc .gitignore && git commit -m 'feat(models): registrar bundle'"
 echo "  6. dvc push"
 echo ""
-echo "Para más información: docs/DVC_GUIDE.md"
+echo "Para más información: docs/ml/dvc-guide.md"

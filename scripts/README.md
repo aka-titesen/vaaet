@@ -1,12 +1,11 @@
-# Scripts
+# Utilidades manuales
 
-This directory contains manual utilities that support the academic workflow
-but are not part of the active notebook runtime.
+Este directorio contiene herramientas auxiliares; no forma parte del runtime de
+los notebooks.
 
-- `convert_backup.py`: one-time local conversion from PostgreSQL `.backup`
-  to CSV so Module 1 can run in Google Colab without `pg_restore`.
-- `evaluate_real_clips.py`: offline comparison utility for reviewing
-  baseline vs candidate results on exported telemetry CSVs.
+- `convert-postgres-backup.py`: convierte un backup PostgreSQL a CSV para Colab.
+- `evaluate-telemetry-exports.py`: compara resultados exportados de telemetría.
+- `setup-dvc.sh`: prepara DVC y describe cómo registrar el bundle completo.
 
-Temporary notebook patch/debug artifacts do not belong here and should
-not be committed.
+Requieren instalación editable del proyecto. No se admiten scripts temporales,
+parches ni modificaciones de `sys.path`.

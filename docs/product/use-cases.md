@@ -1,4 +1,4 @@
-<!-- context: VAAET/docs/USE_CASES.md — Casos de uso del negocio.
+<!-- context: VAAET/docs/product/use-cases.md — Casos de uso del negocio.
 Complementa PRD.md, SRS.md y USER_PERSONAS.md. -->
 
 # Casos de Uso del Negocio (CUN) — VAAET
@@ -8,7 +8,7 @@ Complementa PRD.md, SRS.md y USER_PERSONAS.md. -->
 | Campo | Detalles |
 |---|---|
 | **Nombre del Proyecto** | VAAET — Video Advanced Analysis of Traffic |
-| **Versión** | 3.0.0 |
+| **Versión** | 4.0.0 |
 | **Estado** | Aprobado |
 | **Responsable Técnico** | Facundo Nicolás González |
 | **Última Revisión** | 2026-07-23 |
@@ -60,14 +60,14 @@ graph LR
 
 | Paso | Acción del Actor | Respuesta del Sistema |
 |---|---|---|
-| 1 | Sube archivo .mp4 a Colab | Valida formato de nombre; extrae duración |
+| 1 | Sube archivo .mp4 a Colab | Extrae duración y procedencia temporal disponible |
 | 2 | — | Selecciona variante YOLO según duración |
 | 3 | — | Procesa frame por frame: detección → tracking → velocidad |
 | 4 | — | Agrega telemetría por minuto (conteos, velocidad promedio, señales de calidad) |
 | 5 | Descarga video anotado (opcional) | Genera video con bounding boxes, tipos, velocidades y HUD |
 
 **Flujo alternativo:**
-- **1a.** Nombre de archivo inválido → Error descriptivo, procesamiento abortado
+- **1a.** Nombre libre → continúa con hora de procesamiento y advertencia de trazabilidad
 - **3a.** Frame corrupto → Skip al siguiente frame
 - **3b.** Sin detecciones → Usar promedios históricos
 
@@ -113,12 +113,12 @@ graph LR
 |---|---|
 | **Actor principal** | Investigador |
 | **Precondición** | Datos en `traffic_data` disponibles (BD o CSV de respaldo) |
-| **Postcondición** | Artefactos `.keras`, `.joblib` exportados a `models/intelligence/` |
+| **Postcondición** | Artefactos `.keras`, `.joblib` exportados a `artifacts/traffic-state/` |
 | **Prioridad** | P0 — Crítico (ejecución única) |
 
 | Paso | Acción del Actor | Respuesta del Sistema |
 |---|---|---|
-| 1 | Abre notebook del Módulo 1 en Colab | Carga datos de `traffic_data` |
+| 1 | Abre el notebook de entrenamiento en Colab | Carga datos de `traffic_data` |
 | 2 | — | Inyecta secuencias sintéticas de accidente y congestión |
 | 3 | — | Aplica feature engineering (9 → 19 features) |
 | 4 | — | Auto-etiqueta 4 estados con reglas calibradas |
@@ -160,7 +160,7 @@ graph LR
 | **Precondición** | Suficientes registros HITL validados acumulados |
 | **Postcondición** | Nuevo artefacto `.keras` con F1-macro mejorado |
 | **Prioridad** | P2 — Medio |
-| **Estado** | Scaffold experimental en Módulo 2 |
+| **Estado** | Scaffold experimental en el workflow de inferencia |
 
 ---
 

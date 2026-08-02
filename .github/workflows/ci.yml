@@ -28,36 +28,49 @@ jobs:
       - name: Instalar dependencias
         run: |
           python -m pip install --upgrade pip
-          pip install -e ".[dev]"
-          # Instalar dependencias de percepción e inteligencia para tests completos
-          pip install -e ".[all]"
+          pip install -e ".[vision,training,visualization,database,dev]"
 
-      - name: Ejecutar linter básico
-        run: python -m py_compile src/__init__.py
+      - name: Verificar dependencias e imports
+        run: |
+          pip check
+          python -c "import cv2, imblearn, joblib, numpy, pandas, psycopg2, sklearn, sqlalchemy, tensorflow, ultralytics"
+
+      - name: Ejecutar Ruff
+        run: ruff check src tests scripts
 
       - name: Ejecutar tests
-        run: pytest tests/ -v --tb=short -x
+        run: pytest -v --tb=short -x
 
       - name: Verificar compilación de notebooks
         run: |
           python -c "
           import ast, sys, pathlib
           errors = []
-          for nb_dir in ['notebooks/01_data_prep', 'notebooks/02_production']:
-              for nb in pathlib.Path(nb_dir).glob('*.ipynb'):
-                  import json
-                  cells = json.loads(nb.read_text())['cells']
-                  for i, cell in enumerate(cells):
-                      if cell['cell_type'] == 'code':
-                          src = ''.join(cell['source'])
-                          try:
-                              ast.parse(src)
-                          except SyntaxError as e:
-                              errors.append(f'{nb}:cell {i}: {e}')
+          for nb in pathlib.Path('notebooks').rglob('*.ipynb'):
+              import json
+              cells = json.loads(nb.read_text(encoding='utf-8'))['cells']
+              for i, cell in enumerate(cells):
+                  if cell['cell_type'] == 'code':
+                      src = ''.join(cell['source'])
+                      try:
+                          ast.parse(src)
+                      except SyntaxError as e:
+                          errors.append(f'{nb}:cell {i}: {e}')
           if errors:
               print('\\n'.join(errors))
               sys.exit(1)
           print('✅ Todos los notebooks compilan correctamente')
+          "
+
+      - name: Rechazar binarios ML versionados por Git
+        run: |
+          python -c "
+          import pathlib, subprocess, sys
+          forbidden = {'.pt', '.keras', '.joblib', '.h5'}
+          tracked = subprocess.check_output(['git', 'ls-files'], text=True).splitlines()
+          bad = [p for p in tracked if pathlib.Path(p).suffix.lower() in forbidden]
+          print('Binarios ML versionados:', bad)
+          sys.exit(bool(bad))
           "
 
   docs-links:
@@ -72,9 +85,10 @@ jobs:
           errors = []
           root = pathlib.Path('.')
           for md in root.rglob('*.md'):
-              if '.git' in str(md) or 'plantillas_docs' in str(md):
+              normalized = md.as_posix()
+              if '.git' in normalized or 'plantillas_docs' in normalized:
                   continue
-              content = md.read_text(errors='replace')
+              content = md.read_text(encoding='utf-8', errors='replace')
               links = re.findall(r'\[.*?\]\((?!http)(.*?)\)', content)
               for link in links:
                   clean = link.split('#')[0].split('?')[0]
@@ -107,8 +121,9 @@ jobs:
         run: |
           echo "=== DVC Version ==="
           dvc version
+          dvc doctor
           echo "=== Remotes ==="
           dvc remote list
           echo "=== Status ==="
-          dvc status || true
+          dvc status
           echo "✅ Configuración de DVC verificada"

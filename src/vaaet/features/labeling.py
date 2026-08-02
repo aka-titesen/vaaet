@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import pandas as pd
 
-from src.config import (
+from vaaet.settings import (
     LABELING_THRESHOLDS,
     NEAR_ZERO_RATIO_MIN,
     SPEED_MEASUREMENT_QUALITY_MIN,
@@ -61,16 +61,11 @@ def build_accident_signal_frame(df: pd.DataFrame) -> pd.DataFrame:
         .max()
         .astype(bool)
     )
-    had_cumulative_braking = cumulative_braking < float(
-        t["accident_cumulative_delta_min"]
-    )
-    consecutive_low = (
-        low_speed.rolling(
-            window=int(t["accident_persistence"]),
-            min_periods=int(t["accident_persistence"]),
-        ).sum()
-        >= int(t["accident_persistence"])
-    )
+    had_cumulative_braking = cumulative_braking < float(t["accident_cumulative_delta_min"])
+    consecutive_low = low_speed.rolling(
+        window=int(t["accident_persistence"]),
+        min_periods=int(t["accident_persistence"]),
+    ).sum() >= int(t["accident_persistence"])
 
     quality_ok = pd.Series(True, index=df.index, dtype=bool)
     if "speed_measurement_quality" in df.columns:
@@ -87,8 +82,7 @@ def build_accident_signal_frame(df: pd.DataFrame) -> pd.DataFrame:
         STATIONARY_CONFIRMED_RATIO_MIN,
     )
     has_motion_evidence = (
-        "near_zero_motion_ratio" in df.columns
-        or "stationary_confirmed_ratio" in df.columns
+        "near_zero_motion_ratio" in df.columns or "stationary_confirmed_ratio" in df.columns
     )
     motion_evidence = (
         near_zero_motion | stationary_confirmed
@@ -127,10 +121,7 @@ def build_accident_mask(df: pd.DataFrame) -> pd.Series:
     signals = build_accident_signal_frame(df)
     return (
         signals["accident_low_speed"]
-        & (
-            signals["accident_recent_braking"]
-            | signals["accident_cumulative_braking"]
-        )
+        & (signals["accident_recent_braking"] | signals["accident_cumulative_braking"])
         & signals["accident_persistent_low_speed"]
         & signals["accident_quality_ok"]
         & signals["accident_motion_evidence"]
@@ -156,10 +147,7 @@ def assign_instant_state(df: pd.DataFrame) -> pd.Series:
     states[congested_mask] = 2
 
     # Reduced (1): Moderate speed
-    reduced_mask = (
-        df["avg_speed"].between(15, 30)
-        & (states == 0)
-    )
+    reduced_mask = df["avg_speed"].between(15, 30) & (states == 0)
     states[reduced_mask] = 1
 
     return states

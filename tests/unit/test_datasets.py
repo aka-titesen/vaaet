@@ -4,7 +4,43 @@ from __future__ import annotations
 
 import pandas as pd
 
-from src.dataset import build_group_ids, group_aware_train_test_split
+from vaaet.data.datasets import (
+    build_group_ids,
+    group_aware_train_test_split,
+    merge_raw_telemetry_csv,
+)
+
+
+def _raw_row(record_time: str, *, speed: float = 12.0) -> dict[str, object]:
+    return {
+        "clip_id": "bridge_test",
+        "record_time": record_time,
+        "avg_speed": speed,
+        "count_car": 1,
+        "count_truck": 0,
+        "count_bus": 0,
+        "count_motorcycle": 0,
+        "count_bicycle": 0,
+        "total_vehicles": 1,
+    }
+
+
+def test_merge_raw_telemetry_csv_is_cumulative_and_deduplicated(tmp_path) -> None:
+    destination = tmp_path / "traffic_data_raw.csv"
+    first = pd.DataFrame([_raw_row("2025-05-01 08:01:00")])
+    second = pd.DataFrame(
+        [
+            _raw_row("2025-05-01 08:01:00", speed=15.0),
+            _raw_row("2025-05-01 08:02:00"),
+        ]
+    )
+
+    merge_raw_telemetry_csv(first, destination)
+    merged = merge_raw_telemetry_csv(second, destination)
+
+    assert len(merged) == 2
+    assert merged.loc[0, "avg_speed"] == 15.0
+    assert destination.is_file()
 
 
 class TestBuildGroupIds:

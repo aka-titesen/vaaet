@@ -1,4 +1,4 @@
-<!-- context: VAAET/docs/MODEL_CARD.md — Model Card del clasificador MLP.
+<!-- context: VAAET/docs/ml/model-card.md — Model Card del clasificador MLP.
 Formato HuggingFace completo. Complementa SAD.md y BIAS_AND_LIMITATIONS.md. -->
 
 # Model Card — Clasificador MLP de Estados del Tráfico
@@ -8,10 +8,10 @@ Formato HuggingFace completo. Complementa SAD.md y BIAS_AND_LIMITATIONS.md. -->
 | Campo | Detalles |
 |---|---|
 | **Nombre del Proyecto** | VAAET — Video Advanced Analysis of Traffic |
-| **Versión** | 3.0.0 |
+| **Versión del proyecto** | 4.0.0 |
 | **Estado** | Aprobado |
 | **Responsable Técnico** | Facundo Nicolás González |
-| **Última Revisión** | 2026-07-23 |
+| **Última Revisión** | 2026-08-01 |
 
 ## Información del Modelo
 
@@ -21,10 +21,10 @@ Formato HuggingFace completo. Complementa SAD.md y BIAS_AND_LIMITATIONS.md. -->
 | **Versión** | mlp-v1.1 |
 | **Tipo** | Multi-Layer Perceptron (MLP) — Red neuronal tabular |
 | **Framework** | TensorFlow 2.15+ / Keras |
-| **Formato de artefacto** | `.keras` (modelo) + `.joblib` (scaler, label mapping) |
+| **Formato de artefacto** | Bundle DVC: `.keras` + dos `.joblib` + `model-manifest.json` |
 | **Licencia** | MIT |
 | **Desarrollador** | Facundo Nicolás González |
-| **Fecha de entrenamiento** | Pendiente primera ejecución del Módulo 1 |
+| **Fecha de entrenamiento** | Registrada por cada ejecución del workflow de entrenamiento |
 | **Repositorio** | [github.com/zgfnicolas/vaaet](https://github.com/zgfnicolas/vaaet) |
 
 ---
@@ -124,9 +124,9 @@ Input(19 features)
 
 ### Pre-procesamiento
 
-1. Inyección de secuencias sintéticas (`src/synthetic.py`, IDs ≥ 50.001)
-2. Feature engineering de 9 campos crudos → 19 features (`src/features.py`)
-3. Auto-etiquetado con reglas calibradas al puente (`src/labeling.py`)
+1. Inyección de secuencias sintéticas (`src/vaaet/features/synthetic.py`, IDs ≥ 50.001)
+2. Feature engineering de telemetría cruda → 19 features (`src/vaaet/features/engineering.py`)
+3. Auto-etiquetado con reglas calibradas (`src/vaaet/features/labeling.py`)
 4. StandardScaler fit en train, transform en train+test
 5. SMOTE en conjunto de entrenamiento solamente
 
@@ -226,4 +226,4 @@ El modelo incluye un **gate post-predicción** que puede anular la clasificació
 ---
 
 Responsable del documento: Facundo Nicolás González
-Fecha de revisión: 2026-07-23
+Fecha de revisión: 2026-08-01

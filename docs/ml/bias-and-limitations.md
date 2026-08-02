@@ -1,4 +1,4 @@
-<!-- context: VAAET/docs/BIAS_AND_LIMITATIONS.md — Sesgos y limitaciones.
+<!-- context: VAAET/docs/ml/bias-and-limitations.md — Sesgos y limitaciones.
 Complementa KPIs/KPIs.md (métricas) y DATA_LINEAGE.md (linaje). -->
 
 # Sesgos y Limitaciones — VAAET
@@ -61,21 +61,21 @@ El sistema NO ha sido evaluado sistemáticamente bajo:
 - El pipeline activo de telemetría es physics-first y **no** conecta la fusión MLP opcional por defecto
 - La nomenclatura legada `cnn_validator` es histórica y engañosa; el path de código opcional no se trata como señal validada
 - La mitigación actual: el runtime activo depende de compensación de flujo óptico, filtros de plausibilidad, gates de confiabilidad, y agregación robusta
-- Ver [ADR-004](adr/ADR-004-mlp-como-suavizador.md) como contexto histórico, no como diseño del runtime actual
+- Ver [ADR-0004](../architecture/decisions/0004-mlp-speed-smoother.md) como contexto histórico, no como diseño del runtime actual
 
 ### 2.3 Tracking sin Re-identificación Visual
 
 - SORT usa matching por distancia euclidiana al centroide más cercano
 - Si un vehículo es ocluido por >1 segundo, pierde su ID y recibe uno nuevo
 - En tráfico denso con vehículos del mismo tipo cercanos, pueden ocurrir asignaciones incorrectas
-- Ver [ADR-003](adr/ADR-003-sort-sobre-deepsort.md)
+- Ver [ADR-0003](../architecture/decisions/0003-sort-over-deepsort.md)
 
 ### 2.4 Detección de Estacionarios
 
 - Requiere 200 frames (~6,5s) mínimo de observación — no hay detección temprana
 - Vehículos con micro-movimientos (vibración del motor, viento) pueden no detectarse como estacionarios
 - Umbrales en píxeles fijos — no se adaptan a resolución ni zoom
-- Ver [ADR-006](adr/ADR-006-deteccion-estacionarios-conservadora.md)
+- Ver [ADR-0006](../architecture/decisions/0006-conservative-stationary-detection.md)
 
 ---
 
@@ -105,20 +105,19 @@ El sistema NO ha sido evaluado sistemáticamente bajo:
 
 ## 4. Limitaciones del Código
 
-Estos problemas existen en el Módulo 0 archivado (`archive/00_bootstrap/01_legacy_collection.ipynb`):
+El workflow activo de adquisición evita el antiguo motor monolítico. Persisten
+estas limitaciones técnicas del enfoque visual:
 
 | Problema | Ubicación | Impacto |
 |---|---|---|
-| Código muerto en `is_stationary()` | Clase VAAETHybrid | Segundo bloque de criterios inalcanzable tras el primer `return` |
-| `get_smoothed_average()` duplicado | Clase VAAETHybrid | Segunda definición sobreescribe la primera |
-| Inconsistencia en `pixels_per_meter`: 12 vs 15 | Init vs calibración | Posible error en conversión de velocidad |
-| Inconsistencia en `speed_limits` | Init vs calibración | Diferentes rangos de filtrado |
-| Inconsistencia en `min_track_frames`: 10 vs 20 | Diferentes métodos | Umbral inconsistente |
-| `threading` importado pero no usado | Imports | Dependencia innecesaria |
-| `detection_zone` definido pero no usado | Calibración | Código muerto |
-| Nombre "CNN" para un MLP | Clase, docs | Terminología incorrecta |
+| Calibración manual de escala | Estimación de velocidad | La precisión depende de geometría y perspectiva de cámara |
+| SORT sin reidentificación visual | Tracking | Oclusiones largas pueden crear un ID nuevo |
+| Etiquetas mediante reglas | Entrenamiento | Son proxies de ingeniería, no ground truth humano |
+| Runtime efímero | Google Colab | Videos y outputs deben descargarse o copiarse antes del reinicio |
+| Persistencia opt-in | PostgreSQL | Sin credenciales configuradas, los resultados quedan sólo en memoria/CSV |
 
-**Nota**: Estos problemas están congelados en el Módulo 0 y no serán corregidos. Los módulos compartidos en `src/` usan implementaciones correctas.
+El código compartido permite probar y mejorar estos componentes sin duplicarlos
+en los notebooks.
 
 ---
 
@@ -139,7 +138,7 @@ Estos problemas existen en el Módulo 0 archivado (`archive/00_bootstrap/01_lega
 
 Las etiquetas de entrenamiento NO son ground truth humano. Se generan con reglas de ingeniería (umbrales de velocidad, volumen, persistencia). Esto introduce sesgo circular: el modelo aprende los umbrales que lo etiquetaron, no necesariamente el estado real del tráfico.
 
-**Mitigación actual**: Los umbrales están calibrados a percentiles de la distribución de datos del Puente Belgrano (recalibrados el 2026-03-11, reemplazando valores genéricos de libro). Ver `src/config.py` `LABELING_THRESHOLDS`.
+**Mitigación actual**: Los umbrales están calibrados a percentiles de la distribución de datos del Puente Belgrano (recalibrados el 2026-03-11, reemplazando valores genéricos de libro). Ver `src/vaaet/settings.py` `LABELING_THRESHOLDS`.
 
 **Mitigación futura**: HITL (campos `is_human_validated`, `human_override_state` en `traffic_classifications`) permitirá que operadores SISE refinen las etiquetas.
 
@@ -155,7 +154,7 @@ El dataset real del Puente Belgrano (abril-julio 2025, ~2.000 registros) solo ex
 | Accidente | 0 | ~50 | ~2% | Totalmente sintético — plausible pero no validado |
 
 **Mitigaciones**:
-1. **Secuencias sintéticas** (`src/synthetic.py`): Telemetría plausible de casos extremos inyectada antes del feature engineering. IDs ≥ 50.001 para trazabilidad.
+1. **Secuencias sintéticas** (`src/vaaet/features/synthetic.py`): Telemetría plausible de casos extremos inyectada antes del feature engineering. IDs ≥ 50.001 para trazabilidad.
 2. **SMOTE**: Aplicado en el conjunto de entrenamiento después de la inyección sintética.
 3. **Recalibración de umbrales**: Los umbrales de Reducido y Congestionado se ajustaron a la distribución específica del puente.
 
@@ -163,7 +162,7 @@ El dataset real del Puente Belgrano (abril-julio 2025, ~2.000 registros) solo ex
 
 ### 6.3 Supuestos Temporales
 
-Los umbrales de persistencia en el auto-etiquetado asumen que cada registro representa exactamente 1 minuto de observación. Si la frecuencia de escritura del Módulo 0 cambia, los estados Reducido (>60s), Congestionado (>120s), y Accidente (>180s) se invalidan.
+Los umbrales de persistencia en el auto-etiquetado asumen que cada registro representa aproximadamente 1 minuto. Si cambia la frecuencia de adquisición, los estados temporales deben recalibrarse.
 
 ### 6.4 Clima Simulado
 

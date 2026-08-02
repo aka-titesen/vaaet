@@ -1,4 +1,4 @@
-<!-- context: VAAET/docs/FEASIBILITY.md — Estudio de factibilidad.
+<!-- context: VAAET/docs/product/feasibility.md — Estudio de factibilidad.
 Complementa PRD.md y RISK_MATRIX.md. -->
 
 # Estudio de Factibilidad de Software — VAAET
@@ -8,7 +8,7 @@ Complementa PRD.md y RISK_MATRIX.md. -->
 | Campo | Detalles |
 |---|---|
 | **Nombre del Proyecto** | VAAET — Video Advanced Analysis of Traffic |
-| **Versión** | 3.0.0 |
+| **Versión** | 4.0.0 |
 | **Estado** | Aprobado |
 | **Responsable Técnico** | Facundo Nicolás González |
 | **Última Revisión** | 2026-07-23 |

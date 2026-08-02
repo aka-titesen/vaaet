@@ -119,7 +119,7 @@ def raw_telemetry_df() -> pd.DataFrame:
 @pytest.fixture()
 def engineered_df(raw_telemetry_df: pd.DataFrame) -> pd.DataFrame:
     """DataFrame after feature engineering (14 feature columns, no NaN)."""
-    from src.features import engineer_features
+    from vaaet.features.engineering import engineer_features
 
     return engineer_features(raw_telemetry_df)
 
@@ -127,7 +127,7 @@ def engineered_df(raw_telemetry_df: pd.DataFrame) -> pd.DataFrame:
 @pytest.fixture()
 def labeled_df(engineered_df: pd.DataFrame) -> pd.DataFrame:
     """DataFrame with ``traffic_state`` column assigned."""
-    from src.labeling import assign_traffic_state
+    from vaaet.features.labeling import assign_traffic_state
 
     df = engineered_df.copy()
     df["traffic_state"] = assign_traffic_state(df)

@@ -10,7 +10,7 @@
 
 ## Antes de Crear un Issue
 
-1. **Revisá la documentación**: [Guía de Usuario](docs/USER_GUIDE.md), [Sesgos y Limitaciones](docs/BIAS_AND_LIMITATIONS.md)
+1. **Revisá la documentación**: [Guía de usuario](docs/operations/user-guide.md), [Sesgos y limitaciones](docs/ml/bias-and-limitations.md)
 2. **Buscá issues existentes**: Puede que tu problema ya haya sido reportado
 3. **Verificá la versión**: Asegurate de estar usando la última versión del proyecto
 
@@ -26,12 +26,12 @@
 
 ## Recursos de Autoayuda
 
-- [docs/USER_GUIDE.md](docs/USER_GUIDE.md) — Guía completa de uso
-- [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) — Manual de despliegue
-- [docs/BIAS_AND_LIMITATIONS.md](docs/BIAS_AND_LIMITATIONS.md) — Limitaciones conocidas
-- [docs/KPIs/KPIs.md](docs/KPIs/KPIs.md) — Métricas y validación
+- [Guía de usuario](docs/operations/user-guide.md) — Uso completo
+- [Despliegue](docs/operations/deployment.md) — Operación y promoción
+- [Sesgos y limitaciones](docs/ml/bias-and-limitations.md) — Limitaciones conocidas
+- [KPIs](docs/quality/kpis.md) — Métricas y validación
 
 ---
 
 Responsable: Facundo Nicolás González
-Fecha de revisión: 2026-07-23
+Fecha de revisión: 2026-08-01

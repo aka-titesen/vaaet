@@ -1,4 +1,4 @@
-<!-- context: VAAET/docs/PROJECT_PLAN.md — Plan de gestión del proyecto.
+<!-- context: VAAET/docs/governance/project-plan.md — Plan de gestión del proyecto.
 Complementa SOW.md y RISK_MATRIX.md. -->
 
 # Plan de Gestión del Proyecto — VAAET
@@ -8,7 +8,7 @@ Complementa SOW.md y RISK_MATRIX.md. -->
 | Campo | Detalles |
 |---|---|
 | **Nombre del Proyecto** | VAAET — Video Advanced Analysis of Traffic |
-| **Versión** | 3.0.0 |
+| **Versión** | 4.0.0 |
 | **Estado** | Aprobado |
 | **Responsable Técnico** | Facundo Nicolás González |
 | **Última Revisión** | 2026-07-23 |
@@ -26,7 +26,7 @@ VAEET cubre el ciclo completo de análisis vehicular: percepción (YOLO 11 + SOR
 | M1 | Pipeline de percepción (YOLO + SORT + velocidad) | 2025-03-15 | ✅ |
 | M2 | Clasificador MLP + auto-etiquetado | 2025-07-14 | ✅ |
 | M3 | Persistencia PostgreSQL + upsert | 2025-07-14 | ✅ |
-| M4 | Suite de tests (19 archivos) | 2026-06-30 | ✅ |
+| M4 | Suite de tests (ampliada a 20 archivos en 4.0.0) | 2026-06-30 | ✅ |
 | M5 | Documentación estándar 2026 | 2026-07-23 | ✅ |
 | M6 | Web App MVP | TBD | 📋 |
 
@@ -52,7 +52,7 @@ gantt
     Pipeline YOLO + Tracking               :done, s1, 2025-03-06, 14d
     Estimación de velocidad physics-first   :done, s1b, 2025-03-20, 10d
     section Sprint 2: Datos
-    Feature engineering (9→14 features)     :done, s2, 2025-04-01, 14d
+    Feature engineering histórica (9→14 features) :done, s2, 2025-04-01, 14d
     Auto-etiquetado + generador sintético   :done, s2b, 2025-04-15, 10d
     section Sprint 3: Inteligencia
     Entrenamiento MLP + gate accidentes     :done, s3, 2025-05-01, 21d
@@ -61,7 +61,7 @@ gantt
     Módulo 2 completo + HITL scaffold       :done, s4, 2025-06-05, 30d
     section Sprint 5: Evolución
     19 features + contratos de datos        :done, s5, 2025-07-05, 10d
-    Suite de tests (19 archivos)            :done, s5b, 2025-07-15, 21d
+    Suite de tests inicial                  :done, s5b, 2025-07-15, 21d
     section Sprint 6: Documentación
     Documentación estándar 2026             :done, s6, 2026-07-01, 23d
 ```
@@ -93,7 +93,7 @@ gantt
 | **Rama principal** | `main` |
 | **Ramas de feature** | `feature/*` |
 | **Convención de commits** | Conventional Commits (`feat:`, `fix:`, `docs:`, `refactor:`) |
-| **Versionado** | SemVer (3.0.0 actual) |
+| **Versionado** | SemVer (4.0.0 actual) |
 
 ### 3.2 Artefactos Versionados
 

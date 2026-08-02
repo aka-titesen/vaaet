@@ -5,8 +5,8 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from src.config import LABELING_THRESHOLDS, STATE_LABELS
-from src.labeling import assign_traffic_state, build_accident_mask
+from vaaet.features.labeling import assign_traffic_state, build_accident_mask
+from vaaet.settings import LABELING_THRESHOLDS, STATE_LABELS
 
 
 def _make_features_df(**overrides) -> pd.DataFrame:

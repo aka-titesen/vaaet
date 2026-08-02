@@ -11,10 +11,10 @@ data-preparation notebook will use the CSV via Tier 2, bypassing pg_restore
 entirely on Google Colab.
 
 Usage:
-    python scripts/convert_backup.py
+    python scripts/convert-postgres-backup.py
 
     # Custom paths:
-    python scripts/convert_backup.py --backup path/to/file.backup --output path/to/out.csv
+    python scripts/convert-postgres-backup.py --backup path/to/file.backup --output path/to/out.csv
 """
 
 from __future__ import annotations
@@ -23,11 +23,9 @@ import argparse
 import sys
 from pathlib import Path
 
-# Ensure repo root is on sys.path
-_REPO_ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(_REPO_ROOT))
+from vaaet.data.database import load_from_backup
 
-from src.db import load_from_backup  # noqa: E402
+_REPO_ROOT = Path(__file__).resolve().parent.parent
 
 
 def main() -> None:

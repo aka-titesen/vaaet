@@ -11,6 +11,8 @@ build/
 # Jupyter Notebook
 .ipynb_checkpoints/
 *.ipynb.bak
+.pytest_cache/
+.ruff_cache/
 
 # Temporary patch/debug artifacts
 scripts/_*.txt

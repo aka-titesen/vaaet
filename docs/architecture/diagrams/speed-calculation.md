@@ -1,10 +1,10 @@
-        <!-- context: VAAET/docs/diagrams/speed-calculation.md -- Detailed speed calculation flow.
+<!-- context: VAAET/docs/architecture/diagrams/speed-calculation.md -- Detailed speed calculation flow.
         Referenced by SAD.md as the active physics-first speed path. -->
 
         # Physics-First Speed Calculation Flow
 
-        Detail of the active `estimate_speed()` + `process_clip_telemetry()` pipeline in
-        `src/perception/speed.py` and `src/perception/pipeline.py`.
+        Detail of the active `estimate_speed()` + `analyze_video()` pipeline in
+        `src/vaaet/vision/speed.py` and `src/vaaet/vision/analysis.py`.
 
         ```mermaid
         flowchart TD

@@ -13,8 +13,8 @@ Si descubrís una vulnerabilidad de seguridad en VAAET, por favor **no** la repo
 
 ### Dentro del alcance
 - Exposición de credenciales de base de datos en outputs de notebooks
-- Vulnerabilidades en dependencias listadas en `requirements.txt`
-- Inyección SQL en consultas de `src/persistence.py` o `src/db.py`
+- Vulnerabilidades en dependencias declaradas en `pyproject.toml`
+- Inyección SQL en `src/vaaet/data/persistence.py` o `src/vaaet/data/database.py`
 - Acceso no autorizado a la instancia de AWS RDS
 
 ### Fuera del alcance
@@ -43,11 +43,12 @@ pip audit
 
 | Versión | Soportada |
 |---|---|
-| 3.x.x | ✅ Activa |
+| 4.x.x | ✅ Activa |
+| 3.x.x | ❌ Sin soporte |
 | 2.x.x | ❌ Sin soporte |
 | 1.x.x | ❌ Sin soporte |
 
 ---
 
 Responsable: Facundo Nicolás González
-Fecha de revisión: 2026-07-23
+Fecha de revisión: 2026-08-01

@@ -1,124 +1,45 @@
-# Guía de Contribución — VAAET
+# Guía de contribución — VAAET ML 4.0.0
 
-Gracias por tu interés en contribuir a VAAET. Este documento establece las convenciones y reglas para modificar el proyecto.
+Antes de modificar el proyecto, leé [AGENTS.md](AGENTS.md) y el ADR aplicable en
+[`docs/architecture/decisions/`](docs/architecture/decisions/).
 
----
+## Reglas fundamentales
 
-## Reglas Fundamentales de Arquitectura
+- La lógica compartida vive en `src/vaaet/`; los notebooks sólo orquestan.
+- Los imports internos usan `vaaet.*` después de una instalación editable.
+- `src/vaaet/settings.py` es la fuente única de constantes, rutas y umbrales.
+- Los tres notebooks son orquestadores; la lógica compartida vive en `src/vaaet/`.
+- Las 19 features, cuatro estados, esquema PostgreSQL y arquitectura MLP son
+  contratos; cualquier cambio requiere aprobación y un ADR nuevo.
+- Los pesos YOLO y binarios `.keras`/`.joblib` no se versionan con Git. El bundle
+  completo se registra como unidad mediante DVC.
+- Código, APIs, nombres y comentarios técnicos se escriben en inglés; la
+  documentación explicativa se mantiene en español.
 
-1. **El código compartido vive en `src/`** — Módulos reutilizables (config, db, features, labeling, perception) compartidos por todos los notebooks
-2. **Los notebooks son orquestadores** — Llaman funciones de `src/` y proveen la interfaz de Colab
-3. **El Módulo 0 (`archive/00_bootstrap/`) está CONGELADO** — Nunca modificar
-4. **Debe funcionar en Google Colab** — Todos los cambios deben ser compatibles con Colab Free
-5. **Leer `AGENTS.md` antes de empezar** — Contiene las reglas de gobernanza Always/Ask/Never
+## Entorno y calidad
 
----
+Python soportado: 3.10–3.12.
 
-## Convenciones de Código
-
-### Estilo General
-
-- Python 3.8+ compatible
-- Formato PEP 8 (excepto longitud de línea, que puede extenderse en notebooks)
-- Type hints en todas las funciones públicas de `src/`
-- Docstrings en español para todas las funciones
-
-### Prints con Emoji
-
-El sistema usa `print()` con prefijos de emoji en vez de `logging`:
-
-```python
-print("✅ Operación exitosa")
-print("⚠️ Advertencia: parámetro fuera de rango")
-print("🔴 Error: no se pudo conectar a la BD")
-print("📊 Resultado: 42 vehículos detectados")
+```bash
+python -m pip install -e ".[vision,training,visualization,dev]"
+ruff check src tests scripts
+pytest tests/ -v --tb=short
+python -m compileall -q src tests scripts
+git diff --check
 ```
 
-### Configuración
+También deben compilar todas las celdas de los notebooks y resolver los enlaces
+Markdown activos. La ejecución end-to-end con GPU, Drive, PostgreSQL y DVC
+remoto se valida manualmente en Google Colab.
 
-- **Todas las constantes y umbrales**: `src/config.py` (fuente única de verdad)
-- **Credenciales de BD**: `src/db.py` vía variables de entorno exclusivamente
-- **Credenciales**: NUNCA hardcodear. Usar variables de entorno o `getpass`
+## Cambios por área
 
----
+- Entrenamiento: `notebooks/training/train_traffic_state_classifier.ipynb` y
+  [ADR-0008](docs/architecture/decisions/0008-keras-traffic-state-classifier.md).
+- Inferencia: `notebooks/inference/analyze_traffic_video.ipynb` y
+  [ADR-0009](docs/architecture/decisions/0009-modular-three-stage-architecture.md).
+- Bundle y límite web: [ADR-0012](docs/architecture/decisions/0012-ml-web-boundary-and-artifact-contract.md).
+- DVC: [guía DVC](docs/ml/dvc-guide.md).
 
-## Flujo de Contribución
-
-1. Leer el ADR relevante en `docs/adr/` si tu cambio afecta una decisión arquitectónica
-2. Si no existe un ADR y tu cambio es significativo, redactar uno antes de implementar
-3. Verificar que todos los notebooks activos compilan sin errores después de tus cambios
-4. Módulo 1: Verificar F1-macro ≥ 0.85 tras re-entrenamiento
-5. Módulo 2: Verificar que el pipeline de percepción + clasificación produce salida válida
-6. Actualizar la documentación correspondiente si tu cambio altera comportamiento observable
-7. Ejecutar `pytest tests/ -v --tb=short` antes de solicitar revisión
-
----
-
-## Estructura de Documentación
-
-| Archivo | Propósito | Cuándo Actualizar |
-|---|---|---|
-| `README.md` | Visión general y uso | Cambios en features o dependencias |
-| `AGENTS.md` | Contexto para agentes de IA | Cambios en arquitectura o reglas |
-| `docs/PRD.md` | Requisitos del producto | Nuevos requisitos o cambios funcionales |
-| `docs/SAD.md` | Arquitectura de software | Cambios en algoritmos o componentes |
-| `docs/SRS.md` | Especificación de requisitos | Nuevos requisitos |
-| `docs/USER_GUIDE.md` | Guía de usuario | Cambios en UX o flujo de ejecución |
-| `docs/KPIs/KPIs.md` | Métricas | Nuevas métricas o benchmarks |
-| `docs/adr/` | Decisiones arquitectónicas | Decisiones nuevas o revocadas |
-| `CHANGELOG.md` | Historial de cambios | Cada PR o cambio significativo |
-
----
-
-## ADRs (Architecture Decision Records)
-
-Si querés proponer un cambio que contradice una decisión existente:
-
-1. Leer el ADR original en `docs/adr/`
-2. Crear un nuevo ADR con el próximo número disponible (ADR-XXX)
-3. Usar estado "Propuesto" hasta su aprobación
-4. Referenciar el ADR que se supersede
-
-Formato: usar cualquier ADR existente en `docs/adr/` como plantilla.
-
----
-
-## Lo que NO se debe hacer
-
-- Hardcodear credenciales de AWS RDS
-- Modificar `archive/00_bootstrap/01_legacy_collection.ipynb`
-- Commitear archivos `.pt` (modelos YOLO) ni artefactos `.keras`/`.joblib`
-- Eliminar tests existentes sin justificación
-- Romper compatibilidad con Colab Free
-- Modificar esquemas de tablas de BD sin un nuevo ADR
-- Eliminar campos HITL de `traffic_classifications`
-
----
-
-## Guías por Módulo
-
-### Módulo 1 (Preparación de Datos)
-
-- Ejecutar `data_preparation.ipynb` completo después de cambios
-- Verificar F1-macro ≥ 0.85 en el conjunto de test
-- Leer [ADR-008](docs/adr/ADR-008-tensorflow-keras-traffic-classifier.md) antes de modificar umbrales de auto-etiquetado o arquitectura MLP
-- No commitear `*.keras`, `*.joblib`, ni `data/processed/*.csv`
-
-### Módulo 2 (Producción)
-
-- Verificar que el pipeline de percepción produce un DataFrame de telemetría válido
-- Verificar que la clasificación asigna uno de 4 estados válidos
-- Verificar que la persistencia escribe en ambas tablas (`telemetry_raw` y `traffic_classifications`)
-- Leer [ADR-009](docs/adr/ADR-009-modular-three-stage-architecture.md) para la especificación completa
-
-### Módulos Compartidos `src/`
-
-- Todos los módulos deben ser importables desde notebooks (sin entrypoints CLI, sin bloques `if __name__`)
-- `config.py` es la fuente única de verdad — no duplicar constantes en otros archivos
-- `db.py` es el único punto de configuración de BD — no crear métodos de conexión alternativos
-- 19 features en `FEATURE_COLS` son canónicas — no agregar ni quitar sin actualizar todos los módulos y crear un ADR
-
----
-
-Responsable del documento: Facundo Nicolás González
-Fecha de revisión: 2026-07-23
+Actualizá [CHANGELOG.md](CHANGELOG.md) y la documentación cuando cambie un
+comportamiento observable. Nunca incluyas secretos ni datos sensibles.

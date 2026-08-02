@@ -1,4 +1,4 @@
-<!-- context: VAAET/docs/TEST_PLAN.md — Plan de Pruebas.
+<!-- context: VAAET/docs/quality/test-plan.md — Plan de Pruebas.
 Complementa SRS.md (requisitos) y SAD.md (arquitectura). -->
 
 # Plan de Pruebas (Test Plan) — VAAET
@@ -8,7 +8,7 @@ Complementa SRS.md (requisitos) y SAD.md (arquitectura). -->
 | Campo | Detalles |
 |---|---|
 | **Nombre del Proyecto** | VAAET — Video Advanced Analysis of Traffic |
-| **Versión** | 3.0.0 |
+| **Versión** | 4.0.0 |
 | **Estado** | Aprobado |
 | **Responsable Técnico** | Facundo Nicolás González |
 | **Responsable de QA** | Facundo Nicolás González |
@@ -42,34 +42,35 @@ Verifican el funcionamiento aislado de cada módulo en `src/`.
 
 - **Herramienta:** pytest 7.4+
 - **Ubicación:** `tests/test_*.py` (junto al módulo que testean)
-- **Cobertura actual:** 19 archivos de test, ~2.556 líneas
+- **Cobertura actual:** 20 archivos Python de soporte y pruebas
 
 | Archivo de Test | Módulo Testeado | Cobertura |
 |---|---|---|
-| `test_config.py` | `src/config.py` | Constantes, umbrales, rutas |
-| `test_contracts.py` | `src/contracts.py` | Validación de contratos de datos |
-| `test_features.py` | `src/features.py` | Feature engineering de 19 columnas |
-| `test_labeling.py` | `src/labeling.py` | Auto-etiquetado de 4 estados |
-| `test_classification.py` | `src/classification.py` | Clasificación y gate de accidentes |
-| `test_db.py` | `src/db.py` | Factory de engine, credenciales |
-| `test_persistence.py` | `src/persistence.py` | Persistencia en BD |
-| `test_perception.py` | `src/perception/` | Pipeline de percepción completo |
-| `test_optical_flow.py` | `src/perception/optical_flow.py` | Estimador de flujo óptico |
-| `test_pipeline.py` | `src/perception/pipeline.py` | Extracción de telemetría |
-| `test_calibration.py` | `src/calibration.py` | Calibración de velocidad |
-| `test_dataset.py` | `src/dataset.py` | Carga y validación de datos |
-| `test_synthetic.py` | `src/synthetic.py` | Generación de datos sintéticos |
-| `test_video.py` | `src/video.py` | Utilidades de video I/O |
-| `test_reporting.py` | `src/reporting.py` | Reportes y visualizaciones |
-| `test_parity.py` | Notebooks ↔ src/ | Paridad de código |
-| `test_repo_hygiene.py` | Repositorio | Higiene general del repo |
+| `tests/unit/test_settings.py` | `src/vaaet/settings.py` | Constantes, umbrales, rutas |
+| `tests/contracts/test_contracts.py` | `src/vaaet/contracts.py` | Validación de contratos de datos |
+| `tests/unit/test_engineering.py` | `src/vaaet/features/engineering.py` | Feature engineering de 19 columnas |
+| `tests/unit/test_labeling.py` | `src/vaaet/features/labeling.py` | Auto-etiquetado de 4 estados |
+| `tests/unit/test_traffic_state.py` | `src/vaaet/inference/traffic_state.py` | Clasificación y gate de accidentes |
+| `tests/unit/test_database.py` | `src/vaaet/data/database.py` | Factory de engine, credenciales |
+| `tests/unit/test_persistence.py` | `src/vaaet/data/persistence.py` | Persistencia en BD |
+| `tests/unit/test_vision.py` | `src/vaaet/vision/` | Pipeline de percepción completo |
+| `tests/unit/test_optical_flow.py` | `src/vaaet/vision/optical_flow.py` | Estimador de flujo óptico |
+| `tests/unit/test_telemetry.py` | `src/vaaet/vision/telemetry.py` | Extracción de telemetría |
+| `tests/unit/test_analysis.py` | `src/vaaet/vision/analysis.py` | Video anotado con/sin clasificación |
+| `tests/unit/test_calibration.py` | `src/vaaet/evaluation/calibration.py` | Calibración de velocidad |
+| `tests/unit/test_datasets.py` | `src/vaaet/data/datasets.py` | Carga y validación de datos |
+| `tests/unit/test_synthetic.py` | `src/vaaet/features/synthetic.py` | Generación de datos sintéticos |
+| `tests/unit/test_video.py` | `src/vaaet/vision/video.py` | Utilidades de video I/O |
+| `tests/unit/test_reporting.py` | `src/vaaet/evaluation/reporting.py` | Reportes y visualizaciones |
+| `tests/repository/test_notebook_parity.py` | Notebooks ↔ paquete | Paridad de código |
+| `tests/repository/test_repository_structure.py` | Repositorio | Higiene, rutas y enlaces |
 
 ### 2.2 Pruebas de Integración
 
 Validan la interacción entre módulos sin mocks.
 
 - **Herramienta:** pytest con fixtures compartidos en `conftest.py`
-- **Entorno:** DataFrames sintéticos generados por `src/synthetic.py`
+- **Entorno:** DataFrames sintéticos generados por `src/vaaet/features/synthetic.py`
 - **Mocks:** Solo para servicios externos (AWS RDS, Ultralytics Hub)
 
 ### 2.3 Pruebas de Paridad
@@ -126,7 +127,7 @@ pytest tests/test_features.py -v
 |---|---|
 | Tests que dependen de GPU | Todos los tests de `src/` pueden ejecutarse en CPU |
 | Tests que dependen de BD PostgreSQL | Mocks en `test_db.py` y `test_persistence.py` |
-| Videos reales no disponibles | DataFrames sintéticos y generador de datos en `src/synthetic.py` |
+| Videos reales no disponibles | DataFrames sintéticos y generador en `src/vaaet/features/synthetic.py` |
 | Notebooks no ejecutables en CI | Validación sintáctica con `ast.parse()` como proxy |
 
 ---

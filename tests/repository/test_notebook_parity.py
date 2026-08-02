@@ -122,6 +122,33 @@ def test_training_uses_shared_feature_contracts() -> None:
     assert "def assign_traffic_state(" not in code
 
 
+def test_training_prepares_postgres_backup_reader_in_colab() -> None:
+    code = _code(NOTEBOOKS["training"])
+    condition = (
+        'IN_COLAB and os.path.exists(_backup_dest) and not os.path.exists(_csv_dest)'
+    )
+    assert condition in code
+    assert 'shutil.which("pg_restore") is None' in code
+    assert '["apt-get", "update", "-qq"]' in code
+    assert '["apt-get", "install", "-y", "-qq", "postgresql-client"]' in code
+    assert "Backup reader ready" in code
+    assert "!apt-get" not in code
+
+
+def test_training_augmentation_requires_loaded_dataframe() -> None:
+    code = _code(NOTEBOOKS["training"])
+    guard = '"df_raw" not in globals() or not isinstance(df_raw, pd.DataFrame) or df_raw.empty'
+    assert guard in code
+    assert code.index(guard) < code.index("_n_before = len(df_raw)")
+    assert "Cell 2 finishes successfully" in code
+
+
+def test_training_documents_actual_synthetic_record_count() -> None:
+    notebook = NOTEBOOKS["training"].read_text(encoding="utf-8")
+    assert "200 records total" in notebook
+    assert "100 records total" not in notebook
+
+
 def test_inference_uses_shared_analysis_and_validates_bundle() -> None:
     code = _code(NOTEBOOKS["inference"])
     assert "from vaaet.vision.analysis import TrafficStatePrediction, analyze_video" in code

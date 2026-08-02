@@ -34,7 +34,9 @@ Después de aprobar un modelo, ejecutá localmente `dvc add artifacts/traffic-st
 - Entrenamiento: CSV/BD → dataset procesado + bundle de cuatro archivos.
 - Inferencia: MP4 + bundle → MP4 anotado + DataFrames + PostgreSQL opcional.
 
-Descargá los outputs antes de cerrar la sesión. Un backup PostgreSQL binario puede requerir una versión de `pg_restore` igual o posterior a la que lo creó; si el runtime no la incluye, preferí el CSV exportado o instalá el cliente PostgreSQL correspondiente.
+Descargá los outputs antes de cerrar la sesión. Cuando se carga `traffic_data.backup`, el notebook de entrenamiento instala automáticamente `postgresql-client` si `pg_restore` no está disponible y muestra su versión antes de continuar. Esta dependencia pertenece al sistema operativo y por eso no forma parte de `pyproject.toml`.
+
+Ubuntu puede incluir una versión de PostgreSQL fijada por la distribución. Si el backup fue creado con una versión posterior, el notebook conserva el diagnóstico de incompatibilidad: usá `traffic_data_raw.csv` o instalá manualmente un cliente igual o posterior. El workflow no agrega repositorios APT externos de forma silenciosa.
 
 ## Checklist manual
 

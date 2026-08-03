@@ -79,13 +79,13 @@ El sistema realiza cuatro funciones principales:
 | RF-005 | Estimación de velocidad | El sistema debe estimar velocidad individual por vehículo usando: compensación de flujo óptico, corrección de perspectiva por zona Y, filtros de plausibilidad por tipo de vehículo, y agregación robusta por minuto. | P0 |
 | RF-006 | Detección de estacionarios | El sistema debe clasificar vehículos como estacionarios mediante conjunción AND de 6 criterios estadísticos con histéresis de entrada/salida. | P1 |
 | RF-007 | Feature engineering | El sistema debe transformar la telemetría cruda en 19 features según `src/vaaet/settings.py:FEATURE_COLS`. | P0 |
-| RF-008 | Clasificación de tráfico | El sistema debe clasificar cada minuto en uno de 4 estados (Normal, Reducido, Congestionado, Accidente) usando el MLP entrenado + gate conservador de accidentes. | P0 |
+| RF-008 | Clasificación jerárquica | El MLP debe emitir Normal/Reduced/Congested; Accident sólo puede resultar de un override humano validado. | P0 |
 | RF-009 | Persistencia en BD | El sistema debe persistir mediante `src/vaaet/data/persistence.py` con upsert idempotente y degradación limpia sin BD. | P1 |
 | RF-010 | Video anotado | El sistema debe generar un video de salida con bounding boxes, tipo + ID, velocidad, y HUD informativo. | P1 |
 | RF-011 | Soporte multi-cámara | El sistema debe detectar automáticamente layouts de 1, 2 o 4 cámaras y procesar cada ROI independientemente. | P1 |
 | RF-012 | Auto-etiquetado | El sistema debe asignar etiquetas usando reglas calibradas (ver `src/vaaet/settings.py:LABELING_THRESHOLDS`). | P0 |
-| RF-013 | Generación de datos sintéticos | El sistema debe generar secuencias sintéticas de Accidente y Congestión para compensar la ausencia de estas clases en datos reales. IDs sintéticos ≥ 50.001. | P1 |
-| RF-014 | Scaffold HITL | El workflow de inferencia debe incluir una celda experimental para correcciones humanas y reentrenamiento, fuera del flujo validado. | P2 |
+| RF-013 | Datos sintéticos trazables | Congested sintético sólo puede entrar en train con peso reducido; Accident sintético sólo prueba el detector. | P1 |
+| RF-014 | HITL | Inferencia persiste feedback y entrenamiento consume sólo etiquetas con `is_human_validated=true`. | P0 |
 
 **Detalle técnico del requisito RF-005 (Estimación de velocidad):**
 
@@ -119,8 +119,8 @@ El sistema realiza cuatro funciones principales:
 
 - Todo código compartido debe residir en `src/` con type hints y docstrings
 - Los notebooks deben ser orquestadores que importan funciones de `src/`
-- El sistema debe ser compatible con Python 3.8+ y Google Colab Free/Pro
-- `config.py` debe ser la única fuente de verdad para constantes y umbrales
+- El sistema debe ser compatible con Python 3.10–3.12 y Google Colab Free/Pro
+- `src/vaaet/settings.py` debe ser la única fuente de verdad para constantes y umbrales
 
 ---
 
@@ -134,9 +134,9 @@ El sistema realiza cuatro funciones principales:
 | **HITL** | Human-in-the-Loop — validación humana de clasificaciones |
 | **SORT** | Simple Online and Realtime Tracking — algoritmo de tracking |
 | **NMS** | Non-Maximum Suppression — eliminación de detecciones duplicadas |
-| **Gate conservador** | Regla heurística que anula la predicción del modelo cuando la evidencia de accidente es fuerte |
+| **Candidato de incidente** | Alerta deduplicada que mantiene Congested hasta confirmación humana |
 | **Feature engineering** | Transformación de campos crudos en variables predictivas de calidad |
-| **SMOTE** | Synthetic Minority Over-sampling Technique — balanceo de clases |
+| **Class weights** | Ponderación limitada de clases calculada exclusivamente sobre train |
 
 ### 4.2 Referencias
 

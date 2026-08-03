@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime
 
-from vaaet.settings import VEHICLE_TYPES
+from vaaet.settings import TELEMETRY_SCHEMA_VERSION, VEHICLE_TYPES
 from vaaet.vision.speed import robust_speed_summary
 from vaaet.vision.tracking import Track
 
@@ -25,12 +25,13 @@ class MinuteTelemetryAccumulator:
     minute_speeds: list[float] = field(default_factory=list)
     flow_tracking_ratios: list[float] = field(default_factory=list)
     counted_tracks: set[int] = field(default_factory=set)
+    observed_track_ids: set[int] = field(default_factory=set)
+    near_zero_track_ids: set[int] = field(default_factory=set)
+    stationary_track_ids: set[int] = field(default_factory=set)
+    rejected_speed_track_ids: set[int] = field(default_factory=set)
+    recovered_track_ids: set[int] = field(default_factory=set)
+    reliable_speed_track_ids: set[int] = field(default_factory=set)
     cumulative_counts: dict[str, int] = field(default_factory=_empty_vehicle_counts)
-    near_zero_motion_count: int = 0
-    stationary_confirmed_count: int = 0
-    rejected_speed_count: int = 0
-    recovered_track_count: int = 0
-    speed_sample_count: int = 0
 
     def observe_track(
         self,
@@ -44,18 +45,20 @@ class MinuteTelemetryAccumulator:
         flow_tracking_ratio: float,
     ) -> None:
         """Register one track observation into the current minute bucket."""
+        track_id = track.track_id
+        self.observed_track_ids.add(track_id)
         if near_zero_motion:
-            self.near_zero_motion_count += 1
+            self.near_zero_track_ids.add(track_id)
 
         if stationary_confirmed:
-            self.stationary_confirmed_count += 1
+            self.stationary_track_ids.add(track_id)
         elif not reliable:
-            self.rejected_speed_count += 1
+            self.rejected_speed_track_ids.add(track_id)
             if recovered_gap > 0:
-                self.recovered_track_count += 1
+                self.recovered_track_ids.add(track_id)
         elif smoothed_speed is not None:
             self.minute_speeds.append(smoothed_speed)
-            self.speed_sample_count += 1
+            self.reliable_speed_track_ids.add(track_id)
 
         self.flow_tracking_ratios.append(flow_tracking_ratio)
 
@@ -67,14 +70,17 @@ class MinuteTelemetryAccumulator:
 
     def has_pending_data(self) -> bool:
         """Return whether the accumulator holds any data worth flushing."""
-        return bool(self.minute_speeds or any(self.minute_counts.values()))
+        return bool(self.observed_track_ids or self.minute_speeds or any(self.minute_counts.values()))
 
     def build_record(self, record_time: datetime) -> dict[str, object]:
         """Materialize the current minute into a telemetry record."""
         total = sum(self.minute_counts.values())
-        quality_attempts = self.speed_sample_count + self.rejected_speed_count
+        speed_sample_count = len(self.reliable_speed_track_ids)
+        rejected_ids = self.rejected_speed_track_ids - self.reliable_speed_track_ids
+        rejected_speed_count = len(rejected_ids)
+        quality_attempts = speed_sample_count + rejected_speed_count
         quality = (
-            round(self.speed_sample_count / quality_attempts, 4)
+            round(speed_sample_count / quality_attempts, 4)
             if quality_attempts > 0
             else 0.0
         )
@@ -95,13 +101,14 @@ class MinuteTelemetryAccumulator:
             "count_motorcycle": self.minute_counts.get("motorcycle", 0),
             "count_bicycle": self.minute_counts.get("bicycle", 0),
             "total_vehicles": total,
-            "near_zero_motion_count": self.near_zero_motion_count,
-            "stationary_confirmed_count": self.stationary_confirmed_count,
-            "rejected_speed_count": self.rejected_speed_count,
-            "recovered_track_count": self.recovered_track_count,
-            "speed_sample_count": self.speed_sample_count,
+            "near_zero_motion_count": len(self.near_zero_track_ids),
+            "stationary_confirmed_count": len(self.stationary_track_ids),
+            "rejected_speed_count": rejected_speed_count,
+            "recovered_track_count": len(self.recovered_track_ids),
+            "speed_sample_count": speed_sample_count,
             "speed_measurement_quality": quality,
             "optical_flow_tracking_ratio": round(avg_flow, 4),
+            "telemetry_schema_version": TELEMETRY_SCHEMA_VERSION,
         }
 
     def rollover_minute(self) -> None:
@@ -114,8 +121,9 @@ class MinuteTelemetryAccumulator:
         self.minute_speeds.clear()
         self.flow_tracking_ratios.clear()
         self.counted_tracks.clear()
-        self.near_zero_motion_count = 0
-        self.stationary_confirmed_count = 0
-        self.rejected_speed_count = 0
-        self.recovered_track_count = 0
-        self.speed_sample_count = 0
+        self.observed_track_ids.clear()
+        self.near_zero_track_ids.clear()
+        self.stationary_track_ids.clear()
+        self.rejected_speed_track_ids.clear()
+        self.recovered_track_ids.clear()
+        self.reliable_speed_track_ids.clear()

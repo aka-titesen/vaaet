@@ -220,6 +220,10 @@ def analyze_video(
     """
     import cv2
 
+    # Retained for API compatibility. Predictions are intentionally requested
+    # only after a complete minute, never on status-panel previews.
+    del status_every_seconds
+
     source = Path(video_path).expanduser().resolve()
     destination = (
         Path(output_path).expanduser().resolve()
@@ -265,7 +269,6 @@ def analyze_video(
     classification_records: list[dict[str, object]] = []
     latest_prediction: TrafficStatePrediction | None = None
     frames_per_minute = max(round(fps * 60), 1)
-    status_every_frames = max(round(fps * status_every_seconds), 1)
     frame_index = 0
 
     logger.info("Analyzing %s with %s", source.name, selected_variant)
@@ -337,14 +340,6 @@ def analyze_video(
 
             frame_index += 1
             elapsed = frame_index / fps
-            if prediction_provider is not None and frame_index % status_every_frames == 0:
-                preview = accumulator.build_record(_recording_timestamp(captured_at, elapsed))
-                latest_prediction = _request_prediction(
-                    prediction_provider,
-                    records,
-                    preview,
-                )
-
             _draw_status_panel(frame, accumulator, latest_prediction, elapsed)
             writer.write(frame)
 
@@ -361,17 +356,9 @@ def analyze_video(
                 accumulator.rollover_minute()
 
         if frame_index % frames_per_minute and accumulator.has_pending_data():
-            elapsed = frame_index / fps
-            record = accumulator.build_record(_recording_timestamp(captured_at, elapsed))
-            records.append(record)
-            latest_prediction = _request_prediction(
-                prediction_provider,
-                records[:-1],
-                record,
+            logger.info(
+                "Discarding final partial minute from classification and telemetry persistence"
             )
-            if latest_prediction is not None:
-                classification_records.append(_prediction_record(latest_prediction, record))
-            accumulator.rollover_minute()
     finally:
         capture.release()
         writer.release()

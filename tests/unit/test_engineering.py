@@ -25,19 +25,29 @@ class TestEngineerFeatures:
 
     def test_rows_dropped_from_diff(self, raw_telemetry_df: pd.DataFrame) -> None:
         result = engineer_features(raw_telemetry_df)
-        assert len(result) < len(raw_telemetry_df)
+        assert len(result) == len(raw_telemetry_df) - raw_telemetry_df["clip_id"].nunique()
 
     def test_quality_signals_default_conservatively(
         self, raw_telemetry_df: pd.DataFrame
     ) -> None:
-        result = engineer_features(raw_telemetry_df)
-        assert (result["speed_measurement_quality"] == 1.0).all()
-        assert (result["near_zero_motion_ratio"] == 0.0).all()
-        assert (result["stationary_confirmed_ratio"] == 0.0).all()
+        legacy = raw_telemetry_df.drop(
+            columns=[
+                "speed_measurement_quality",
+                "speed_sample_count",
+                "rejected_speed_count",
+                "near_zero_motion_count",
+                "stationary_confirmed_count",
+            ]
+        )
+        result = engineer_features(legacy)
+        assert result["speed_measurement_quality"].isna().all()
+        assert result["near_zero_motion_ratio"].isna().all()
+        assert result["stationary_confirmed_ratio"].isna().all()
 
     def test_quality_signals_are_derived_when_counts_exist(self) -> None:
         df = pd.DataFrame(
             {
+                "clip_id": ["clip_a"] * 3,
                 "record_time": pd.date_range("2025-05-01", periods=3, freq="1min"),
                 "avg_speed": [20.0, 10.0, 2.0],
                 "total_vehicles": [5, 5, 5],
@@ -54,8 +64,8 @@ class TestEngineerFeatures:
         )
         result = engineer_features(df)
         assert result["speed_measurement_quality"].iloc[-1] == 0.8
-        assert result["near_zero_motion_ratio"].iloc[-1] == 0.75
-        assert result["stationary_confirmed_ratio"].iloc[-1] == 0.5
+        assert result["near_zero_motion_ratio"].iloc[-1] == 3 / 7
+        assert result["stationary_confirmed_ratio"].iloc[-1] == 2 / 7
 
     def test_metadata_columns_survive_feature_engineering(
         self, raw_telemetry_df: pd.DataFrame
@@ -101,9 +111,30 @@ class TestEngineerFeatures:
 
     def test_delta_speed_values(self, raw_telemetry_df: pd.DataFrame) -> None:
         result = engineer_features(raw_telemetry_df)
-        raw_speeds = raw_telemetry_df["avg_speed"].values
-        expected_deltas = np.diff(raw_speeds)
+        expected_deltas = (
+            raw_telemetry_df.groupby("clip_id")["avg_speed"].diff().dropna().to_numpy()
+        )
         np.testing.assert_allclose(
             result["delta_speed"].values, expected_deltas, rtol=1e-10
         )
+
+    def test_windows_reset_on_large_gap(self, raw_telemetry_df: pd.DataFrame) -> None:
+        frame = raw_telemetry_df.loc[raw_telemetry_df["clip_id"].eq("clip_0")].copy()
+        frame.loc[frame.index[3]:, "record_time"] += pd.Timedelta(minutes=10)
+        result = engineer_features(frame)
+        assert len(result) == len(frame) - 2
+
+    def test_rejects_duplicates(self, raw_telemetry_df: pd.DataFrame) -> None:
+        duplicate = pd.concat([raw_telemetry_df, raw_telemetry_df.iloc[[0]]], ignore_index=True)
+        with np.testing.assert_raises_regex(ValueError, "Duplicate"):
+            engineer_features(duplicate)
+
+    def test_rejects_non_monotonic_clip(self, raw_telemetry_df: pd.DataFrame) -> None:
+        frame = raw_telemetry_df.copy()
+        first_clip = frame.index[frame["clip_id"].eq("clip_0")]
+        frame.loc[first_clip[:2], "record_time"] = frame.loc[
+            first_clip[:2][::-1], "record_time"
+        ].to_numpy()
+        with np.testing.assert_raises_regex(ValueError, "monotonic"):
+            engineer_features(frame)
 

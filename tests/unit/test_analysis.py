@@ -34,33 +34,38 @@ class _FakeFlow:
 
 
 def _make_video(path: Path) -> None:
-    writer = cv2.VideoWriter(str(path), cv2.VideoWriter_fourcc(*"mp4v"), 5.0, (96, 64))
-    for _ in range(12):
+    writer = cv2.VideoWriter(str(path), cv2.VideoWriter_fourcc(*"mp4v"), 1.0, (96, 64))
+    for _ in range(60):
         writer.write(np.zeros((64, 96, 3), dtype=np.uint8))
     writer.release()
 
 
 def test_analyze_video_with_and_without_prediction_provider(tmp_path, monkeypatch) -> None:
-    source = tmp_path / "bridge_2025-05-01_08-00-00_to_08-00-03.mp4"
+    source = tmp_path / "bridge_2025-05-01_08-00-00_to_08-01-00.mp4"
     _make_video(source)
     monkeypatch.setattr(analysis, "YOLODetector", _FakeDetector)
     monkeypatch.setattr(analysis, "OpticalFlowEstimator", _FakeFlow)
 
-    collection = analyze_video(source, tmp_path / "collection.mp4", max_frames=12)
+    collection = analyze_video(source, tmp_path / "collection.mp4", max_frames=60)
     assert collection.video_path.is_file()
     assert not collection.telemetry.empty
     assert collection.classifications is None
 
+    provider_calls = 0
+
     def provider(_telemetry: object) -> TrafficStatePrediction:
+        nonlocal provider_calls
+        provider_calls += 1
         return TrafficStatePrediction(0, "Normal", 0.9)
 
     inference = analyze_video(
         source,
         tmp_path / "inference.mp4",
         prediction_provider=provider,
-        max_frames=12,
+        max_frames=60,
         status_every_seconds=0.2,
     )
     assert inference.video_path.is_file()
     assert inference.classifications is not None
     assert inference.classifications.iloc[-1]["state_label"] == "Normal"
+    assert provider_calls == 1

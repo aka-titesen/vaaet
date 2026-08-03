@@ -30,6 +30,16 @@ _RAW_COLS = {
     "count_bicycle",
     "total_vehicles",
 }
+_V2_COLS = {
+    "near_zero_motion_count",
+    "stationary_confirmed_count",
+    "rejected_speed_count",
+    "recovered_track_count",
+    "speed_sample_count",
+    "speed_measurement_quality",
+    "optical_flow_tracking_ratio",
+    "telemetry_schema_version",
+}
 
 
 def _tiny_raw_df(n: int = 5) -> pd.DataFrame:
@@ -56,6 +66,14 @@ class TestGenerateAccidentSequences:
     def test_schema_matches_raw(self) -> None:
         df = generate_accident_sequences(n_sequences=1, records_per_seq=5)
         assert _RAW_COLS.issubset(df.columns)
+        assert _V2_COLS.issubset(df.columns)
+
+    def test_unique_track_counters_are_bounded(self) -> None:
+        df = generate_accident_sequences(n_sequences=2, records_per_seq=10)
+        assert (df["near_zero_motion_count"] <= df["total_vehicles"]).all()
+        assert (df["stationary_confirmed_count"] <= df["total_vehicles"]).all()
+        assert df["speed_measurement_quality"].between(0, 1).all()
+        assert df["optical_flow_tracking_ratio"].between(0, 1).all()
 
     def test_standstill_records_have_low_speed(self) -> None:
         df = generate_accident_sequences(n_sequences=2, records_per_seq=10)

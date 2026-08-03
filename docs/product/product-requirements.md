@@ -24,13 +24,13 @@ El monitoreo del tráfico vehicular en el Puente Gral. Manuel Belgrano (Corrient
 
 ### 1.2 Solución Propuesta
 
-VAAET es un sistema de análisis vehicular automatizado que procesa video de vigilancia existente para extraer telemetría por minuto (conteos por tipo, velocidad promedio, señales de calidad) y clasificar el estado del tráfico en 4 categorías. Opera sobre infraestructura de costo cercano a cero (Google Colab + AWS RDS opcional).
+VAAET procesa video de vigilancia para extraer telemetría por minuto y resolver tres estados estables. Mantiene cuatro categorías públicas porque Accident puede ser confirmado por una persona, pero nunca es una salida automática del MLP. Opera sobre Google Colab y PostgreSQL opcional.
 
 ### 1.3 Valor Diferenciador
 
 - **Pipeline physics-first**: Estimación de velocidad basada en óptica computacional con compensación de movimiento, no en modelos de caja negra
 - **Selección adaptativa de modelo**: 5 variantes de YOLO 11 seleccionadas automáticamente por duración del video
-- **Gate conservador de accidentes**: Regla heurística que complementa al modelo ML para la clase más crítica
+- **Detector conservador de posible incidente**: genera un candidato separado; nunca publica Accident automáticamente
 - **19 features de calidad**: Incluyen señales de calidad de medición, no solo datos crudos
 - **Costo mínimo**: Runtime gratuito (Colab Free), BD opcional ($15/mes)
 - **Degradación silenciosa**: Funciona sin BD, sin GPU, y ante videos con frames corruptos
@@ -41,7 +41,7 @@ VAAET es un sistema de análisis vehicular automatizado que procesa video de vig
 
 | Métrica | Definición | Objetivo |
 |---|---|---|
-| **F1-macro del clasificador** | F1-Score promedio no ponderado de las 4 clases | ≥ 0.85 |
+| **F1-macro del clasificador** | F1-Score promedio de Normal, Reduced y Congested sobre holdout humano | ≥ 0.88 |
 | **F1-Score de detección** | Precisión de detección vehicular YOLO 11 | ≥ 0.97 (objetivo declarado) |
 | **MAE de velocidad** | Error absoluto medio de velocidad estimada | < 5 km/h (objetivo, sin benchmark) |
 | **ID Switches de tracking** | Cambios de identidad por video | Minimizar (sin umbral formal) |
@@ -56,11 +56,11 @@ Ver [KPIs](../quality/kpis.md) para la guía completa de validación.
 ### 3.1 Funcionalidades Incluidas (En Alcance)
 
 - **Percepción**: Detección YOLO 11 + tracking SORT + estimación de velocidad physics-first
-- **Inteligencia**: Feature engineering de 19 columnas + clasificador MLP de 4 estados
+- **Inteligencia**: Feature engineering v2 + MLP de tres estados + política jerárquica; cuatro estados públicos
 - **Persistencia**: Telemetría y clasificaciones en PostgreSQL (opcional)
 - **Visualización**: Video anotado con bounding boxes y HUD + dashboard de métricas
-- **Datos sintéticos**: Generación de secuencias de Accidente y Congestión para entrenamiento
-- **Scaffold HITL**: Celda experimental de validación humana (no productiva)
+- **Datos sintéticos**: Congested sólo como augmentación de train; Accident sólo como estrés técnico
+- **HITL**: feedback persistido en inferencia y consumido exclusivamente por entrenamiento
 
 ### 3.2 Fuera de Alcance
 
@@ -98,16 +98,16 @@ Ver [KPIs](../quality/kpis.md) para la guía completa de validación.
 **Criterios de Aceptación:**
 - **Dado** telemetría procesada con 19 features
 - **Cuando** el sistema clasifica cada registro
-- **Entonces** asigna uno de 4 estados (Normal, Reducido, Congestionado, Accidente) con confianza numérica
+- **Entonces** asigna un estado estable 0–2; un posible incidente mantiene Congested y sólo un override humano validado produce Accident
 
 #### US-003: Entrenar el Clasificador — P0
 
-**Como** investigador, **quiero** entrenar el clasificador MLP con datos de telemetría, **para** obtener un modelo capaz de clasificar 4 estados del tráfico.
+**Como** investigador, **quiero** entrenar el MLP con datos de telemetría, **para** clasificar tres estados estables y evaluar incidentes por separado.
 
 **Criterios de Aceptación:**
 - **Dado** datos de `traffic_data` con secuencias sintéticas inyectadas
-- **Cuando** el sistema completa el entrenamiento con SMOTE y EarlyStopping
-- **Entonces** el F1-macro en el conjunto de test es ≥ 0.85
+- **Cuando** el sistema completa el entrenamiento con class weights limitados, validation explícita y EarlyStopping
+- **Entonces** el bundle sólo es promovible si cumple F1-macro ≥0,88 y todos los gates de soporte, calibración y procedencia
 
 #### US-004: Persistir Resultados — P1
 

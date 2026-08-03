@@ -1,12 +1,11 @@
 """Synthetic edge-case sequences for the VAAET traffic-state classifier.
 
-The real Belgrano Bridge dataset (~2 000 records, Apr–Jul 2025) contains
-only Normal and Reduced traffic. Congested and Accident states never
-occurred during that period (min speed 5.4 km/h, max vehicles 28).
+The historical Belgrano Bridge dataset has no human-confirmed Accident and
+limited proxy support for Congested.
 
 This module generates physically plausible synthetic sequences that push
-the telemetry into Congested (2) and Accident (3) territory so the
-classifier can learn all four classes. Synthetic records are clearly
+the telemetry into Congested and possible-incident territory. Congested may
+augment train; Accident scenarios only stress the rule detector. Records are
 distinguishable from real data:
 
 * ``id`` starts at :data:`SYNTHETIC_ID_OFFSET` (50 001).
@@ -28,6 +27,7 @@ from vaaet.settings import (
     LABELING_THRESHOLDS,
     RANDOM_SEED,
     SYNTHETIC_SCENARIO_COL,
+    TELEMETRY_SCHEMA_VERSION,
 )
 
 __all__ = [
@@ -105,6 +105,14 @@ def generate_accident_sequences(
             motos = int(rng.integers(0, 2))
             bikes = int(rng.integers(0, 1))
             total = cars + trucks + buses + motos + bikes
+            if total < 1:
+                cars = 1
+                total = 1
+            stationary_count = int(total * sc_pct)
+            mobile_count = max(total - stationary_count, 0)
+            rejected_count = int(rng.binomial(mobile_count, 0.1))
+            speed_count = mobile_count - rejected_count
+            quality_attempts = speed_count + rejected_count
 
             rec.update(
                 {
@@ -115,11 +123,17 @@ def generate_accident_sequences(
                     "count_bus": buses,
                     "count_motorcycle": motos,
                     "count_bicycle": bikes,
-                    "total_vehicles": max(total, 1),
-                    "near_zero_motion_count": int(max(total, 1) * nzm_pct),
-                    "stationary_confirmed_count": int(max(total, 1) * sc_pct),
-                    "speed_sample_count": max(total, 1),
-                    "speed_measurement_quality": round(rng.uniform(0.7, 1.0), 2),
+                    "total_vehicles": total,
+                    "near_zero_motion_count": int(total * nzm_pct),
+                    "stationary_confirmed_count": stationary_count,
+                    "rejected_speed_count": rejected_count,
+                    "recovered_track_count": 0,
+                    "speed_sample_count": speed_count,
+                    "speed_measurement_quality": round(
+                        speed_count / quality_attempts if quality_attempts else 0.0, 4
+                    ),
+                    "optical_flow_tracking_ratio": round(rng.uniform(0.75, 1.0), 4),
+                    "telemetry_schema_version": TELEMETRY_SCHEMA_VERSION,
                 }
             )
             rows.append(rec)
@@ -166,7 +180,14 @@ def generate_congestion_sequences(
             motos = int(rng.integers(0, 3))
             bikes = int(rng.integers(0, 2))
             total = cars + trucks + buses + motos + bikes
-            total = max(total, veh_min)
+            if total < veh_min:
+                cars += veh_min - total
+                total = veh_min
+            stationary_count = int(total * round(rng.uniform(0.0, 0.15), 2))
+            mobile_count = max(total - stationary_count, 0)
+            rejected_count = int(rng.binomial(mobile_count, 0.1))
+            speed_count = mobile_count - rejected_count
+            quality_attempts = speed_count + rejected_count
 
             rows.append(
                 {
@@ -181,9 +202,15 @@ def generate_congestion_sequences(
                     "count_bicycle": bikes,
                     "total_vehicles": total,
                     "near_zero_motion_count": int(total * round(rng.uniform(0.1, 0.3), 2)),
-                    "stationary_confirmed_count": int(total * round(rng.uniform(0.0, 0.15), 2)),
-                    "speed_sample_count": total,
-                    "speed_measurement_quality": round(rng.uniform(0.7, 1.0), 2),
+                    "stationary_confirmed_count": stationary_count,
+                    "rejected_speed_count": rejected_count,
+                    "recovered_track_count": 0,
+                    "speed_sample_count": speed_count,
+                    "speed_measurement_quality": round(
+                        speed_count / quality_attempts if quality_attempts else 0.0, 4
+                    ),
+                    "optical_flow_tracking_ratio": round(rng.uniform(0.75, 1.0), 4),
+                    "telemetry_schema_version": TELEMETRY_SCHEMA_VERSION,
                 }
             )
             base_id += 1

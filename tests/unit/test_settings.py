@@ -48,14 +48,16 @@ class TestConstants:
 
     def test_accident_gate_constants(self) -> None:
         from vaaet.settings import (
-            ACCIDENT_GATE_LOW_CONFIDENCE_MAX,
             ACCIDENT_GATE_MIN_EVIDENCE_SCORE,
+            INCIDENT_PERSISTENCE_MINUTES,
+            N_MODEL_STATES,
             SPEED_MEASUREMENT_QUALITY_MIN,
         )
 
         assert 0.0 < ACCIDENT_GATE_MIN_EVIDENCE_SCORE <= 1.0
-        assert 0.0 < ACCIDENT_GATE_LOW_CONFIDENCE_MAX <= 1.0
         assert 0.0 < SPEED_MEASUREMENT_QUALITY_MIN <= 1.0
+        assert INCIDENT_PERSISTENCE_MINUTES >= 2
+        assert N_MODEL_STATES == 3
 
     def test_model_version_format(self) -> None:
         from vaaet.settings import MODEL_VERSION

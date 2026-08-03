@@ -18,6 +18,7 @@ from pathlib import Path
 import pandas as pd
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
+from sqlalchemy.exc import ProgrammingError
 
 from vaaet.exceptions import (
     ArtifactNotFoundError,
@@ -35,6 +36,7 @@ __all__ = [
     "get_optional_db_config",
     "hydrate_db_environment_from_colab",
     "load_from_backup",
+    "load_human_ground_truth",
     "load_telemetry",
     "parse_sql_dump",
     "restore_backup_to_sql",
@@ -141,6 +143,18 @@ def test_connection(engine: Engine) -> bool:
 TELEMETRY_QUERY: str = """
     SELECT id, clip_id, record_time, avg_speed,
            count_car, count_truck, count_bus,
+           count_motorcycle, count_bicycle, total_vehicles,
+           near_zero_motion_count, stationary_confirmed_count,
+           rejected_speed_count, recovered_track_count, speed_sample_count,
+           speed_measurement_quality, optical_flow_tracking_ratio,
+           telemetry_schema_version
+    FROM traffic_data
+    ORDER BY record_time
+"""
+
+LEGACY_TELEMETRY_QUERY: str = """
+    SELECT id, clip_id, record_time, avg_speed,
+           count_car, count_truck, count_bus,
            count_motorcycle, count_bicycle, total_vehicles
     FROM traffic_data
     ORDER BY record_time
@@ -156,7 +170,53 @@ def load_telemetry(
     active_engine = engine or get_engine(config)
 
     try:
-        return pd.read_sql(text(TELEMETRY_QUERY), active_engine)
+        try:
+            return pd.read_sql(text(TELEMETRY_QUERY), active_engine)
+        except ProgrammingError as exc:
+            logger.warning(
+                "Modern telemetry columns are unavailable; loading schema v1 with NULL quality fields: %s",
+                exc,
+            )
+            legacy = pd.read_sql(text(LEGACY_TELEMETRY_QUERY), active_engine)
+            for column in (
+                "near_zero_motion_count",
+                "stationary_confirmed_count",
+                "rejected_speed_count",
+                "recovered_track_count",
+                "speed_sample_count",
+                "speed_measurement_quality",
+                "optical_flow_tracking_ratio",
+                "telemetry_schema_version",
+            ):
+                legacy[column] = pd.NA
+            return legacy
+    finally:
+        if owns_engine:
+            active_engine.dispose()
+
+
+HUMAN_GROUND_TRUTH_QUERY: str = """
+    SELECT tr.*,
+           COALESCE(tc.human_override_state, tc.traffic_state) AS traffic_state,
+           tc.is_human_validated,
+           tc.human_override_state,
+           tc.validated_at
+    FROM telemetry_raw AS tr
+    JOIN traffic_classifications AS tc ON tc.telemetry_id = tr.id
+    WHERE tc.is_human_validated = TRUE
+    ORDER BY tr.clip_id, tr.record_time
+"""
+
+
+def load_human_ground_truth(
+    config: dict[str, str] | None = None,
+    engine: Engine | None = None,
+) -> pd.DataFrame:
+    """Load only validated feedback using the effective human label."""
+    owns_engine = engine is None
+    active_engine = engine or get_engine(config)
+    try:
+        return pd.read_sql(text(HUMAN_GROUND_TRUTH_QUERY), active_engine)
     finally:
         if owns_engine:
             active_engine.dispose()

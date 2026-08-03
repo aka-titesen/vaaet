@@ -38,6 +38,9 @@ jobs:
       - name: Ejecutar Ruff
         run: ruff check src tests scripts
 
+      - name: Compilar módulos Python
+        run: python -m compileall -q src tests scripts
+
       - name: Ejecutar tests
         run: pytest -v --tb=short -x
 

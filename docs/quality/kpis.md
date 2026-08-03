@@ -84,8 +84,10 @@ F1-Score ≥ 0.97 valida el objetivo de 97% de precisión. Si está por debajo, 
 | Cambios de ID | Minimizar | Sin medición formal. Requiere ground truth con IDs consistentes |
 | FPS Procesamiento | Variable | No publicado. Depende del modelo YOLO y GPU de Colab |
 | Precisión Estacionarios | Alta | Sin evaluación cuantitativa. Validado cualitativamente con demos sintéticos |
-| F1-macro Clasificación | ≥ 0.85 | Registrado en el manifiesto de cada bundle |
-| Recall clase Accidente | > 0 | Pendiente. Clase extremadamente rara |
+| F1-macro Clasificación | ≥ 0.88 | Sólo válido sobre holdout real, humano y agrupado |
+| ECE | ≤ 0.05 | Registrado junto con temperatura y Brier en bundle v2 |
+| Estados Accident automáticos | 0 | Invariante contractual |
+| Candidatos falsos de incidente | < 1/100 h | Preliminar hasta acumular unas 300 h negativas |
 
 ### Prerrequisitos de Validación
 
@@ -107,16 +109,15 @@ Estos KPIs evalúan la calidad del clasificador MLP.
 ### 4.1 F1-Score Macro
 
 - **Qué**: Promedio no ponderado del F1-Score por clase. Trata todas las clases por igual independientemente de su frecuencia.
-- **Por qué**: Penaliza el rendimiento pobre en clases raras (Accidente ~0,1%) y clases frecuentes (Normal ~80%) de forma equitativa.
-- **Objetivo**: ≥ 0.85
+- **Por qué**: Penaliza el rendimiento pobre en Reduced/Congested sin ocultarlo bajo Normal.
+- **Objetivo**: ≥ 0.88 para las tres salidas aprendidas
 - **Cómo**: `sklearn.metrics.f1_score(y_test, y_pred, average='macro')`
 
 ### 4.2 Recall por Clase
 
 - **Qué**: De todos los registros que verdaderamente pertenecen a una clase, ¿qué porcentaje detectó el modelo?
-- **Por qué**: Recall de 0 para Accidente significa que el modelo NUNCA detecta la clase más crítica operativamente.
-- **Objetivo**: > 0 para todas las clases presentes
-- **Especialmente crítico**: Accidente (recall > 0 es el mínimo aceptable)
+- **Objetivo**: Normal ≥0,93; Reduced ≥0,90; Congested ≥0,85, siempre con soporte e intervalos.
+- **Accident**: sin casos reales no se calcula recall. Se mide la tasa de candidatos falsos y la confirmación humana.
 
 ### 4.3 Matriz de Confusión
 
@@ -124,14 +125,14 @@ Estos KPIs evalúan la calidad del clasificador MLP.
 - **Confusiones esperadas**:
   - Normal ↔ Reducido: frontera difusa a ~40 km/h
   - Congestionado ↔ Reducido: frontera difusa a ~5 km/h
-  - Accidente raramente confundido con Normal (velocidades muy diferentes)
+  - Normal ↔ Congested debe permanecer ≤1%; no se permite un salto automático directo
 
 ### 4.4 Estado Actual de Medición (Módulos 1 y 2)
 
 | KPI | Objetivo | Estado |
 |---|---|---|
-| F1-macro | ≥ 0.85 | Pendiente primera ejecución |
-| Recall Accidente | > 0 | Pendiente (clase rara, SMOTE mitiga) |
-| Recall Normal | > 0.90 | Pendiente (clase mayoritaria) |
-| Recall Reducido | > 0.50 | Pendiente |
-| Recall Congestionado | > 0.50 | Pendiente |
+| F1-macro | ≥ 0.88 | Pendiente holdout humano suficiente |
+| Recall Accidente | Sin objetivo hasta disponer de soporte real | No publicable con cero accidentes reales |
+| Recall Normal | ≥ 0.93 | Pendiente |
+| Recall Reducido | ≥ 0.90 | Pendiente |
+| Recall Congestionado | ≥ 0.85 | Insuficiente hasta 100 minutos / 20 episodios reales |

@@ -50,7 +50,7 @@ Verifican el funcionamiento aislado de cada módulo en `src/`.
 | `tests/contracts/test_contracts.py` | `src/vaaet/contracts.py` | Validación de contratos de datos |
 | `tests/unit/test_engineering.py` | `src/vaaet/features/engineering.py` | Feature engineering de 19 columnas |
 | `tests/unit/test_labeling.py` | `src/vaaet/features/labeling.py` | Auto-etiquetado de 4 estados |
-| `tests/unit/test_traffic_state.py` | `src/vaaet/inference/traffic_state.py` | Clasificación y gate de accidentes |
+| `tests/unit/test_traffic_state.py` | `src/vaaet/inference/traffic_state.py` | Tres salidas, histéresis, candidato de incidente y override humano |
 | `tests/unit/test_database.py` | `src/vaaet/data/database.py` | Factory de engine, credenciales |
 | `tests/unit/test_persistence.py` | `src/vaaet/data/persistence.py` | Persistencia en BD |
 | `tests/unit/test_vision.py` | `src/vaaet/vision/` | Pipeline de percepción completo |

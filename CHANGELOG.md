@@ -27,6 +27,15 @@ Todos los cambios relevantes del proyecto VAAET se documentan en este archivo, s
 - Establecido el límite multi-repo ML/Web mediante ADR-0012.
 - Sincronizada CI para Python 3.10–3.12, todos los extras, `pip check`, Ruff,
   pytest, tres notebooks, enlaces, DVC y control de binarios ML.
+- Sustituido el clasificador plano de cuatro salidas por `mlp-v2.0`: tres
+  estados estables, calibración por validation, histéresis y candidato de incidente.
+- Prohibido `Accident` automático; el código 3 requiere override humano validado.
+- Migrada telemetría a schema v2 nullable, con contadores por track único y
+  semántica temporal reiniciada por clip y hueco.
+- Sustituidos SMOTE 1:1 y `validation_split` por test temporal, validation por
+  grupos, class weights limitados y gates explícitos de promoción.
+- Publicados contrato de bundle v2, ADR-0014, protocolo de anotación humana y
+  auditoría obligatoria del dataset.
 
 ### Incompatible
 

@@ -15,11 +15,15 @@ def valid_bundle(tmp_path: Path) -> Path:
         (tmp_path / name).write_bytes(name.encode())
     create_manifest(
         tmp_path,
-        metrics={"f1_macro": 0.85},
+        metrics={"f1_macro": 0.85, "production_eligible": True},
         data_provenance={
             "origin": "test",
             "record_count": 1,
             "synthetic_data_included": False,
+            "telemetry_v2_coverage": 1.0,
+            "human_holdout": True,
+            "production_eligible": True,
+            "promotion_blockers": [],
         },
     )
     return tmp_path
@@ -34,7 +38,14 @@ def _write_manifest(bundle: Path, payload: object) -> None:
 
 
 def test_valid_bundle(valid_bundle: Path) -> None:
-    assert validate_manifest(valid_bundle)["contract_version"] == 1
+    manifest = validate_manifest(valid_bundle)
+    assert manifest["contract_version"] == 2
+    assert manifest["model_output_mapping"] == {
+        "0": "Normal",
+        "1": "Reduced",
+        "2": "Congested",
+    }
+    assert manifest["decision_policy"]["automatic_accident_state_allowed"] is False
 
 
 @pytest.mark.parametrize("delta", [-1, 1])
@@ -73,11 +84,35 @@ def test_rejects_incompatible_mapping(valid_bundle: Path) -> None:
         validate_manifest(valid_bundle)
 
 
+def test_rejects_four_mlp_outputs(valid_bundle: Path) -> None:
+    payload = _manifest(valid_bundle)
+    payload["model_output_mapping"]["3"] = "Accident"
+    _write_manifest(valid_bundle, payload)
+    with pytest.raises(ArtifactValidationError, match="MLP output mapping"):
+        validate_manifest(valid_bundle)
+
+
 def test_rejects_unsupported_contract(valid_bundle: Path) -> None:
     payload = _manifest(valid_bundle)
     payload["contract_version"] = 999
     _write_manifest(valid_bundle, payload)
     with pytest.raises(ArtifactValidationError, match="contract version"):
+        validate_manifest(valid_bundle)
+
+
+def test_rejects_policy_that_allows_automatic_accident(valid_bundle: Path) -> None:
+    payload = _manifest(valid_bundle)
+    payload["decision_policy"]["automatic_accident_state_allowed"] = True
+    _write_manifest(valid_bundle, payload)
+    with pytest.raises(ArtifactValidationError, match="prohibit automatic Accident"):
+        validate_manifest(valid_bundle)
+
+
+def test_rejects_invalid_calibration_temperature(valid_bundle: Path) -> None:
+    payload = _manifest(valid_bundle)
+    payload["decision_policy"]["temperature"] = 0
+    _write_manifest(valid_bundle, payload)
+    with pytest.raises(ArtifactValidationError, match="temperature"):
         validate_manifest(valid_bundle)
 
 
@@ -102,6 +137,14 @@ def test_rejects_invalid_provenance_types(valid_bundle: Path) -> None:
     payload["data_provenance"]["synthetic_data_included"] = "false"
     _write_manifest(valid_bundle, payload)
     with pytest.raises(ArtifactValidationError, match="must be a boolean"):
+        validate_manifest(valid_bundle)
+
+
+def test_rejects_inconsistent_production_eligibility(valid_bundle: Path) -> None:
+    payload = _manifest(valid_bundle)
+    payload["metrics"]["production_eligible"] = False
+    _write_manifest(valid_bundle, payload)
+    with pytest.raises(ArtifactValidationError, match="eligibility"):
         validate_manifest(valid_bundle)
 
 

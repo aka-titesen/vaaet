@@ -24,7 +24,7 @@ src/vaaet/                  lógica compartida instalable
 tests/                      pruebas unitarias, contractuales y de repositorio
 ```
 
-La Web App futura vive en otro repositorio y sólo consume el bundle definido por `docs/ml/model-artifact-contract.md`.
+La Web App futura vive en otro repositorio y sólo consume el bundle v2 definido por `docs/ml/model-artifact-contract.md`. El MLP aprende tres estados estables; Accident es un estado público exclusivamente humano conforme a ADR-0014.
 
 ## Gobernanza
 
@@ -57,4 +57,4 @@ La lógica de negocio vive en `src/vaaet/`. Los notebooks importan `vaaet.*` des
 
 GPU, Drive, PostgreSQL, descarga de YOLO y DVC remoto se validan manualmente en Colab.
 
-No agregar, quitar ni reordenar las 19 `FEATURE_COLS`; no cambiar los cuatro estados ni el esquema PostgreSQL sin autorización y un ADR. ADR-0012 gobierna el límite multi-repo y ADR-0013 el workflow de adquisición.
+No agregar, quitar ni reordenar las 19 `FEATURE_COLS`; no cambiar los cuatro estados públicos ni el esquema PostgreSQL sin autorización y un ADR. ADR-0012 gobierna el límite multi-repo, ADR-0013 el workflow de adquisición y ADR-0014 la arquitectura jerárquica y la confirmación humana de Accident.

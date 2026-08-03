@@ -30,6 +30,8 @@ Cada notebook tiene una sola celda de preparación: clona o actualiza `https://g
 
 ## Contrato del modelo
 
-El bundle aprobado contiene `traffic_classifier.keras`, `feature_scaler.joblib`, `label_mapping.joblib` y `model-manifest.json`. El manifiesto fija el orden exacto de las 19 features, clases, checksums, procedencia, dependencias y métricas. Consultá el [contrato de artefactos](docs/ml/model-artifact-contract.md).
+El bundle v2 contiene `traffic_classifier.keras`, `feature_scaler.joblib`, `label_mapping.joblib` y `model-manifest.json`. El MLP aprende `Normal`, `Reduced` y `Congested`; una sospecha de incidente conserva `Congested` y sólo una confirmación humana validada puede publicar `Accident`. El manifiesto fija las 19 features, calibración, política temporal, elegibilidad, bloqueos, procedencia y checksums. Consultá el [contrato de artefactos](docs/ml/model-artifact-contract.md) y [ADR-0014](docs/architecture/decisions/0014-hierarchical-traffic-state-and-incident-policy.md).
+
+Los aproximadamente 2.068 registros históricos permiten reproducir un baseline, pero no acreditan un modelo de producción: carecen de telemetría v2 completa, holdout humano y accidentes reales. El notebook lo refleja marcando el bundle como `experimental/shadow-only` hasta cumplir los gates.
 
 La futura Web App pertenece a otro repositorio y consumirá únicamente bundles validados. La [documentación](docs/index.md) y la [guía de Colab](docs/operations/colab-guide.md) describen el flujo completo.

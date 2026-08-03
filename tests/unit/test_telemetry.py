@@ -35,8 +35,9 @@ class TestMinuteTelemetryAccumulator:
 
         record = accumulator.build_record(datetime(2025, 5, 1, 8, 0, 0))
         assert record["count_car"] == 1
-        assert record["speed_sample_count"] == 2
+        assert record["speed_sample_count"] == 1
         assert record["speed_measurement_quality"] == 1.0
+        assert record["telemetry_schema_version"] == "traffic-telemetry-v2"
 
     def test_quality_tracks_rejected_and_stationary_events(self) -> None:
         accumulator = MinuteTelemetryAccumulator(clip_id="clip_001")
@@ -101,5 +102,5 @@ class TestMinuteTelemetryAccumulator:
 
         assert accumulator.cumulative_counts["motorcycle"] == 1
         assert accumulator.minute_counts["motorcycle"] == 0
-        assert accumulator.speed_sample_count == 0
-        assert accumulator.near_zero_motion_count == 0
+        assert accumulator.reliable_speed_track_ids == set()
+        assert accumulator.near_zero_track_ids == set()

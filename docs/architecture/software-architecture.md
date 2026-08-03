@@ -22,7 +22,7 @@ flowchart LR
 | Orquestación | `notebooks/` | UI Colab, selección de entradas y descargas |
 | Visión | `src/vaaet/vision/` | YOLO, tracking, flujo óptico, velocidad, HUD y telemetría |
 | Features | `src/vaaet/features/` | 19 features, etiquetas y datos sintéticos trazables |
-| Inferencia | `src/vaaet/inference/` | Clasificación tabular y gate de accidentes |
+| Inferencia | `src/vaaet/inference/` | MLP de tres estados, histéresis y candidato conservador de incidente |
 | Datos | `src/vaaet/data/` | CSV, PostgreSQL y persistencia idempotente |
 | Contratos | `contracts.py`, `artifacts.py` | Esquemas y bundle portable |
 | Evaluación | `src/vaaet/evaluation/` | Calibración y reporting |
@@ -41,6 +41,6 @@ flowchart LR
 
 GitHub Actions cubre Python 3.10–3.12, instalación de todos los extras, `pip check`, smoke imports, Ruff, pytest, compilación de tres notebooks, enlaces, DVC y ausencia de binarios ML en Git. GPU, Drive, videos reales y PostgreSQL se validan manualmente en Colab.
 
-Decisiones principales: [ADR-0009](decisions/0009-modular-three-stage-architecture.md), [ADR-0010](decisions/0010-mlops-pipeline-19-features.md), [ADR-0012](decisions/0012-ml-web-boundary-and-artifact-contract.md) y [ADR-0013](decisions/0013-on-demand-data-collection-workflow.md).
+Decisiones principales: [ADR-0009](decisions/0009-modular-three-stage-architecture.md), [ADR-0010](decisions/0010-mlops-pipeline-19-features.md), [ADR-0012](decisions/0012-ml-web-boundary-and-artifact-contract.md), [ADR-0013](decisions/0013-on-demand-data-collection-workflow.md) y [ADR-0014](decisions/0014-hierarchical-traffic-state-and-incident-policy.md).
 
 Los diagramas complementarios están en el [índice de diagramas](diagrams/index.md).

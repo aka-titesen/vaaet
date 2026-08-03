@@ -113,12 +113,20 @@ def raw_telemetry_df() -> pd.DataFrame:
         + df["count_motorcycle"]
         + df["count_bicycle"]
     )
+    df["near_zero_motion_count"] = 0
+    df["stationary_confirmed_count"] = 0
+    df["rejected_speed_count"] = 1
+    df["recovered_track_count"] = 0
+    df["speed_sample_count"] = 4
+    df["speed_measurement_quality"] = 0.8
+    df["optical_flow_tracking_ratio"] = 0.9
+    df["telemetry_schema_version"] = "traffic-telemetry-v2"
     return df
 
 
 @pytest.fixture()
 def engineered_df(raw_telemetry_df: pd.DataFrame) -> pd.DataFrame:
-    """DataFrame after feature engineering (14 feature columns, no NaN)."""
+    """DataFrame after feature engineering (19 feature columns, no NaN)."""
     from vaaet.features.engineering import engineer_features
 
     return engineer_features(raw_telemetry_df)

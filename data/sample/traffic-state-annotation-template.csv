@@ -1,0 +1,2 @@
+clip_id,window_start,window_end,traffic_state,annotator_confidence,is_ambiguous,visual_quality,notes,annotation_partition,is_human_validated,human_override_state
+example_clip,2026-08-02T12:00:00,2026-08-02T12:01:00,0,high,false,good,,train,true,0

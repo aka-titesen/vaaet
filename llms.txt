@@ -4,6 +4,6 @@ Repositorio ML para análisis vehicular del Puente General Manuel Belgrano. Dist
 
 Tres workflows Colab: adquisición opcional en `notebooks/data-collection/collect_traffic_telemetry.ipynb`, entrenamiento en `notebooks/training/train_traffic_state_classifier.ipynb` e inferencia en `notebooks/inference/analyze_traffic_video.ipynb`. La lógica vive en `src/vaaet/`; `vision/analysis.py` comparte el procesamiento anotado.
 
-Invariantes: 19 `FEATURE_COLS` en orden exacto, cuatro estados, umbrales, esquema PostgreSQL y MLP. El bundle DVC tiene modelo Keras, scaler, mapping y manifiesto; validar antes de deserializar.
+Invariantes: 19 `FEATURE_COLS` v2 en orden exacto; cuatro estados públicos; MLP con tres salidas estables; Accident sólo mediante override humano validado. El bundle DVC v2 tiene modelo Keras, scaler, mapping y manifiesto jerárquico; validar antes de deserializar.
 
 Validación: Ruff, pytest, compileall, `ast.parse()` de los tres notebooks, enlaces y `git diff --check`. La prueba real de GPU, Drive, PostgreSQL, YOLO y DVC remoto es manual en Colab. Leer `AGENTS.md`, `docs/index.md`, ADR-0012 y ADR-0013.

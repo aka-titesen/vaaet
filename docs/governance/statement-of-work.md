@@ -87,7 +87,7 @@ VAAET es un sistema de análisis vehicular avanzado que procesa video de vigilan
 2. Google Colab Free proporciona acceso a GPU de forma razonable para el procesamiento
 3. La conexión a AWS RDS es estable durante las sesiones de procesamiento
 4. Los umbrales de auto-etiquetado son calibrados para el Puente Belgrano específicamente
-5. Clases raras (Accidente, Congestión) se abordan con datos sintéticos hasta disponer de eventos reales
+5. Congested sintético sólo aumenta train; Accident permanece fuera del MLP y exige confirmación humana
 
 ---
 

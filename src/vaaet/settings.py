@@ -33,8 +33,16 @@ STATE_LABELS: dict[int, str] = MappingProxyType(
     }
 )
 
+# The public contract keeps four states, while the learned classifier models
+# only the stable traffic-flow states. Accident is a human-confirmed outcome
+# produced by the hierarchical decision policy, never a direct MLP output.
+MODEL_STATE_LABELS: dict[int, str] = MappingProxyType(  # type: ignore[assignment]
+    {key: STATE_LABELS[key] for key in (0, 1, 2)}
+)
+
 # Number of traffic-state classes
 N_STATES: int = len(STATE_LABELS)
+N_MODEL_STATES: int = len(MODEL_STATE_LABELS)
 
 
 # Feature columns (19) — canonical order used by scaler and model
@@ -87,10 +95,22 @@ LABELING_THRESHOLDS: dict[str, float | int] = MappingProxyType(
 )
 
 ACCIDENT_GATE_MIN_EVIDENCE_SCORE: float = 0.75
-ACCIDENT_GATE_LOW_CONFIDENCE_MAX: float = 0.70
 SPEED_MEASUREMENT_QUALITY_MIN: float = 0.45
 NEAR_ZERO_RATIO_MIN: float = 0.20
 STATIONARY_CONFIRMED_RATIO_MIN: float = 0.10
+OPTICAL_FLOW_QUALITY_MIN: float = 0.35
+INCIDENT_PERSISTENCE_MINUTES: int = 2
+INCIDENT_RECOVERY_MINUTES: int = 3
+
+# Conservative post-model policy. Concrete per-class thresholds are stored in
+# bundle v2 so they can be selected on validation without changing the API.
+DEFAULT_CLASS_THRESHOLDS: dict[int, float] = MappingProxyType(  # type: ignore[assignment]
+    {0: 0.60, 1: 0.60, 2: 0.70}
+)
+DEFAULT_MIN_PROBABILITY_MARGIN: float = 0.10
+WORSENING_PERSISTENCE_MINUTES: int = 2
+RECOVERY_PERSISTENCE_MINUTES: int = 3
+FEATURE_MAX_GAP_MINUTES: int = 2
 
 
 # Artifact paths (relative to repository root)
@@ -122,7 +142,8 @@ DB_ENV_VARS: tuple[str, ...] = (
 DEFAULT_DB_PORT: str = "5432"
 
 # Model versioning
-MODEL_VERSION: str = "mlp-v1.1"
+MODEL_VERSION: str = "mlp-v2.0"
+TELEMETRY_SCHEMA_VERSION: str = "traffic-telemetry-v2"
 
 
 # Bridge domain context

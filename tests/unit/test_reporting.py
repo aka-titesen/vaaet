@@ -2,14 +2,40 @@
 
 from __future__ import annotations
 
+import numpy as np
 import pandas as pd
 
 from vaaet.evaluation.reporting import (
     build_class_support_notes,
+    build_classification_support_table,
+    expected_confusion_cost,
+    select_validation_decision_policy,
     summarize_data_origin,
     summarize_resampled_balance,
     summarize_state_balance,
 )
+
+
+def test_classification_support_includes_intervals() -> None:
+    table = build_classification_support_table([0, 0, 1, 2], [0, 1, 1, 2])
+    assert table["support"].tolist() == [2, 1, 1]
+    assert all(len(interval) == 2 for interval in table["recall_ci_95"])
+
+
+def test_extreme_confusion_costs_more_than_adjacent() -> None:
+    assert expected_confusion_cost([0], [2]) > expected_confusion_cost([0], [1])
+
+
+def test_decision_policy_is_selected_from_validation_probabilities() -> None:
+    frame = pd.DataFrame({"clip_id": ["a"] * 4})
+    probabilities = np.array(
+        [[0.9, 0.08, 0.02], [0.1, 0.85, 0.05], [0.05, 0.1, 0.85], [0.05, 0.1, 0.85]]
+    )
+    policy = select_validation_decision_policy(
+        frame, [0, 1, 2, 2], probabilities, temperature=1.2
+    )
+    assert set(policy["class_thresholds"]) == {"0", "1", "2"}
+    assert policy["temperature"] == 1.2
 
 
 class TestSummarizeDataOrigin:

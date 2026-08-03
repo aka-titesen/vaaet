@@ -4,6 +4,10 @@ DVC versiona el bundle promocionable sin guardar binarios pesados en Git. El
 bundle se trata como una unidad indivisible porque modelo, scaler, mapping y
 manifiesto deben pertenecer al mismo entrenamiento.
 
+El baseline v1 permanece recuperable en el historial/DVC, pero no es compatible
+con el runtime v2. Un bundle con `production_eligible=false` puede conservarse
+como experimento, aunque no debe promoverse al canal consumido por la Web App.
+
 ## Bundle requerido
 
 ```text

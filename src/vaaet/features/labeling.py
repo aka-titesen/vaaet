@@ -25,6 +25,7 @@ from vaaet.settings import (
 
 __all__ = [
     "assign_traffic_state",
+    "assign_stable_traffic_state",
     "assign_instant_state",
     "build_accident_signal_frame",
     "build_accident_mask",
@@ -45,27 +46,22 @@ def build_accident_signal_frame(df: pd.DataFrame) -> pd.DataFrame:
 
     low_speed = df["avg_speed"] < float(t["accident_speed_max"])
     braking = df["delta_speed"] < float(t["accident_delta_min"])
-    cumulative_braking = (
-        df["delta_speed"]
-        .rolling(
-            window=int(t["rolling_window"]),
-            min_periods=1,
-        )
-        .sum()
+    group_key = df["clip_id"] if "clip_id" in df.columns else pd.Series("all", index=df.index)
+    cumulative_braking = df["delta_speed"].groupby(group_key, sort=False).transform(
+        lambda values: values.rolling(window=int(t["rolling_window"]), min_periods=1).sum()
     )
-    had_recent_braking = (
-        braking.rolling(
-            window=int(t["rolling_window"]),
-            min_periods=1,
-        )
+    had_recent_braking = braking.groupby(group_key, sort=False).transform(
+        lambda values: values.rolling(window=int(t["rolling_window"]), min_periods=1)
         .max()
         .astype(bool)
     )
     had_cumulative_braking = cumulative_braking < float(t["accident_cumulative_delta_min"])
-    consecutive_low = low_speed.rolling(
-        window=int(t["accident_persistence"]),
-        min_periods=int(t["accident_persistence"]),
-    ).sum() >= int(t["accident_persistence"])
+    consecutive_low = low_speed.groupby(group_key, sort=False).transform(
+        lambda values: values.rolling(
+            window=int(t["accident_persistence"]),
+            min_periods=int(t["accident_persistence"]),
+        ).sum()
+    ) >= int(t["accident_persistence"])
 
     quality_ok = pd.Series(True, index=df.index, dtype=bool)
     if "speed_measurement_quality" in df.columns:
@@ -154,7 +150,11 @@ def assign_instant_state(df: pd.DataFrame) -> pd.Series:
 
 
 def assign_traffic_state(df: pd.DataFrame) -> pd.Series:
-    """Assign traffic states using engineering rules."""
+    """Assign legacy four-class proxy labels for retrospective comparisons.
+
+    New training code must use :func:`assign_stable_traffic_state`; Accident
+    proxy labels are retained only so v1 experiments remain reproducible.
+    """
     t = LABELING_THRESHOLDS
     states = pd.Series(0, index=df.index, dtype=int)
 
@@ -187,4 +187,36 @@ def assign_traffic_state(df: pd.DataFrame) -> pd.Series:
     )
     states[reduced_mask] = 1
 
+    return states
+
+
+def assign_stable_traffic_state(df: pd.DataFrame) -> pd.Series:
+    """Assign only Normal, Reduced, and Congested proxy labels.
+
+    These rules are a bootstrap label source, not human ground truth. Rolling
+    persistence is scoped to each clip so unrelated episodes cannot reinforce
+    one another.
+    """
+    t = LABELING_THRESHOLDS
+    states = pd.Series(0, index=df.index, dtype=int)
+    congestion = (df["avg_speed"] < t["congested_speed_max"]) & (
+        df["total_vehicles"] >= t["congested_vehicles_min"]
+    )
+    group_key = df["clip_id"] if "clip_id" in df.columns else pd.Series("all", index=df.index)
+    consecutive = congestion.groupby(group_key, sort=False).transform(
+        lambda values: values.rolling(
+            window=int(t["congested_persistence"]),
+            min_periods=int(t["congested_persistence"]),
+        ).sum()
+    ) >= int(t["congested_persistence"])
+    states[congestion & consecutive] = 2
+
+    reduced = (
+        df["avg_speed"].between(t["reduced_speed_min"], t["reduced_speed_max"])
+        & df["total_vehicles"].between(
+            t["reduced_vehicles_min"], t["reduced_vehicles_max"]
+        )
+        & states.eq(0)
+    )
+    states[reduced] = 1
     return states

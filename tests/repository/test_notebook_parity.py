@@ -95,7 +95,7 @@ def test_notebook_pip_check_is_visible_but_non_blocking(path: Path) -> None:
 def test_notebooks_keep_workflow_smoke_imports() -> None:
     expected_imports = {
         "collection": ("cv2", "numpy", "pandas", "psycopg2", "sqlalchemy", "torch", "ultralytics"),
-        "training": ("imblearn", "joblib", "numpy", "pandas", "psycopg2", "sqlalchemy", "tensorflow"),
+        "training": ("joblib", "numpy", "pandas", "psycopg2", "sqlalchemy", "tensorflow"),
         "inference": ("cv2", "joblib", "numpy", "pandas", "psycopg2", "sqlalchemy", "tensorflow", "ultralytics"),
     }
     for workflow, import_names in expected_imports.items():
@@ -116,10 +116,18 @@ def test_training_uses_shared_feature_contracts() -> None:
     code = _code(NOTEBOOKS["training"])
     assert "FEATURE_COLS" in code
     assert "from vaaet.features.engineering import engineer_features" in code
-    assert "from vaaet.features.labeling import assign_traffic_state" in code
+    assert "from vaaet.features.labeling import assign_stable_traffic_state" in code
     assert "from vaaet.data.database import" in code
     assert "def engineer_features(" not in code
     assert "def assign_traffic_state(" not in code
+    assert "grouped_temporal_train_validation_test_split" in code
+    assert "validation_data=(X_validation, y_validation)" in code
+    assert "validation_split" not in code
+    assert "Dense(n_classes, activation=\"softmax\")" in code
+    assert "N_MODEL_STATES" in code
+    assert "fit_temperature" in code
+    assert "production_eligible" in code
+    assert "SMOTE(" not in code
 
 
 def test_training_prepares_postgres_backup_reader_in_colab() -> None:
@@ -155,6 +163,14 @@ def test_inference_uses_shared_analysis_and_validates_bundle() -> None:
     code = _code(NOTEBOOKS["inference"])
     assert "from vaaet.vision.analysis import TrafficStatePrediction, analyze_video" in code
     assert "validate_manifest(_model_dir_abs)" in code
-    assert "from sqlalchemy import text as sa_text" in code
+    assert "from sqlalchemy import text as sa_text" not in code
+    assert "Feedback ownership" in code
+    assert "validation_split" not in code
+    assert "SMOTE" not in code
     assert "def estimate_speed(" not in code
     assert "def generate_annotated_video(" not in code
+    assert 'decision_policy=manifest["decision_policy"]' in code
+    assert "ALLOW_EXPERIMENTAL_BUNDLE" in code
+    assert "retrain_with_feedback" not in code
+    assert "model.output_shape[-1]" in code
+    assert "dict(label_mapping) != dict(STATE_LABELS)" in code

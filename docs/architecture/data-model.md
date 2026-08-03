@@ -36,6 +36,14 @@ Complementa SAD.md (arquitectura) y DATA_LINEAGE.md (linaje). -->
 | `count_motorcycle` | INTEGER | NOT NULL | Motocicletas detectadas | 2 |
 | `count_bicycle` | INTEGER | NOT NULL | Bicicletas detectadas | 0 |
 | `total_vehicles` | INTEGER | NOT NULL | Total de vehículos en el minuto | 18 |
+| `near_zero_motion_count` | INTEGER | NULL en v1 | Tracks únicos con movimiento casi nulo | 2 |
+| `stationary_confirmed_count` | INTEGER | NULL en v1 | Tracks únicos confirmados estacionarios | 1 |
+| `rejected_speed_count` | INTEGER | NULL en v1 | Tracks únicos cuya medición fue rechazada | 1 |
+| `recovered_track_count` | INTEGER | NULL en v1 | Tracks únicos recuperados tras un gap | 0 |
+| `speed_sample_count` | INTEGER | NULL en v1 | Tracks únicos con velocidad aceptada | 8 |
+| `speed_measurement_quality` | NUMERIC(8,4) | NULL en v1 | Aceptados / intentos válidos | 0.8889 |
+| `optical_flow_tracking_ratio` | NUMERIC(8,4) | NULL en v1 | Calidad media del flujo óptico | 0.9200 |
+| `telemetry_schema_version` | TEXT | NULL en v1 | `traffic-telemetry-v2` para registros modernos | traffic-telemetry-v2 |
 
 **Restricción UNIQUE:** `(clip_id, record_time)` — Un registro por minuto por clip.
 
@@ -66,6 +74,7 @@ Complementa SAD.md (arquitectura) y DATA_LINEAGE.md (linaje). -->
 | `cumulative_delta_speed` | NUMERIC(8,2) | — | Delta de velocidad acumulado en ventana rolling | -8.50 |
 | `low_speed_persistence` | NUMERIC(8,2) | — | Persistencia de baja velocidad en ventana rolling | 0.60 |
 | `speed_measurement_quality` | NUMERIC(8,4) | — | Ratio de muestras aceptadas/intentadas | 0.8500 |
+| `optical_flow_tracking_ratio` | NUMERIC(8,4) | — | Calidad media del tracking por flujo óptico | 0.9200 |
 | `near_zero_motion_ratio` | NUMERIC(8,4) | — | Ratio de tracks con movimiento cercano a cero | 0.1500 |
 | `stationary_confirmed_ratio` | NUMERIC(8,4) | — | Ratio de tracks confirmados como estacionarios | 0.0500 |
 | `near_zero_motion_count` | INTEGER | — | Contador absoluto de near-zero-motion | 3 |
@@ -73,6 +82,7 @@ Complementa SAD.md (arquitectura) y DATA_LINEAGE.md (linaje). -->
 | `rejected_speed_count` | INTEGER | — | Muestras de velocidad rechazadas por filtros | 2 |
 | `recovered_track_count` | INTEGER | — | Tracks recuperados después de un gap | 0 |
 | `speed_sample_count` | INTEGER | — | Total de muestras de velocidad aceptadas | 15 |
+| `telemetry_schema_version` | TEXT | — | Versión de la semántica de adquisición | traffic-telemetry-v2 |
 | `data_origin` | TEXT | — | Proveniencia: `"real"` o `"synthetic"` | real |
 | `synthetic_scenario` | TEXT | — | Escenario: `"observed"`, `"accident"`, `"congestion"` | observed |
 
@@ -80,7 +90,7 @@ Complementa SAD.md (arquitectura) y DATA_LINEAGE.md (linaje). -->
 
 ### Tabla: `traffic_classifications` (Activa — Módulos 1 y 2)
 
-**Descripción:** Almacena las predicciones del clasificador MLP, metadatos del gate conservador de accidentes, y campos HITL para validación humana.
+**Descripción:** Almacena la salida del MLP de tres clases, el estado estable final, candidatos de incidente y campos HITL. `Accident` sólo es válido con confirmación humana.
 
 | Campo | Tipo de Dato | Restricciones | Descripción | Ejemplo |
 |---|---|---|---|---|
@@ -89,19 +99,25 @@ Complementa SAD.md (arquitectura) y DATA_LINEAGE.md (linaje). -->
 | `classified_at` | TIMESTAMP | DEFAULT NOW() | Momento de la clasificación | 2025-07-14 10:30:00 |
 | `traffic_state` | SMALLINT | NOT NULL | Estado final del tráfico (0-3) | 0 |
 | `state_label` | TEXT | NOT NULL | Etiqueta legible del estado | Normal |
-| `confidence` | NUMERIC(8,4) | NOT NULL | Confianza final (puede ser del gate) | 0.9200 |
-| `model_version` | TEXT | NOT NULL | Versión del modelo usado | mlp-v1.1 |
+| `confidence` | NUMERIC(8,4) | NOT NULL | Score del estado estable; no se denomina probabilidad sin calibración | 0.9200 |
+| `model_version` | TEXT | NOT NULL | Versión del modelo usado | mlp-v2.0 |
 | `model_traffic_state` | SMALLINT | — | Estado predicho por el modelo (pre-gate) | 0 |
 | `model_state_label` | TEXT | — | Etiqueta del estado pre-gate | Normal |
 | `model_confidence` | NUMERIC(8,4) | — | Confianza original del modelo | 0.9200 |
+| `probability_margin` | NUMERIC(8,4) | — | Diferencia entre las dos mayores probabilidades calibradas | 0.4100 |
+| `decision_abstained` | BOOLEAN | DEFAULT FALSE | Si se conservó el estado previo por ambigüedad/persistencia | false |
+| `measurement_reliable` | BOOLEAN | — | Calidad suficiente para evaluar un candidato de incidente | true |
 | `accident_rule_triggered` | BOOLEAN | DEFAULT FALSE | Si la evidencia de accidente superó el umbral | false |
-| `accident_gate_applied` | BOOLEAN | DEFAULT FALSE | Si el gate anuló la predicción del modelo | false |
+| `accident_alert_started` | BOOLEAN | DEFAULT FALSE | Inicio deduplicado de un nuevo candidato | false |
+| `accident_gate_applied` | BOOLEAN | DEFAULT FALSE | Compatibilidad histórica; debe ser siempre false en v2 | false |
 | `accident_evidence_score` | NUMERIC(8,4) | — | Score de evidencia de accidente [0,1] | 0.15 |
 | `is_human_validated` | BOOLEAN | DEFAULT FALSE | Si un operador SISE validó este registro | false |
 | `human_override_state` | SMALLINT | — | Estado corregido por el operador | NULL |
 | `validated_at` | TIMESTAMP | — | Momento de la validación humana | NULL |
 
 **Restricción UNIQUE:** `(telemetry_id, model_version)` — Una clasificación por registro por versión de modelo.
+
+La etiqueta efectiva para reentrenamiento es `COALESCE(human_override_state, traffic_state)`, exclusivamente cuando `is_human_validated=true`. La migración está en `migrations/0001-traffic-data-telemetry-v2.sql`; las filas históricas conservan `NULL` y schema v1.
 
 ---
 

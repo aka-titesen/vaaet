@@ -14,7 +14,13 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from vaaet.data.database import _build_connection_string
+from vaaet.data.database import HUMAN_GROUND_TRUTH_QUERY, _build_connection_string
+
+
+def test_human_ground_truth_uses_effective_validated_label() -> None:
+    normalized = " ".join(HUMAN_GROUND_TRUTH_QUERY.split())
+    assert "COALESCE(tc.human_override_state, tc.traffic_state)" in normalized
+    assert "tc.is_human_validated = TRUE" in normalized
 
 
 def test_hydrate_db_environment_from_colab(monkeypatch: pytest.MonkeyPatch) -> None:

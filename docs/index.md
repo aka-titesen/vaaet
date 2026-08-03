@@ -4,6 +4,8 @@
 
 - [Arquitectura de software](architecture/software-architecture.md)
 - [Contrato del bundle](ml/model-artifact-contract.md)
+- [Model card y gates de promoción](ml/model-card.md)
+- [Protocolo de anotación humana](ml/human-annotation-protocol.md)
 - [Guía de usuario](operations/user-guide.md)
 - [Guía de Google Colab](operations/colab-guide.md)
 - [Requisitos de producto](product/product-requirements.md)

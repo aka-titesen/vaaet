@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from math import hypot
 from statistics import median
 
+import numpy as np
 import pandas as pd
 
 __all__ = [
@@ -14,7 +15,47 @@ __all__ = [
     "build_calibration_table",
     "pixels_per_meter_from_segment",
     "pseudo_ground_truth_speed_kmh",
+    "apply_temperature_scaling",
+    "fit_temperature",
+    "multiclass_brier_score",
 ]
+
+
+def apply_temperature_scaling(probabilities: np.ndarray, temperature: float) -> np.ndarray:
+    """Calibrate multiclass probabilities with a scalar temperature."""
+    values = np.asarray(probabilities, dtype=float)
+    if values.ndim != 2 or values.shape[1] != 3:
+        raise ValueError("probabilities must have shape (records, 3).")
+    if not np.isfinite(temperature) or temperature <= 0:
+        raise ValueError("temperature must be a finite positive number.")
+    logits = np.log(np.clip(values, 1e-12, 1.0)) / float(temperature)
+    logits -= logits.max(axis=1, keepdims=True)
+    calibrated = np.exp(logits)
+    return calibrated / calibrated.sum(axis=1, keepdims=True)
+
+
+def fit_temperature(probabilities: np.ndarray, y_true: np.ndarray) -> float:
+    """Select temperature on validation negative log-likelihood only."""
+    values = np.asarray(probabilities, dtype=float)
+    truth = np.asarray(y_true, dtype=int)
+    if values.shape != (len(truth), 3) or len(truth) == 0:
+        raise ValueError("Validation probabilities must have shape (records, 3).")
+    candidates = np.geomspace(0.5, 3.0, 80)
+    losses = []
+    for candidate in candidates:
+        calibrated = apply_temperature_scaling(values, float(candidate))
+        losses.append(-np.log(np.clip(calibrated[np.arange(len(truth)), truth], 1e-12, 1)).mean())
+    return round(float(candidates[int(np.argmin(losses))]), 6)
+
+
+def multiclass_brier_score(y_true: np.ndarray, probabilities: np.ndarray) -> float:
+    """Return mean squared probability error across the three stable states."""
+    truth = np.asarray(y_true, dtype=int)
+    values = np.asarray(probabilities, dtype=float)
+    if values.shape != (len(truth), 3):
+        raise ValueError("probabilities must have shape (records, 3).")
+    one_hot = np.eye(3)[truth]
+    return float(np.mean(np.sum((values - one_hot) ** 2, axis=1)))
 
 
 @dataclass(frozen=True)

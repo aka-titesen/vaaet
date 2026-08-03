@@ -79,15 +79,15 @@ graph LR
 |---|---|
 | **Actor principal** | Operador SISE |
 | **Precondición** | Telemetría procesada (CU-001) + modelo MLP cargado |
-| **Postcondición** | Cada minuto clasificado en uno de 4 estados con confianza |
+| **Postcondición** | Cada minuto completo obtiene un estado estable; Accident requiere confirmación humana |
 | **Prioridad** | P0 — Crítico |
 
 | Paso | Acción del Actor | Respuesta del Sistema |
 |---|---|---|
 | 1 | Ejecuta celda de clasificación | Aplica feature engineering (9 → 19 features) |
 | 2 | — | Escala features con StandardScaler cargado |
-| 3 | — | Predice estado con MLP → softmax → estado + confianza |
-| 4 | — | Aplica gate conservador de accidentes |
+| 3 | — | Predice tres estados con MLP y calibración |
+| 4 | — | Aplica umbrales, histéresis y candidato conservador de incidente |
 | 5 | Revisa resultados | Muestra tabla con estado, confianza, y señales de evidencia |
 
 ---
@@ -119,13 +119,13 @@ graph LR
 | Paso | Acción del Actor | Respuesta del Sistema |
 |---|---|---|
 | 1 | Abre el notebook de entrenamiento en Colab | Carga datos de `traffic_data` |
-| 2 | — | Inyecta secuencias sintéticas de accidente y congestión |
+| 2 | — | Audita telemetría v2 y conserva procedencia real/sintética |
 | 3 | — | Aplica feature engineering (9 → 19 features) |
-| 4 | — | Auto-etiqueta 4 estados con reglas calibradas |
-| 5 | — | Balancea con SMOTE en conjunto de entrenamiento |
+| 4 | — | Usa ground truth humano o etiquetas proxy de tres estados |
+| 5 | — | Calcula class weights limitados sólo con train; sintéticos con peso reducido |
 | 6 | — | Entrena MLP con EarlyStopping |
-| 7 | Verifica F1-macro ≥ 0.85 | Muestra métricas, matriz de confusión |
-| 8 | — | Exporta artefactos `.keras` y `.joblib` |
+| 7 | Verifica gates de producción | Muestra coste, F1, calibración, soporte e intervalos |
+| 8 | — | Exporta bundle v2 con elegibilidad y bloqueos |
 
 ---
 

@@ -16,13 +16,13 @@ Los videos pueden contener información sensible y no se versionan. VAAET no ext
 
 ## Entrenamiento
 
-El notebook de entrenamiento carga `traffic_data`, CSV o backup, conserva la procedencia, puede añadir escenarios sintéticos identificados, genera las 19 features, autoetiqueta cuatro estados, separa grupos para evitar leakage, aplica scaler/SMOTE sólo sobre train y entrena el MLP.
+El notebook de entrenamiento carga `traffic_data`, CSV o backup, audita schema y procedencia, genera las 19 features v2 dentro de cada clip/segmento continuo y etiqueta provisionalmente tres estados estables. Reserva grupos temporalmente posteriores para test, crea validation por clips, ajusta el scaler sólo con train y usa class weights limitados. Los sintéticos sólo pueden aparecer en train; Accident sintético se reserva para estrés técnico del detector.
 
 El resultado es un bundle de cuatro archivos: modelo, scaler, mapping y manifiesto. El manifiesto contiene commit, timestamp UTC, schema, dependencias, procedencia, presencia sintética, métricas y checksums. DVC versiona el bundle como unidad.
 
 ## Inferencia y feedback
 
-El notebook de inferencia valida el bundle antes de deserializar, ejecuta el mismo análisis visual, genera las 19 features y produce estado, confianza y evidencia. La persistencia opcional escribe `telemetry_raw` y `traffic_classifications`; las validaciones humanas pueden alimentar un reentrenamiento posterior manual.
+El notebook de inferencia valida el bundle antes de deserializar, clasifica únicamente minutos completos y ejecuta la misma política jerárquica. Una sospecha permanece Congested con alerta separada; sólo una corrección humana validada produce Accident. Inferencia persiste feedback, pero el reentrenamiento ocurre exclusivamente en el notebook de entrenamiento.
 
 ```text
 raw acquisition -> engineered dataset -> approved bundle

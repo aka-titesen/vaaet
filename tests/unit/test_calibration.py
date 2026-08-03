@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
+import numpy as np
 import pytest
 
 from vaaet.evaluation.calibration import (
     CalibrationSegment,
     aggregate_pixels_per_meter,
+    apply_temperature_scaling,
     build_calibration_table,
+    fit_temperature,
+    multiclass_brier_score,
     pixels_per_meter_from_segment,
     pseudo_ground_truth_speed_kmh,
 )
@@ -51,3 +55,18 @@ class TestCalibrationHelpers:
     def test_invalid_distance_raises(self) -> None:
         with pytest.raises(ValueError):
             pseudo_ground_truth_speed_kmh(distance_m=0.0, elapsed_seconds=1.0)
+
+    def test_temperature_scaling_preserves_probability_rows(self) -> None:
+        probabilities = np.array([[0.9, 0.08, 0.02], [0.2, 0.7, 0.1]])
+        calibrated = apply_temperature_scaling(probabilities, 1.5)
+        np.testing.assert_allclose(calibrated.sum(axis=1), 1.0)
+        assert calibrated[0, 0] < probabilities[0, 0]
+
+    def test_temperature_is_fit_only_from_supplied_validation_data(self) -> None:
+        probabilities = np.array([[0.99, 0.005, 0.005], [0.99, 0.005, 0.005]])
+        temperature = fit_temperature(probabilities, np.array([0, 1]))
+        assert 0.5 <= temperature <= 3.0
+
+    def test_multiclass_brier_is_zero_for_perfect_predictions(self) -> None:
+        probabilities = np.eye(3)
+        assert multiclass_brier_score(np.array([0, 1, 2]), probabilities) == 0.0

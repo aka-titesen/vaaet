@@ -99,7 +99,7 @@ El sistema NO ha sido evaluado sistemáticamente bajo:
 | Sin connection pooling | Cada escritura abre/cierra conexión |
 | Sin reintento automático | Si falla la conexión, se pierde el registro del minuto |
 | Sin SSL por defecto | Conexión en texto plano (riesgo en redes no confiables) |
-| Sin migraciones de esquema | `CREATE TABLE IF NOT EXISTS` como único mecanismo |
+| Migración manual | La migración SQL v2 es retrocompatible, pero su aplicación y permisos siguen siendo operativos |
 
 ---
 
@@ -144,21 +144,21 @@ Las etiquetas de entrenamiento NO son ground truth humano. Se generan con reglas
 
 ### 6.2 Desequilibrio de Clases y Datos Sintéticos
 
-El dataset real del Puente Belgrano (abril-julio 2025, ~2.000 registros) solo exhibe tráfico Normal y Reducido. Los eventos de Congestión y Accidente nunca ocurrieron durante el período de observación (velocidad mínima registrada: 5,4 km/h, conteo máximo: 28 vehículos/min).
+El dataset del Puente Belgrano (abril-julio 2025, ~2.000 registros) no contiene accidentes confirmados. Puede producir etiquetas proxy Congested mediante reglas, pero no existe todavía soporte humano suficiente para tratarlas como ground truth.
 
 | Clase | Datos Reales | Sintéticos | Frecuencia Combinada | Riesgo |
 |---|---|---|---|---|
 | Normal | ~2.004 | 0 | ~75% | Sobre-representada — el modelo tiende a predecir Normal |
-| Reducido | ~63 | 0 | ~3% | Baja representación — SMOTE compensa |
-| Congestionado | 0 | ~50 | ~2% | Totalmente sintético — puede no capturar todos los patrones reales |
-| Accidente | 0 | ~50 | ~2% | Totalmente sintético — plausible pero no validado |
+| Reducido | Soporte limitado | 0 | Variable | Requiere más episodios humanos y class weights limitados |
+| Congestionado | Proxy limitado | ~100 | Variable | Sin soporte humano mínimo para promoción |
+| Accidente | 0 confirmado | ~100 de estrés | Fuera del MLP | No respalda recall operacional |
 
 **Mitigaciones**:
 1. **Secuencias sintéticas** (`src/vaaet/features/synthetic.py`): Telemetría plausible de casos extremos inyectada antes del feature engineering. IDs ≥ 50.001 para trazabilidad.
-2. **SMOTE**: Aplicado en el conjunto de entrenamiento después de la inyección sintética.
-3. **Recalibración de umbrales**: Los umbrales de Reducido y Congestionado se ajustaron a la distribución específica del puente.
+2. **Balanceo conservador**: El baseline v2 usa class weights limitados; no aplica SMOTE 1:1.
+3. **Separación jerárquica**: Accident no es una salida aprendida y exige confirmación humana.
 
-**Limitación**: Las muestras sintéticas de Accidente y Congestión son aproximaciones de ingeniería, no eventos observados. El rendimiento del modelo en incidentes reales es desconocido hasta que la validación HITL provea correcciones de ground truth.
+**Limitación**: Las muestras sintéticas de Accidente y Congestión son aproximaciones de ingeniería, no eventos observados. Accident sintético sólo prueba sensibilidad técnica del detector y no respalda recall operacional. Véase [ADR-0014](../architecture/decisions/0014-hierarchical-traffic-state-and-incident-policy.md).
 
 ### 6.3 Supuestos Temporales
 
@@ -168,9 +168,9 @@ Los umbrales de persistencia en el auto-etiquetado asumen que cada registro repr
 
 La feature `weather_condition` es un proxy basado en hora del día (0=diurno 6-18h, 1=nocturno). NO son datos meteorológicos reales. Esto limita la capacidad del modelo para aprender patrones relacionados con el clima.
 
-### 6.5 Sin Temporalidad en el MLP
+### 6.5 Temporalidad externa al MLP
 
-El MLP procesa cada registro independientemente — no tiene memoria de registros anteriores. No puede aprender patrones secuenciales como "velocidad decreciente durante 5 minutos consecutivos". La evolución a LSTM en una fase futura abordará esta limitación.
+El MLP procesa cada registro independientemente. Las features se calculan por clip y segmento continuo, y la política posterior añade persistencia, histéresis y transiciones adyacentes. No se justifica una LSTM hasta disponer de más episodios reales.
 
 ### 6.6 Generalización
 

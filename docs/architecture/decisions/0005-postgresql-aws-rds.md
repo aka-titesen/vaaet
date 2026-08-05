@@ -3,9 +3,9 @@ Referenciado por AGENTS.md, PRD.md, README.md. -->
 
 # ADR-005: PostgreSQL (AWS RDS) sobre SQLite/Local
 
-**Status:** Superseded by [ADR-0009](0009-modular-three-stage-architecture.md)
-> PostgreSQL on AWS RDS remains the persistence layer across all modules.
-> See ADR-009 for the current three-table schema.  
+**Status:** Superseded by [ADR-0015](0015-postgresql-namespaces-security-and-hitl.md)
+> La elección histórica de PostgreSQL permanece, pero proveedor, credenciales,
+> schemas, roles y migraciones se rigen desde 4.1.0 por ADR-0015.
 **Fecha:** 2026-03-06  
 **Decisores:** Equipo VAAET
 

@@ -5,10 +5,8 @@ This script is not used by the active notebooks at runtime. It exists as a
 one-time local helper for preparing a Colab-friendly CSV from a PostgreSQL
 binary backup.
 
-Run this script locally (where the correct PostgreSQL version is installed)
-to produce a CSV that can be committed to the repo.  Once committed, the
-data-preparation notebook will use the CSV via Tier 2, bypassing pg_restore
-entirely on Google Colab.
+Run this script locally (where PostgreSQL client 17 is installed) to produce an
+explicit ``RawCsvSource``. Raw data is sensitive and remains ignored by Git.
 
 Usage:
     python scripts/convert-postgres-backup.py
@@ -53,7 +51,7 @@ def main() -> None:
     print(f"🔄 Converting {args.backup} → {args.output}")
     df = load_from_backup(args.backup, cache_csv=args.output)
     print(f"✅ Done — {len(df)} records written to {args.output}")
-    print(f"   You can now commit {args.output.relative_to(_REPO_ROOT)} to the repo.")
+    print(f"   Declare RawCsvSource({args.output.relative_to(_REPO_ROOT)!s}) in training.")
 
 
 if __name__ == "__main__":

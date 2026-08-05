@@ -5,6 +5,10 @@
 **Complementa:** ADR-008 (TF/Keras), ADR-009 (Arquitectura modular)
 **Decisores:** Facundo Nicolás González
 
+> Nota de vigencia (2026-08-04): las 19 features permanecen; nombres de tablas,
+> roles e ingestión HITL se rigen por
+> [ADR-0015](0015-postgresql-namespaces-security-and-hitl.md).
+
 ## Contexto
 
 El clasificador MLP fue diseñado originalmente con 14 features (ADR-008, columna Input(14,)). Durante la evolución del pipeline de percepción en el Módulo 2, se identificó que las señales de calidad de medición de velocidad, el movimiento cercano a cero, y los estacionarios confirmados aportan información valiosa para la clasificación del tráfico.

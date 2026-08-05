@@ -132,14 +132,14 @@ DRIVE_ARTIFACT_DIR: str = os.path.join("MyDrive", "vaaet-ml", "artifacts", "traf
 # Database
 
 DB_ENV_VARS: tuple[str, ...] = (
-    "DB_HOST",
-    "DB_PORT",
-    "DB_NAME",
-    "DB_USER",
-    "DB_PASSWORD",
+    "VAAET_DB_HOST",
+    "VAAET_DB_PORT",
+    "VAAET_DB_NAME",
 )
 
 DEFAULT_DB_PORT: str = "5432"
+DATABASE_SCHEMA_VERSION: str = "vaaet-db-v2"
+DATABASE_SCHEMAS: tuple[str, ...] = ("vaaet_raw", "vaaet_ml", "vaaet_feedback")
 
 # Model versioning
 MODEL_VERSION: str = "mlp-v2.0"

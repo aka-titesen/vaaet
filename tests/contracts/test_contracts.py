@@ -79,7 +79,7 @@ class TestClassificationRecord:
     def test_label_mismatch_raises(self) -> None:
         with pytest.raises(ValueError):
             ClassificationRecord(
-                telemetry_id=1,
+                telemetry_feature_id=1,
                 traffic_state=3,
                 state_label="Congested",
                 confidence=0.8,
@@ -88,11 +88,11 @@ class TestClassificationRecord:
                 synthetic_scenario="accident",
             )
 
-    def test_valid_synthetic_accident_record(self) -> None:
+    def test_valid_incident_candidate_remains_congested(self) -> None:
         record = ClassificationRecord(
-            telemetry_id=1,
-            traffic_state=3,
-            state_label="Accident",
+            telemetry_feature_id=1,
+            traffic_state=2,
+            state_label="Congested",
             confidence=0.8,
             model_version="mlp-v1.1",
             data_origin="synthetic",
@@ -100,11 +100,10 @@ class TestClassificationRecord:
             model_traffic_state=2,
             model_confidence=0.63,
             accident_rule_triggered=True,
-            accident_gate_applied=True,
             accident_evidence_score=0.9,
         )
-        assert record.traffic_state == 3
-        assert record.accident_gate_applied is True
+        assert record.traffic_state == 2
+        assert record.accident_rule_triggered is True
 
 
 class TestTrackSpeedState:

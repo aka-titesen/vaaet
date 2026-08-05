@@ -28,7 +28,6 @@ from vaaet.settings import (
 
 __all__ = [
     "apply_conservative_accident_gate",
-    "apply_human_override",
     "apply_stable_state_policy",
     "classify_raw_telemetry",
     "classify_telemetry_dataframe",
@@ -140,21 +139,6 @@ def apply_stable_state_policy(
     return out
 
 
-def apply_human_override(df: pd.DataFrame) -> pd.DataFrame:
-    """Apply valid human labels; only this path may publish Accident."""
-    out = df.copy()
-    if "is_human_validated" not in out or "human_override_state" not in out:
-        return out
-    validated = out["is_human_validated"].fillna(False).astype(bool)
-    overrides = pd.to_numeric(out["human_override_state"], errors="coerce")
-    valid_codes = overrides.isin(STATE_LABELS)
-    mask = validated & valid_codes
-    out.loc[mask, "traffic_state"] = overrides.loc[mask].astype(int)
-    out.loc[mask, "state_label"] = out.loc[mask, "traffic_state"].map(STATE_LABELS)
-    out["human_override_applied"] = mask
-    return out
-
-
 def apply_conservative_accident_gate(
     df: pd.DataFrame,
     *,
@@ -227,11 +211,7 @@ def apply_conservative_accident_gate(
         pd.to_numeric(out.loc[active_values, confidence_col], errors="coerce").fillna(0.0),
         out.loc[active_values, "accident_evidence_score"],
     ).round(4)
-    out = apply_human_override(out)
-    automatic_accident = out[predicted_state_col].eq(3) & ~out.get(
-        "human_override_applied", pd.Series(False, index=out.index)
-    )
-    if automatic_accident.any():
+    if out[predicted_state_col].eq(3).any():
         raise RuntimeError("Hierarchical policy invariant violated: automatic Accident state.")
     return out
 

@@ -5,10 +5,10 @@
 | Campo | Detalle |
 |---|---|
 | Proyecto | VAAET ML — Video Advanced Analysis of Traffic |
-| Versión | 4.0.0 |
+| Versión | 4.1.0 |
 | Runtime objetivo | Python 3.10–3.12; Google Colab |
 | Responsable | Facundo Nicolás González |
-| Última revisión | 2026-08-01 |
+| Última revisión | 2026-08-04 |
 
 ## Mandato
 
@@ -24,7 +24,7 @@ src/vaaet/                  lógica compartida instalable
 tests/                      pruebas unitarias, contractuales y de repositorio
 ```
 
-La Web App futura vive en otro repositorio y sólo consume el bundle v2 definido por `docs/ml/model-artifact-contract.md`. El MLP aprende tres estados estables; Accident es un estado público exclusivamente humano conforme a ADR-0014.
+La Web App futura vive en otro repositorio y sólo consume el bundle v2 definido por `docs/ml/model-artifact-contract.md`. El MLP aprende tres estados estables; Accident es un estado público exclusivamente humano conforme a ADR-0014. ADR-0015 gobierna PostgreSQL, roles, ingestión declarativa y feedback append-only.
 
 ## Gobernanza
 

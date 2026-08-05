@@ -9,7 +9,7 @@ y SAD.md (arquitectura). -->
 | Campo | Detalles |
 |---|---|
 | **Nombre del Proyecto** | VAAET — Video Advanced Analysis of Traffic |
-| **Versión** | 4.0.0 |
+| **Versión** | 4.1.0 |
 | **Fecha de Creación** | 2025-03-06 |
 | **Estado** | Aprobado |
 | **Responsable Técnico** | Facundo Nicolás González |
@@ -60,9 +60,9 @@ El sistema realiza cuatro funciones principales:
 ### 2.3 Restricciones, Suposiciones y Dependencias
 
 - **Runtime**: Google Colab Free/Pro (GPU T4/V100 cuando disponible)
-- **Red**: Conexión a internet para descarga de modelos YOLO y acceso a AWS RDS
+- **Red**: Conexión a internet para descarga de modelos YOLO y PostgreSQL remoto opcional
 - **Video**: Formato MP4, nomenclatura estricta `bridge_YYYY-MM-DD_HH-MM-SS_to_HH-MM-SS.mp4`
-- **BD**: PostgreSQL 12+ en AWS RDS (opcional, el sistema degrada sin ella)
+- **BD**: PostgreSQL 14+ compatible (AWS RDS, Neon, Supabase o servidor propio)
 
 ---
 
@@ -85,7 +85,7 @@ El sistema realiza cuatro funciones principales:
 | RF-011 | Soporte multi-cámara | El sistema debe detectar automáticamente layouts de 1, 2 o 4 cámaras y procesar cada ROI independientemente. | P1 |
 | RF-012 | Auto-etiquetado | El sistema debe asignar etiquetas usando reglas calibradas (ver `src/vaaet/settings.py:LABELING_THRESHOLDS`). | P0 |
 | RF-013 | Datos sintéticos trazables | Congested sintético sólo puede entrar en train con peso reducido; Accident sintético sólo prueba el detector. | P1 |
-| RF-014 | HITL | Inferencia persiste feedback y entrenamiento consume sólo etiquetas con `is_human_validated=true`. | P0 |
+| RF-014 | HITL | Revisión agrega validaciones append-only y entrenamiento consume sólo `effective_human_labels`. | P0 |
 
 **Detalle técnico del requisito RF-005 (Estimación de velocidad):**
 

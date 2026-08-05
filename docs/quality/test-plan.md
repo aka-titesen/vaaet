@@ -8,7 +8,7 @@ Complementa SRS.md (requisitos) y SAD.md (arquitectura). -->
 | Campo | Detalles |
 |---|---|
 | **Nombre del Proyecto** | VAAET — Video Advanced Analysis of Traffic |
-| **Versión** | 4.0.0 |
+| **Versión** | 4.1.0 |
 | **Estado** | Aprobado |
 | **Responsable Técnico** | Facundo Nicolás González |
 | **Responsable de QA** | Facundo Nicolás González |
@@ -71,7 +71,7 @@ Validan la interacción entre módulos sin mocks.
 
 - **Herramienta:** pytest con fixtures compartidos en `conftest.py`
 - **Entorno:** DataFrames sintéticos generados por `src/vaaet/features/synthetic.py`
-- **Mocks:** Solo para servicios externos (AWS RDS, Ultralytics Hub)
+- **Mocks:** para unidades puras; schemas, migración, vistas y grants se prueban con PostgreSQL 17 real en CI
 
 ### 2.3 Pruebas de Paridad
 

@@ -1,4 +1,4 @@
-# Guía DVC — VAAET ML 4.0.0
+# Guía DVC — VAAET ML 4.1.0
 
 DVC versiona el bundle promocionable sin guardar binarios pesados en Git. El
 bundle se trata como una unidad indivisible porque modelo, scaler, mapping y

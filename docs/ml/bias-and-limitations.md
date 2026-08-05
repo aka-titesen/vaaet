@@ -91,7 +91,7 @@ El sistema NO ha sido evaluado sistemáticamente bajo:
 | Almacenamiento efímero | Videos de salida se pierden al cerrar la sesión |
 | Sin ejecución programática | No se puede automatizar vía API o cron |
 
-### 3.2 AWS RDS
+### 3.2 PostgreSQL administrado
 
 | Limitación | Impacto |
 |---|---|
@@ -140,7 +140,7 @@ Las etiquetas de entrenamiento NO son ground truth humano. Se generan con reglas
 
 **Mitigación actual**: Los umbrales están calibrados a percentiles de la distribución de datos del Puente Belgrano (recalibrados el 2026-03-11, reemplazando valores genéricos de libro). Ver `src/vaaet/settings.py` `LABELING_THRESHOLDS`.
 
-**Mitigación futura**: HITL (campos `is_human_validated`, `human_override_state` en `traffic_classifications`) permitirá que operadores SISE refinen las etiquetas.
+**Mitigación vigente**: HITL append-only en `vaaet_feedback.human_validations` permite refinar etiquetas sin modificar predicciones. Sólo la vista `effective_human_labels` ingresa al entrenamiento supervisado.
 
 ### 6.2 Desequilibrio de Clases y Datos Sintéticos
 

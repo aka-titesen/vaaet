@@ -1,34 +1,53 @@
-# Linaje de datos — VAAET ML 4.0.0
+# Linaje de datos — VAAET ML 4.1.0
 
-## Adquisición bajo demanda
+## Flujo operacional
 
-`notebooks/data-collection/collect_traffic_telemetry.ipynb` recibe video SISE, ejecuta YOLO, SORT, compensación de cámara y estimación de velocidad mediante `vaaet.vision.analysis`. Produce video anotado y registros por minuto.
-
-```text
-MP4 -> detecciones -> tracks -> velocidades y calidad -> agregados por minuto
-    -> data/raw/traffic_data_raw.csv
-    -> traffic_data (PostgreSQL, opcional)
+```mermaid
+flowchart LR
+    V["Video"] --> C["Collection"]
+    C --> R[("vaaet_raw.traffic_data")]
+    V --> I["Inference"]
+    I --> F[("vaaet_ml.telemetry_features")]
+    I --> P[("vaaet_ml.traffic_predictions")]
+    P --> Q["Explicit HITL review"]
+    Q --> H[("vaaet_feedback.human_validations")]
+    R --> T["Training ingestion"]
+    F --> T
+    H --> T
+    T --> B["Bundle v2 candidate"]
 ```
 
-El CSV se acumula y deduplica por `(clip_id, record_time)`. En nombres `bridge_YYYY-MM-DD_HH-MM-SS_to_HH-MM-SS.mp4`, los timestamps derivan de la captura y soportan cruces de medianoche. Un nombre libre utiliza la hora de procesamiento y tiene menor trazabilidad.
+Cada ejecución de adquisición o inferencia genera un `pipeline_run_id`. Los
+timestamps se persisten como `TIMESTAMPTZ` UTC; valores históricos sin zona se
+interpretan como `America/Argentina/Buenos_Aires` durante la migración.
 
-Los videos pueden contener información sensible y no se versionan. VAAET no extrae patentes ni identidades y no persiste frames individuales.
+## Adquisición
+
+`collect_traffic_telemetry.ipynb` produce video anotado, CSV raw y, al habilitarlo,
+inserta exclusivamente en `vaaet_raw.traffic_data`. La unicidad
+`(clip_id, record_time)` hace idempotente la repetición. No se persisten frames,
+patentes ni identidades.
+
+## Inferencia y revisión
+
+`analyze_traffic_video.ipynb` persiste las 19 features y predicciones estables
+0–2 con el perfil `inference`. Después del clip, una celda opcional abre una cola
+`priority` o `all`; no interrumpe el procesamiento con pop-ups. El perfil
+`review` agrega validaciones sin modificar predicciones. El modo `all` conserva la
+validación previa como `supersedes_validation_id` al corregir. Accident requiere nota y
+revisión explícita del contexto. Sin base disponible se exporta
+`vaaet-training-dataset-v1.zip`.
 
 ## Entrenamiento
 
-El notebook de entrenamiento carga `traffic_data`, CSV o backup, audita schema y procedencia, genera las 19 features v2 dentro de cada clip/segmento continuo y etiqueta provisionalmente tres estados estables. Reserva grupos temporalmente posteriores para test, crea validation por clips, ajusta el scaler sólo con train y usa class weights limitados. Los sintéticos sólo pueden aparecer en train; Accident sintético se reserva para estrés técnico del detector.
+`TrainingIngestionPlan` declara fuentes raw y feedback. Puede combinar servidor,
+backup, CSV raw y paquete contractual. El tipo nunca se infiere por columnas:
 
-El resultado es un bundle de cuatro archivos: modelo, scaler, mapping y manifiesto. El manifiesto contiene commit, timestamp UTC, schema, dependencias, procedencia, presencia sintética, métricas y checksums. DVC versiona el bundle como unidad.
+- raw: auditoría, ingeniería de las 19 features y etiqueta proxy;
+- feedback: contrato de feature schema y última validación humana, sin recalcular;
+- estados humanos 0–2: candidatos al MLP;
+- estado humano 3: evaluación del detector de incidente, nunca target del MLP.
 
-## Inferencia y feedback
-
-El notebook de inferencia valida el bundle antes de deserializar, clasifica únicamente minutos completos y ejecuta la misma política jerárquica. Una sospecha permanece Congested con alerta separada; sólo una corrección humana validada produce Accident. Inferencia persiste feedback, pero el reentrenamiento ocurre exclusivamente en el notebook de entrenamiento.
-
-```text
-raw acquisition -> engineered dataset -> approved bundle
-       ^                                      |
-       |                                      v
-       +-- human feedback <- classified telemetry
-```
-
-Este bucle es una capacidad de mejora continua, no un trigger automático de Continuous Training.
+La etiqueta humana prevalece sobre el proxy para el mismo minuto. Conflictos
+entre validaciones efectivas detienen el entrenamiento. Sintéticos sólo aparecen
+en train y siempre permanecen identificados.

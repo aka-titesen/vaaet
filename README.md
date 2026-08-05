@@ -1,14 +1,14 @@
-# VAAET ML 4.0.0
+# VAAET ML 4.1.0
 
 VAAET ML es el repositorio de machine learning para analizar el tránsito del Puente General Manuel Belgrano. Implementa adquisición de telemetría bajo demanda, entrenamiento batch e inferencia batch con feedback. La ejecución y promoción del modelo siguen siendo manuales en Google Colab; por eso es una base de MLOps Nivel 1, no un sistema de Continuous Training autónomo.
 
 ## Workflows
 
 ```text
-video -> notebooks/data-collection -> data/raw/traffic_data_raw.csv
-                                      -> traffic_data (PostgreSQL opcional)
-raw telemetry -> notebooks/training -> artifacts/traffic-state (bundle DVC)
-video + bundle -> notebooks/inference -> video anotado + clasificación + feedback
+video -> collection -> vaaet_raw.traffic_data
+raw + validated feedback -> training -> artifacts/traffic-state (bundle DVC)
+video + bundle -> inference -> vaaet_ml.telemetry_features + traffic_predictions
+predictions -> explicit HITL review -> vaaet_feedback.human_validations
 ```
 
 - `notebooks/data-collection/collect_traffic_telemetry.ipynb`: adquisición opcional y reutilizable.
@@ -35,3 +35,24 @@ El bundle v2 contiene `traffic_classifier.keras`, `feature_scaler.joblib`, `labe
 Los aproximadamente 2.068 registros históricos permiten reproducir un baseline, pero no acreditan un modelo de producción: carecen de telemetría v2 completa, holdout humano y accidentes reales. El notebook lo refleja marcando el bundle como `experimental/shadow-only` hasta cumplir los gates.
 
 La futura Web App pertenece a otro repositorio y consumirá únicamente bundles validados. La [documentación](docs/index.md) y la [guía de Colab](docs/operations/colab-guide.md) describen el flujo completo.
+
+## PostgreSQL e HITL
+
+Una única base PostgreSQL 14+ usa tres schemas: `vaaet_raw`, `vaaet_ml` y
+`vaaet_feedback`. Cada notebook carga un perfil de mínimo privilegio desde Colab
+Secrets o variables locales; las URLs se construyen con SQLAlchemy y TLS
+`verify-full` es el valor recomendado. Alembic y el rol administrador quedan fuera
+de Colab. Aplicación inicial:
+
+```bash
+export VAAET_DATABASE_ADMIN_URL='postgresql+psycopg2://...'
+alembic upgrade head
+psql 'postgresql://admin:...@host:5432/vaaet' -f migrations/provision-roles.sql
+```
+
+El entrenamiento declara sus fuentes mediante `TrainingIngestionPlan`: puede
+combinar PostgreSQL, backups, CSV raw y `vaaet-training-dataset-v1.zip`. Sólo
+`human_validations` efectivas ingresan como etiquetas; predicciones sin revisar
+nunca se convierten en ground truth. Consultá [ADR-0015](docs/architecture/decisions/0015-postgresql-namespaces-security-and-hitl.md).
+El provisionamiento, backup, rotación y recuperación están en la
+[guía PostgreSQL](docs/operations/postgresql-guide.md).

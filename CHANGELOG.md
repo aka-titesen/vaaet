@@ -13,6 +13,31 @@ Todos los cambios relevantes del proyecto VAAET se documentan en este archivo, s
 
 ---
 
+## [4.1.0] - 2026-08-04
+
+### Añadido
+
+- Contrato PostgreSQL `vaaet-db-v2` con schemas `vaaet_raw`, `vaaet_ml` y
+  `vaaet_feedback`, migración Alembic y cuatro roles de mínimo privilegio.
+- Configuración tipada por perfil, TLS, health check redactado y soporte directo
+  para Colab Secrets, entorno local y `.env` explícito.
+- Ingestión declarativa que combina PostgreSQL, backups, CSV raw y paquetes
+  `vaaet-training-dataset-v1.zip` con checksums y procedencia.
+- Cola HITL posterior a inferencia, validaciones append-only y exportación offline.
+- Integración PostgreSQL 17 en CI para migración, constraints, vistas y grants.
+
+### Cambiado
+
+- Features y predicciones se persisten en tablas separadas; una reinferencia no
+  modifica ni elimina feedback humano.
+- El entrenamiento sólo acepta etiquetas humanas efectivas 0–2; Accident se
+  reserva para evaluar el detector y las predicciones sin revisar quedan excluidas.
+- Los notebooks ya no contienen DDL ni lógica propia de credenciales.
+
+### Deprecado
+
+- Variables `DB_*` y vistas `public.*`, disponibles sólo durante VAAET 4.x.
+
 ## [4.0.0] - 2026-08-01
 
 ### Cambiado

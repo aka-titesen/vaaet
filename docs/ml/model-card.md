@@ -4,7 +4,7 @@
 
 | Campo | Valor |
 |---|---|
-| Proyecto | VAAET ML 4.0.0 |
+| Proyecto | VAAET ML 4.1.0 |
 | Modelo vigente | `mlp-v2.0` |
 | Estado inicial | Experimental / shadow-only hasta cumplir gates |
 | Runtime | TensorFlow/Keras, Python 3.10–3.12, Google Colab |
@@ -69,4 +69,4 @@ La promoción manual exige telemetría v2 suficiente, holdout humano, retrospect
 | `mlp-v1.1` | Baseline de 19 features y cuatro salidas |
 | `mlp-v2.0` | Tres salidas estables, contrato v2 y política jerárquica humana para Accident |
 
-Última revisión: 2026-08-02. Véase [ADR-0014](../architecture/decisions/0014-hierarchical-traffic-state-and-incident-policy.md).
+Última revisión: 2026-08-04. Véanse [ADR-0014](../architecture/decisions/0014-hierarchical-traffic-state-and-incident-policy.md) y [ADR-0015](../architecture/decisions/0015-postgresql-namespaces-security-and-hitl.md).

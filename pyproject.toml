@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "vaaet-ml"
-version = "4.0.0"
+version = "4.1.0"
 description = "Video Advanced Analysis of Traffic — Sistema de análisis vehicular avanzado para el Puente Gral. Manuel Belgrano"
 readme = "README.md"
 license = "MIT"
@@ -42,12 +42,15 @@ training = [
 database = [
     "sqlalchemy>=2,<3",
     "psycopg2-binary>=2.9,<3",
+    "python-dotenv>=1.0,<2",
 ]
 visualization = [
     "matplotlib>=3.8,<4",
     "seaborn>=0.13,<1",
+    "ipywidgets>=8.1,<9",
 ]
 dev = [
+    "alembic>=1.14,<2",
     "pytest>=7.4.0",
     "pytest-cov>=4.1.0",
     "ruff>=0.12.0",
@@ -67,6 +70,9 @@ include = ["vaaet*"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-v --tb=short"
+markers = [
+    "postgres: requires a live PostgreSQL integration database",
+]
 
 [tool.ruff]
 target-version = "py310"

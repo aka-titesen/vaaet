@@ -7,6 +7,8 @@
 
 > Nota de vigencia (2026-08-01): la separación modular continúa vigente; los
 > nombres y límites actuales de los workflows se precisan en [ADR-0013](0013-on-demand-data-collection-workflow.md).
+> La persistencia y HITL vigentes se definen en
+> [ADR-0015](0015-postgresql-namespaces-security-and-hitl.md).
 
 > **Current applicability (2026-08-01):** this ADR preserves the original
 > three-stage rationale. Active paths use `src/vaaet/`, `notebooks/training/`

@@ -9,6 +9,8 @@ Introduce la Etapa 2 (Inteligencia) del pipeline VAAET. -->
 
 > Nota de vigencia (2026-08-01): Keras y las 19 features siguen vigentes bajo
 > ADR-0010; la adquisición actual se define en [ADR-0013](0013-on-demand-data-collection-workflow.md).
+> Las tablas y el feedback histórico fueron sustituidos por
+> [ADR-0015](0015-postgresql-namespaces-security-and-hitl.md).
 **Decisores:** Equipo VAAET
 
 > **Nota de vigencia (2026-08-01):** este ADR conserva la narrativa histórica

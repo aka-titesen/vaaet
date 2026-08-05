@@ -80,8 +80,7 @@ class TestConstants:
     def test_db_env_vars(self) -> None:
         from vaaet.settings import DB_ENV_VARS
 
-        assert len(DB_ENV_VARS) == 5
-        assert "DB_HOST" in DB_ENV_VARS
+        assert DB_ENV_VARS == ("VAAET_DB_HOST", "VAAET_DB_PORT", "VAAET_DB_NAME")
 
     def test_artifact_paths_are_relative(self) -> None:
         import os

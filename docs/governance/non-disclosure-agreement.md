@@ -21,7 +21,7 @@ El presente acuerdo establece las obligaciones de confidencialidad para las part
 
 - Videos de vigilancia SISE del Puente Gral. Manuel Belgrano
 - Datos de telemetría almacenados en la base de datos de producción
-- Credenciales de acceso a infraestructura (AWS RDS, APIs)
+- Credenciales de acceso a infraestructura (PostgreSQL administrado, APIs)
 - Datos de calibración específicos del puente (landmarks, factores de corrección)
 - Información comercial y estratégica del proyecto
 
@@ -34,8 +34,8 @@ El presente acuerdo establece las obligaciones de confidencialidad para las part
 | Tipo | Ejemplos |
 |---|---|
 | **Datos de video** | Archivos `.mp4` de cámaras SISE |
-| **Datos de producción** | Registros de `telemetry_raw` y `traffic_classifications` |
-| **Credenciales** | Variables de entorno (`DB_HOST`, `DB_PASSWORD`, etc.) |
+| **Datos de producción** | Registros de `vaaet_raw`, `vaaet_ml` y `vaaet_feedback` |
+| **Credenciales** | Colab Secrets o variables `VAAET_*` específicas por perfil |
 | **Modelos entrenados** | Artefactos `.keras` y `.joblib` con datos propietarios |
 | **Parámetros de calibración** | `pixels_per_meter`, factores de perspectiva del puente |
 | **Información estratégica** | Planes comerciales, contratos con entes viales |

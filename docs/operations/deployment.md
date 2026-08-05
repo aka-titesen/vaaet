@@ -8,7 +8,7 @@ Complementa USER_GUIDE.md y SAD.md. -->
 | Campo | Detalles |
 |---|---|
 | **Nombre del Proyecto** | VAAET — Video Advanced Analysis of Traffic |
-| **Versión** | 4.0.0 |
+| **Versión** | 4.1.0 |
 | **Estado** | Aprobado |
 | **Responsable Técnico** | Facundo Nicolás González |
 | **Última Revisión** | 2026-07-23 |
@@ -17,7 +17,9 @@ Complementa USER_GUIDE.md y SAD.md. -->
 
 ## 1. Arquitectura de Infraestructura
 
-VAAET opera en un modelo "Notebook-as-Runtime": Google Colab es el entorno de ejecución, AWS RDS provee persistencia opcional, y los artefactos de modelo se comparten vía Google Drive.
+VAAET opera en un modelo "Notebook-as-Runtime": Google Colab es el entorno de
+ejecución, cualquier proveedor PostgreSQL 14+ compatible puede proveer
+persistencia opcional y Google Drive transporta artefactos.
 
 ### 1.1 Componentes del Sistema
 
@@ -25,7 +27,7 @@ VAAET opera en un modelo "Notebook-as-Runtime": Google Colab es el entorno de ej
 |---|---|---|
 | **Runtime** | Google Colab Free/Pro | Ejecución de notebooks con GPU T4/V100 |
 | **Código fuente** | GitHub | Versionado y CI/CD |
-| **Base de datos** | PostgreSQL 12+ en AWS RDS | Persistencia de telemetría (opcional) |
+| **Base de datos** | PostgreSQL 14+ compatible | Raw, features, predicciones y HITL (opcional) |
 | **Almacenamiento de modelos** | Google Drive / local | Artefactos `.keras` y `.joblib` |
 | **Almacenamiento de video** | Local / Colab temporal | Videos de entrada y salida |
 
@@ -36,7 +38,7 @@ flowchart LR
     A[Usuario] -->|Sube .mp4| B[Google Colab]
     B -->|Inferencia| C[GPU T4/V100]
     C -->|Detecciones| B
-    B -->|INSERT por minuto| D[(AWS RDS PostgreSQL)]
+    B -->|Perfiles de mínimo privilegio| D[(PostgreSQL 14+)]
     B -->|Video anotado| A
     E[Ultralytics Hub] -->|Modelo .pt| B
     F[Google Drive] -->|Artefactos .keras/.joblib| B
@@ -51,7 +53,7 @@ flowchart LR
 |---|---|---|---|
 | **Desarrollo local** | Python 3.10–3.12 | Desarrollo y testing de `src/vaaet/` | Datos sintéticos, sin GPU |
 | **Google Colab** | Colab Free/Pro | Ejecución de notebooks (entorno principal) | Videos reales, GPU disponible |
-| **CI** | GitHub Actions | Validación automática | Tests unitarios, sin GPU ni BD |
+| **CI** | GitHub Actions + PostgreSQL 17 | Validación automática | Tests puros y migración/grants reales, sin GPU |
 
 ---
 
@@ -90,18 +92,12 @@ actualiza `/content/vaaet`, instala un wheel local con los extras del workflow,
 limpia imports anteriores y valida que `vaaet` provenga del paquete instalado.
 El modo editable se reserva para desarrollo local.
 
-### Celda 1 — Configuración de BD (Opcional)
+### Configuración de BD (opcional)
 
-```python
-import os
-os.environ['DB_HOST'] = 'tu-instancia.rds.amazonaws.com'
-os.environ['DB_PORT'] = '5432'
-os.environ['DB_NAME'] = 'vaaet'
-# Credenciales vía getpass (nunca hardcodear)
-import getpass
-os.environ['DB_USER'] = getpass.getpass('DB User: ')
-os.environ['DB_PASSWORD'] = getpass.getpass('DB Password: ')
-```
+Definí el endpoint `VAAET_DB_*` y la credencial específica de cada perfil en
+Colab Secrets, según la [guía de Colab](colab-guide.md). No uses `getpass`, celdas
+con `os.environ` ni un usuario compartido. El administrador aplica Alembic y
+grants fuera de Colab.
 
 ---
 
@@ -109,7 +105,7 @@ os.environ['DB_PASSWORD'] = getpass.getpass('DB Password: ')
 
 | Secreto | Mecanismo | Ubicación |
 |---|---|---|
-| Credenciales de BD | Variables de entorno + `getpass` | Runtime de Colab |
+| Credenciales de BD | Colab Secrets por perfil | Runtime de Colab |
 | Token de GitHub | Configuración de Colab | Secrets de Colab |
 
 **Está estrictamente prohibido:**
@@ -121,15 +117,17 @@ os.environ['DB_PASSWORD'] = getpass.getpass('DB Password: ')
 
 ## 6. Estrategia de Base de Datos
 
-### Creación de Tablas
+### Migraciones
 
-Las tablas se crean automáticamente con `CREATE TABLE IF NOT EXISTS` al ejecutar la celda de persistencia. No hay sistema formal de migraciones.
+Alembic es la única autoridad DDL. Ejecutá `alembic upgrade head` con el perfil
+administrador y después `migrations/provision-roles.sql`. Los notebooks sólo
+comprueban el contrato y fallan con un mensaje claro si la migración falta.
 
 ### Backups
 
-- Backup manual vía `pg_dump` almacenado en `data/raw/` (gitignored)
+- Backup administrativo de los schemas `vaaet_raw`, `vaaet_ml` y `vaaet_feedback`
 - Script de conversión: `scripts/convert-postgres-backup.py`
-- **Recomendación:** Configurar backups automáticos en AWS RDS (diarios, retención 7 días)
+- Configurar backups automáticos, retención y restauraciones probadas en el proveedor
 
 ---
 

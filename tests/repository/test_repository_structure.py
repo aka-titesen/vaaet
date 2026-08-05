@@ -17,6 +17,7 @@ ALLOWED_SCRIPT_FILES = {
     "README.md",
     "convert-postgres-backup.py",
     "evaluate-telemetry-exports.py",
+    "export-training-dataset.py",
     "setup-dvc.sh",
 }
 
@@ -84,6 +85,8 @@ def test_active_sources_do_not_use_legacy_paths_or_import_hacks() -> None:
         *active_docs,
         REPO_ROOT / "docs/architecture/decisions/0012-ml-web-boundary-and-artifact-contract.md",
         REPO_ROOT / "docs/architecture/decisions/0013-on-demand-data-collection-workflow.md",
+        REPO_ROOT / "docs/architecture/decisions/0014-hierarchical-traffic-state-and-incident-policy.md",
+        REPO_ROOT / "docs/architecture/decisions/0015-postgresql-namespaces-security-and-hitl.md",
     ]
     for path in active_files:
         content = path.read_text(encoding="utf-8")
@@ -107,6 +110,15 @@ def test_active_notebooks_use_canonical_feature_count_and_repository_root() -> N
     ).read_text(encoding="utf-8")
     assert "14 features" not in diagram
     assert "19 features" in diagram
+
+
+def test_notebooks_do_not_own_database_schema_or_legacy_credentials() -> None:
+    for notebook_path in ACTIVE_NOTEBOOKS:
+        code = _concatenate_code_cells(notebook_path)
+        assert "CREATE TABLE" not in code.upper()
+        assert "ALTER TABLE" not in code.upper()
+        assert "getpass(" not in code
+        assert "hydrate_db_environment_from_colab" not in code
 
 
 def test_internal_markdown_links_resolve() -> None:

@@ -79,7 +79,7 @@ class TestApplyConservativeAccidentGate:
         assert not gated["traffic_state"].eq(3).any()
         assert bool(gated["accident_gate_applied"].iloc[-1]) is False
 
-    def test_only_validated_human_override_can_publish_accident(self) -> None:
+    def test_legacy_override_fields_cannot_publish_accident(self) -> None:
         df = _feature_rows(
             traffic_state=[2, 2, 2],
             confidence=[0.62, 0.62, 0.62],
@@ -90,7 +90,8 @@ class TestApplyConservativeAccidentGate:
             human_override_state=[3, 3, 3],
         )
         gated = apply_conservative_accident_gate(df)
-        assert gated["traffic_state"].tolist()[-1] == 3
+        assert not gated["traffic_state"].eq(3).any()
+        assert gated["traffic_state"].tolist()[-1] == 2
         assert gated["traffic_state"].tolist()[:2] == [2, 2]
 
     def test_incident_alert_has_deduplicated_start_and_exit_hysteresis(self) -> None:

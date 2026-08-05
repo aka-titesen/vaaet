@@ -20,7 +20,29 @@ Si el runtime se reinicia, volvé a ejecutar desde la primera celda; los archivo
 
 ## Secrets y PostgreSQL
 
-Creá los secretos `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER` y `DB_PASSWORD` en el panel de Secrets y habilitá acceso al notebook. Las variables de entorno son fallback. La persistencia permanece deshabilitada hasta cambiar explícitamente el interruptor del notebook.
+Creá el endpoint común `VAAET_DB_HOST`, `VAAET_DB_PORT`, `VAAET_DB_NAME` y
+`VAAET_DB_SSLMODE` en Colab Secrets. Para `verify-full`, agregá
+`VAAET_DB_SSLROOTCERT_PEM` con el certificado CA del proveedor. Luego habilitá
+sólo las credenciales necesarias:
+
+| Workflow | Secrets |
+|---|---|
+| Adquisición | `VAAET_COLLECTION_DB_USER`, `VAAET_COLLECTION_DB_PASSWORD` |
+| Inferencia | `VAAET_INFERENCE_DB_USER`, `VAAET_INFERENCE_DB_PASSWORD` |
+| Entrenamiento | `VAAET_TRAINING_DB_USER`, `VAAET_TRAINING_DB_PASSWORD` |
+| Revisión | `VAAET_REVIEW_DB_USER`, `VAAET_REVIEW_DB_PASSWORD`, `VAAET_REVIEWER_ID` |
+
+Los notebooks consultan Secrets directamente: no copian contraseñas a variables,
+celdas ni outputs. `sslmode=require` se admite con advertencia; `disable` sólo en
+localhost. Los nombres `DB_*` funcionan de forma deprecada durante 4.x.
+
+La migración se aplica una sola vez desde un entorno administrativo, nunca desde
+Colab:
+
+```bash
+alembic upgrade head
+psql 'postgresql://admin:...@host:5432/vaaet' -f migrations/provision-roles.sql
+```
 
 ## Artefactos y Drive
 
@@ -30,11 +52,23 @@ Después de aprobar un modelo, ejecutá localmente `dvc add artifacts/traffic-st
 
 ## Entradas y salidas
 
-- Adquisición: MP4 → MP4 anotado + `data/raw/traffic_data_raw.csv` + `traffic_data` opcional.
-- Entrenamiento: CSV/BD → dataset procesado + bundle de cuatro archivos.
-- Inferencia: MP4 + bundle → MP4 anotado + DataFrames + PostgreSQL opcional.
+- Adquisición: MP4 → MP4 anotado + `data/raw/traffic_data_raw.csv` + `vaaet_raw.traffic_data` opcional.
+- Entrenamiento: plan explícito de servidor/backup/CSV/paquete → dataset compuesto + bundle.
+- Inferencia: MP4 + bundle → MP4 anotado + features/predicciones PostgreSQL opcionales.
 
-El clasificador sólo consume minutos completos. Durante una ventana parcial se muestra el último estado estable. `Accident` nunca es automático: una evidencia persistente produce `Congested + accident_rule_triggered`; el código 3 exige feedback humano validado, que se consume únicamente desde el notebook de entrenamiento.
+El clasificador sólo consume minutos completos. Durante una ventana parcial se muestra el último estado estable. `Accident` nunca es automático: una evidencia persistente produce `Congested + accident_rule_triggered`; el código 3 exige feedback humano validado.
+
+La revisión HITL es una celda explícita posterior al clip, no un pop-up durante
+inferencia. `priority` muestra incidentes candidatos, baja confianza, abstenciones
+y transiciones; `all` permite revisar cada minuto. Sin conexión de review, la
+sesión exporta `vaaet-training-dataset-v1.zip`, que luego puede declararse como
+`DatasetPackageSource` en entrenamiento. Sólo validaciones humanas ingresan como
+etiquetas; Accident se reserva para evaluar el detector.
+
+En entrenamiento, `ENABLE_DATA_UPLOAD=False` evita abrir el selector cuando todas
+las fuentes son `PostgresSource`. La celda siguiente declara objetos en
+`RAW_SOURCES` y `FEEDBACK_SOURCES`; al cargar CSV, backup o ZIP se debe habilitar
+el tipo correspondiente de forma explícita.
 
 Descargá los outputs antes de cerrar la sesión. El backup canónico usa el formato de archivo `1.16`, que requiere PostgreSQL 17 o posterior. Cuando debe procesarlo, el notebook de entrenamiento configura de forma visible el repositorio APT oficial PGDG, instala únicamente `postgresql-client-17` y ejecuta directamente `/usr/lib/postgresql/17/bin/pg_restore`. La clave, URL, codename y arquitectura del repositorio se declaran explícitamente en la celda; no se instala el servidor PostgreSQL.
 
@@ -44,9 +78,12 @@ El cliente es una dependencia del sistema operativo y por eso no forma parte de 
 
 - Confirmar GPU y descarga automática de YOLO.
 - Procesar un clip real en adquisición y descargar CSV/video.
-- Activar una vez la persistencia y comprobar deduplicación en `traffic_data`.
+- Aplicar Alembic fuera de Colab y verificar health check/rol sin secretos.
+- Activar una vez la persistencia y comprobar deduplicación en `vaaet_raw.traffic_data`.
 - Entrenar y validar los cuatro archivos del bundle.
 - Cargar el bundle desde local, Drive y upload en inferencia.
 - Confirmar que un bundle incompleto o incompatible se rechaza antes de inferir.
 - Confirmar que un bundle sin telemetría v2/holdout humano queda `experimental/shadow-only`.
 - Revisar candidatos de incidente sobre hard negatives y acumular horas negativas; no publicar recall de Accident sin casos reales.
+- Completar una cola HITL, persistir con el perfil review y repetir una inferencia para confirmar que la validación sobrevive.
+- Entrenar combinando una fuente raw y una fuente de feedback validado.

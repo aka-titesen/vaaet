@@ -10,7 +10,7 @@ flowchart TD
     S --> H["Annotated video and HUD"]
     M --> C{"Workflow"}
     C -->|"Data collection"| CSV["Cumulative raw CSV"]
-    C -->|"Data collection, opt-in"| RAW["traffic_data"]
+    C -->|"Data collection, opt-in"| RAW["vaaet_raw.traffic_data"]
     C -->|"Inference + bundle"| F["19 engineered features"]
     F --> P["Traffic state + confidence"]
     P --> DB["Optional feedback tables"]

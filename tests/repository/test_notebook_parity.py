@@ -128,10 +128,16 @@ def test_training_uses_shared_feature_contracts() -> None:
     assert "fit_temperature" in code
     assert "production_eligible" in code
     assert "SMOTE(" not in code
+    assert "TrainingIngestionPlan(" in code
+    assert "compose_supervised_dataset(" in code
+    assert 'feedback_policy=FeedbackPolicy.VALIDATED_ONLY' in code
+    assert "USE_HUMAN_VALIDATED_FEEDBACK" not in code
+    assert "persist_traffic_analysis" not in code
 
 
 def test_training_prepares_postgres_backup_reader_in_colab() -> None:
     code = _code(NOTEBOOKS["training"])
+    assert "ENABLE_DATA_UPLOAD = True" in code
     condition = 'os.path.exists(_backup_dest) and not os.path.exists(_csv_dest)'
     assert condition in code
     assert 'Path("/usr/lib/postgresql/17/bin/pg_restore")' in code
@@ -139,18 +145,19 @@ def test_training_prepares_postgres_backup_reader_in_colab() -> None:
     assert '"postgresql-client-17"' in code
     assert "https://apt.postgresql.org/pub/repos/apt" in code
     assert "https://www.postgresql.org/media/keys/ACCC4CF8.asc" in code
-    assert "pg_restore_path=PG_RESTORE_PATH" in code
+    assert "PostgresBackupSource(BACKUP_PATH" in code
+    assert "Path(PG_RESTORE_PATH) if PG_RESTORE_PATH else None" in code
     assert "Backup reader ready" in code
     assert "!apt-get" not in code
     assert "shell=True" not in code
 
 
-def test_training_augmentation_requires_loaded_dataframe() -> None:
+def test_training_augmentation_handles_raw_and_feedback_inputs() -> None:
     code = _code(NOTEBOOKS["training"])
-    guard = '"df_raw" not in globals() or not isinstance(df_raw, pd.DataFrame) or df_raw.empty'
+    guard = 'if "df_raw" not in globals() or not isinstance(df_raw, pd.DataFrame):'
     assert guard in code
     assert code.index(guard) < code.index("_n_before = len(df_raw)")
-    assert "Cell 2 finishes successfully" in code
+    assert "Feedback-only run: synthetic raw augmentation skipped" in code
 
 
 def test_training_documents_actual_synthetic_record_count() -> None:
@@ -164,7 +171,12 @@ def test_inference_uses_shared_analysis_and_validates_bundle() -> None:
     assert "from vaaet.vision.analysis import TrafficStatePrediction, analyze_video" in code
     assert "validate_manifest(_model_dir_abs)" in code
     assert "from sqlalchemy import text as sa_text" not in code
-    assert "Feedback ownership" in code
+    assert "load_review_queue" in code
+    assert "build_review_widget" in code
+    assert "export_completed_offline_review" in code
+    assert "DatabaseProfile.REVIEW" in code
+    assert "ENABLE_HUMAN_REVIEW = False" in code
+    assert "PERSIST_TO_DATABASE = False" in code
     assert "validation_split" not in code
     assert "SMOTE" not in code
     assert "def estimate_speed(" not in code
@@ -174,3 +186,18 @@ def test_inference_uses_shared_analysis_and_validates_bundle() -> None:
     assert "retrain_with_feedback" not in code
     assert "model.output_shape[-1]" in code
     assert "dict(label_mapping) != dict(STATE_LABELS)" in code
+
+
+def test_notebooks_use_profile_specific_database_api() -> None:
+    collection = _code(NOTEBOOKS["collection"])
+    inference = _code(NOTEBOOKS["inference"])
+    training = _code(NOTEBOOKS["training"])
+
+    assert "DatabaseProfile.COLLECTION" in collection
+    assert "DatabaseProfile.INFERENCE" in inference
+    assert "DatabaseProfile.REVIEW" in inference
+    assert "DatabaseProfile.TRAINING" in training
+    for code in (collection, inference, training):
+        assert "hydrate_db_environment_from_colab" not in code
+        assert 'os.environ["DB_PASSWORD"]' not in code
+        assert "getpass(" not in code

@@ -8,7 +8,7 @@ Complementa SAD.md (arquitectura) y KPIs/KPIs.md (métricas). -->
 | Campo | Detalles |
 |---|---|
 | **Nombre del Proyecto** | VAAET — Video Advanced Analysis of Traffic |
-| **Versión** | 4.0.0 |
+| **Versión** | 4.1.0 |
 | **Fecha de Creación** | 2025-03-06 |
 | **Estado** | Aprobado |
 | **Responsable Técnico** | Facundo Nicolás González |
@@ -105,7 +105,7 @@ Ver [KPIs](../quality/kpis.md) para la guía completa de validación.
 **Como** investigador, **quiero** entrenar el MLP con datos de telemetría, **para** clasificar tres estados estables y evaluar incidentes por separado.
 
 **Criterios de Aceptación:**
-- **Dado** datos de `traffic_data` con secuencias sintéticas inyectadas
+- **Dado** telemetría raw con augmentación sintética trazable sólo en train
 - **Cuando** el sistema completa el entrenamiento con class weights limitados, validation explícita y EarlyStopping
 - **Entonces** el bundle sólo es promovible si cumple F1-macro ≥0,88 y todos los gates de soporte, calibración y procedencia
 
@@ -116,7 +116,7 @@ Ver [KPIs](../quality/kpis.md) para la guía completa de validación.
 **Criterios de Aceptación:**
 - **Dado** credenciales de BD configuradas vía variables de entorno
 - **Cuando** el sistema persiste telemetría y clasificaciones
-- **Entonces** los registros se insertan con upsert idempotente en `telemetry_raw` y `traffic_classifications`
+- **Entonces** los registros se insertan idempotentemente en `vaaet_ml.telemetry_features` y `vaaet_ml.traffic_predictions`, sin alterar feedback
 
 ---
 

@@ -8,7 +8,7 @@ Complementa PRD.md, SRS.md y USER_PERSONAS.md. -->
 | Campo | Detalles |
 |---|---|
 | **Nombre del Proyecto** | VAAET — Video Advanced Analysis of Traffic |
-| **Versión** | 4.0.0 |
+| **Versión** | 4.1.0 |
 | **Estado** | Aprobado |
 | **Responsable Técnico** | Facundo Nicolás González |
 | **Última Revisión** | 2026-07-23 |
@@ -98,7 +98,7 @@ graph LR
 |---|---|
 | **Actor principal** | Sistema (automático) |
 | **Precondición** | Telemetría clasificada + credenciales de BD disponibles |
-| **Postcondición** | Registros en `telemetry_raw` y `traffic_classifications` |
+| **Postcondición** | Registros en `vaaet_ml.telemetry_features` y `vaaet_ml.traffic_predictions` |
 | **Prioridad** | P1 — Alto |
 
 **Flujo alternativo:**
@@ -112,13 +112,13 @@ graph LR
 | Campo | Detalle |
 |---|---|
 | **Actor principal** | Investigador |
-| **Precondición** | Datos en `traffic_data` disponibles (BD o CSV de respaldo) |
+| **Precondición** | Datos raw disponibles en `vaaet_raw.traffic_data`, CSV o backup |
 | **Postcondición** | Artefactos `.keras`, `.joblib` exportados a `artifacts/traffic-state/` |
 | **Prioridad** | P0 — Crítico (ejecución única) |
 
 | Paso | Acción del Actor | Respuesta del Sistema |
 |---|---|---|
-| 1 | Abre el notebook de entrenamiento en Colab | Carga datos de `traffic_data` |
+| 1 | Abre el notebook de entrenamiento en Colab | Ejecuta el plan de ingestión tipado |
 | 2 | — | Audita telemetría v2 y conserva procedencia real/sintética |
 | 3 | — | Aplica feature engineering (9 → 19 features) |
 | 4 | — | Usa ground truth humano o etiquetas proxy de tres estados |
@@ -135,7 +135,7 @@ graph LR
 |---|---|
 | **Actor principal** | Operador SISE |
 | **Precondición** | Clasificación realizada (CU-002), scaffold HITL habilitado |
-| **Postcondición** | Campo `is_human_validated` = TRUE, `human_override_state` actualizado |
+| **Postcondición** | Nueva fila append-only en `vaaet_feedback.human_validations` |
 | **Prioridad** | P2 — Medio (experimental) |
 | **Estado** | Scaffold experimental, no flujo productivo validado |
 

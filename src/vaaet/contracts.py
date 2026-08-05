@@ -14,7 +14,7 @@ import pandas as pd
 
 from vaaet.settings import (
     DATA_ORIGINS,
-    STATE_LABELS,
+    MODEL_STATE_LABELS,
     SYNTHETIC_SCENARIOS,
     VEHICLE_TYPES,
 )
@@ -201,9 +201,9 @@ class EngineeredTelemetryRecord:
 
 @dataclass(frozen=True)
 class ClassificationRecord:
-    """Validated traffic-state classification output."""
+    """Validated automatic prediction; human ground truth is a separate contract."""
 
-    telemetry_id: int
+    telemetry_feature_id: int
     traffic_state: int
     state_label: str
     confidence: float
@@ -213,17 +213,14 @@ class ClassificationRecord:
     model_traffic_state: int | None = None
     model_confidence: float | None = None
     accident_rule_triggered: bool = False
-    accident_gate_applied: bool = False
     accident_evidence_score: float = 0.0
-    is_human_validated: bool = False
-    human_override_state: int | None = None
 
     def __post_init__(self) -> None:
-        if self.telemetry_id <= 0:
-            raise ValueError("telemetry_id must be > 0")
-        if self.traffic_state not in STATE_LABELS:
-            raise ValueError(f"traffic_state must be one of {tuple(STATE_LABELS)}")
-        expected_label = STATE_LABELS[self.traffic_state]
+        if self.telemetry_feature_id <= 0:
+            raise ValueError("telemetry_feature_id must be > 0")
+        if self.traffic_state not in MODEL_STATE_LABELS:
+            raise ValueError("Automatic traffic_state must be Normal, Reduced, or Congested.")
+        expected_label = MODEL_STATE_LABELS[self.traffic_state]
         if self.state_label != expected_label:
             raise ValueError(
                 f"state_label must match STATE_LABELS[{self.traffic_state}]={expected_label!r}"
@@ -231,13 +228,14 @@ class ClassificationRecord:
         _validate_ratio(self.confidence, "confidence")
         if not self.model_version:
             raise ValueError("model_version must be non-empty")
-        if self.model_traffic_state is not None and self.model_traffic_state not in STATE_LABELS:
-            raise ValueError("model_traffic_state must be a valid traffic state")
+        if (
+            self.model_traffic_state is not None
+            and self.model_traffic_state not in MODEL_STATE_LABELS
+        ):
+            raise ValueError("model_traffic_state must be a stable traffic state")
         if self.model_confidence is not None:
             _validate_ratio(self.model_confidence, "model_confidence")
         _validate_ratio(self.accident_evidence_score, "accident_evidence_score")
-        if self.human_override_state is not None and self.human_override_state not in STATE_LABELS:
-            raise ValueError("human_override_state must be a valid traffic state")
         _validate_origin(self.data_origin, self.synthetic_scenario)
 
 

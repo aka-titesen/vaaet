@@ -1,105 +1,95 @@
-"""Tests for src/persistence.py — shared row preparation helpers."""
+"""Tests for schema-qualified PostgreSQL persistence payloads."""
 
 from __future__ import annotations
 
 import pandas as pd
 import pytest
-from sqlalchemy import create_engine, text
 
 from vaaet.data.persistence import (
-    _prepare_classification_row,
-    _prepare_telemetry_row,
-    persist_raw_telemetry,
+    INSERT_RAW_SQL,
+    UPSERT_FEATURE_SQL,
+    UPSERT_PREDICTION_SQL,
+    _feature_payload,
+    _prediction_payload,
+    _raw_payload,
 )
 
 
-def test_persist_raw_telemetry_is_idempotent() -> None:
-    engine = create_engine("sqlite+pysqlite:///:memory:")
-    telemetry = pd.DataFrame(
-        [
-            {
-                "clip_id": "bridge_test",
-                "record_time": pd.Timestamp("2025-05-01 08:01:00"),
-                "avg_speed": 12.5,
-                "count_car": 1,
-                "count_truck": 0,
-                "count_bus": 0,
-                "count_motorcycle": 0,
-                "count_bicycle": 0,
-                "total_vehicles": 1,
-            }
-        ]
+def test_queries_use_versioned_schemas() -> None:
+    assert "vaaet_raw.traffic_data" in INSERT_RAW_SQL
+    assert "vaaet_ml.telemetry_features" in UPSERT_FEATURE_SQL
+    assert "vaaet_ml.traffic_predictions" in UPSERT_PREDICTION_SQL
+    assert "is_human_validated" not in UPSERT_PREDICTION_SQL
+    assert "human_override_state" not in UPSERT_PREDICTION_SQL
+
+
+def test_raw_payload_localizes_historical_buenos_aires_time() -> None:
+    row = pd.Series(
+        {
+            "clip_id": "bridge_test",
+            "record_time": pd.Timestamp("2025-05-01 08:01:00"),
+            "avg_speed": 12.5,
+            "count_car": 1,
+            "count_truck": 0,
+            "count_bus": 0,
+            "count_motorcycle": 0,
+            "count_bicycle": 0,
+            "total_vehicles": 1,
+        }
     )
-
-    assert persist_raw_telemetry(telemetry, engine=engine) == 1
-    assert persist_raw_telemetry(telemetry, engine=engine) == 0
-    with engine.connect() as connection:
-        assert connection.execute(text("SELECT COUNT(*) FROM traffic_data")).scalar_one() == 1
+    payload = _raw_payload(row, "00000000-0000-0000-0000-000000000001")
+    assert payload["record_time"].tzinfo is not None
+    assert payload["record_time"].hour == 11
 
 
-class TestPrepareTelemetryRow:
-    def test_uses_id_as_source_record_id_when_needed(self) -> None:
-        row = pd.Series(
-            {
-                "id": 7,
-                "record_time": pd.Timestamp("2025-05-01 08:00:00"),
-                "avg_speed": 12.5,
-                "total_vehicles": 4,
-            }
+def test_feature_payload_uses_source_id_and_schema_version() -> None:
+    row = pd.Series(
+        {
+            "id": 7,
+            "clip_id": "clip",
+            "record_time": pd.Timestamp("2025-05-01 08:00:00", tz="UTC"),
+        }
+    )
+    payload = _feature_payload(row, "00000000-0000-0000-0000-000000000001")
+    assert payload["source_record_id"] == 7
+    assert payload["feature_schema_version"] == "traffic-features-v2"
+
+
+def test_prediction_rejects_automatic_accident() -> None:
+    row = pd.Series(
+        {
+            "traffic_state": 3,
+            "model_traffic_state": 2,
+            "state_label": "Accident",
+            "confidence": 0.91,
+        }
+    )
+    with pytest.raises(ValueError, match="exclusively"):
+        _prediction_payload(
+            row,
+            feature_id=10,
+            pipeline_run_id="00000000-0000-0000-0000-000000000001",
+            model_version="mlp-v2.0",
         )
-        payload = _prepare_telemetry_row(row)
-        assert payload["source_record_id"] == 7
-        assert payload["speed_measurement_quality"] is None
-
-    def test_handles_rows_without_source_record_id(self) -> None:
-        row = pd.Series(
-            {
-                "record_time": pd.Timestamp("2025-05-01 08:00:00"),
-                "avg_speed": 12.5,
-                "total_vehicles": 4,
-            }
-        )
-        payload = _prepare_telemetry_row(row)
-        assert payload["source_record_id"] is None
 
 
-class TestPrepareClassificationRow:
-    def test_preserves_accident_gate_metadata(self) -> None:
-        row = pd.Series(
-            {
-                "traffic_state": 3,
-                "state_label": "Accident",
-                "confidence": 0.91,
-                "model_traffic_state": 2,
-                "model_state_label": "Congested",
-                "model_confidence": 0.64,
-                "probability_margin": 0.31,
-                "decision_abstained": False,
-                "measurement_reliable": True,
-                "accident_rule_triggered": True,
-                "accident_gate_applied": True,
-                "accident_evidence_score": 0.88,
-                "is_human_validated": True,
-                "human_override_state": 3,
-            }
-        )
-        with pytest.raises(ValueError, match="automatic Accident"):
-            _prepare_classification_row(row, telemetry_id=10, model_version="mlp-v2.0")
-
-    def test_accepts_human_confirmed_accident_without_automatic_gate(self) -> None:
-        row = pd.Series(
-            {
-                "traffic_state": 3,
-                "state_label": "Accident",
-                "confidence": 1.0,
-                "model_traffic_state": 2,
-                "accident_rule_triggered": True,
-                "accident_gate_applied": False,
-                "is_human_validated": True,
-                "human_override_state": 3,
-            }
-        )
-        payload = _prepare_classification_row(row, telemetry_id=10, model_version="mlp-v2.0")
-        assert payload["traffic_state"] == 3
-        assert payload["human_override_state"] == 3
-        assert payload["accident_gate_applied"] is False
+def test_prediction_preserves_incident_candidate_as_congested() -> None:
+    row = pd.Series(
+        {
+            "traffic_state": 2,
+            "state_label": "Congested",
+            "confidence": 0.91,
+            "model_traffic_state": 2,
+            "accident_rule_triggered": True,
+            "accident_alert_started": True,
+            "accident_evidence_score": 0.88,
+        }
+    )
+    payload = _prediction_payload(
+        row,
+        feature_id=10,
+        pipeline_run_id="00000000-0000-0000-0000-000000000001",
+        model_version="mlp-v2.0",
+    )
+    assert payload["traffic_state"] == 2
+    assert payload["accident_rule_triggered"] is True

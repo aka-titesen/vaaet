@@ -39,10 +39,10 @@ jobs:
         run: ruff check src tests scripts
 
       - name: Compilar módulos Python
-        run: python -m compileall -q src tests scripts
+        run: python -m compileall -q src tests scripts migrations
 
-      - name: Ejecutar tests
-        run: pytest -v --tb=short -x
+      - name: Ejecutar tests unitarios, contractuales y de repositorio
+        run: pytest -v --tb=short -x -m "not postgres"
 
       - name: Verificar compilación de notebooks
         run: |
@@ -106,6 +106,51 @@ jobs:
               sys.exit(1)
           print('✅ Todos los enlaces internos son válidos')
           "
+
+  postgres-integration:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: vaaet
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d vaaet"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      VAAET_DATABASE_ADMIN_URL: postgresql+psycopg2://postgres:postgres@localhost:5432/vaaet
+      VAAET_EXPECT_LEGACY_FIXTURE: "1"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Instalar dependencias de base de datos
+        run: pip install -e ".[database,dev]"
+
+      - name: Aplicar migración y roles
+        run: |
+          python -c "import os, pathlib, psycopg2; c=psycopg2.connect(os.environ['VAAET_DATABASE_ADMIN_URL'].replace('postgresql+psycopg2://','postgresql://')); c.autocommit=True; c.cursor().execute(pathlib.Path('tests/fixtures/postgres-legacy.sql').read_text()); c.close()"
+          alembic upgrade head
+          python -c "import os, pathlib, psycopg2; c=psycopg2.connect(os.environ['VAAET_DATABASE_ADMIN_URL'].replace('postgresql+psycopg2://','postgresql://')); c.autocommit=True; c.cursor().execute(pathlib.Path('migrations/provision-roles.sql').read_text()); c.close()"
+
+      - name: Probar schema, constraints y mínimo privilegio
+        run: pytest tests/integration -v --tb=short -m postgres
+
+      - name: Probar migración desde base vacía
+        run: |
+          python -c "import psycopg2; c=psycopg2.connect('postgresql://postgres:postgres@localhost:5432/vaaet'); c.autocommit=True; c.cursor().execute('CREATE DATABASE vaaet_fresh'); c.close()"
+          VAAET_DATABASE_ADMIN_URL=postgresql+psycopg2://postgres:postgres@localhost:5432/vaaet_fresh alembic upgrade head
+          VAAET_DATABASE_ADMIN_URL=postgresql+psycopg2://postgres:postgres@localhost:5432/vaaet_fresh python -c "import os, pathlib, psycopg2; c=psycopg2.connect(os.environ['VAAET_DATABASE_ADMIN_URL'].replace('postgresql+psycopg2://','postgresql://')); c.autocommit=True; c.cursor().execute(pathlib.Path('migrations/provision-roles.sql').read_text()); c.close()"
+          VAAET_EXPECT_LEGACY_FIXTURE=0 VAAET_DATABASE_ADMIN_URL=postgresql+psycopg2://postgres:postgres@localhost:5432/vaaet_fresh pytest tests/integration -v --tb=short -m postgres
 
   dvc-check:
     runs-on: ubuntu-latest

@@ -1,4 +1,4 @@
-# Documentación de VAAET ML 4.0.0
+# Documentación de VAAET ML 4.1.0
 
 ## Puntos de entrada
 
@@ -8,8 +8,11 @@
 - [Protocolo de anotación humana](ml/human-annotation-protocol.md)
 - [Guía de usuario](operations/user-guide.md)
 - [Guía de Google Colab](operations/colab-guide.md)
+- [Operación PostgreSQL](operations/postgresql-guide.md)
 - [Requisitos de producto](product/product-requirements.md)
 - [Plan de pruebas](quality/test-plan.md)
+- [Modelo PostgreSQL](architecture/data-model.md)
+- [ADR-0015: PostgreSQL seguro e HITL](architecture/decisions/0015-postgresql-namespaces-security-and-hitl.md)
 
 ## Mapa documental
 

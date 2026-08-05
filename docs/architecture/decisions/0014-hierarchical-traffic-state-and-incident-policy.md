@@ -10,7 +10,10 @@ El baseline `mlp-v1.1` aprendía cuatro clases a partir de etiquetas automática
 
 ## Decisión
 
-`mlp-v2.0` aprende únicamente `Normal`, `Reduced` y `Congested`. Los cuatro estados públicos permanecen vigentes, pero `Accident` sólo puede resultar de `human_override_state=3` cuando `is_human_validated=true`.
+`mlp-v2.0` aprende únicamente `Normal`, `Reduced` y `Congested`. Los cuatro
+estados públicos permanecen vigentes, pero `Accident` sólo puede resultar de una
+validación humana efectiva con estado 3. Desde VAAET 4.1.0 su persistencia
+append-only se define en [ADR-0015](0015-postgresql-namespaces-security-and-hitl.md).
 
 La cadena compartida por entrenamiento e inferencia es:
 
@@ -38,4 +41,3 @@ El contrato de bundle v2 registra tres salidas aprendidas, cuatro estados públi
 ## Criterios de promoción
 
 La promoción es manual. Requiere holdout real y humano, telemetría v2 con cobertura suficiente, ausencia de leakage, métricas con soporte e intervalos, revisión retrospectiva y shadow mode prospectivo. Sin accidentes reales no se publica recall de Accident; se reportan candidatos falsos por hora y la exposición acumulada.
-

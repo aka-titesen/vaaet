@@ -4,7 +4,7 @@
 - [Entrenamiento e inteligencia](intelligence-pipeline.md)
 - [Selección adaptativa de YOLO](model-selection.md)
 - [Cálculo de velocidad](speed-calculation.md)
-- [Arquitectura Colab y PostgreSQL](colab-aws-architecture.md)
+- [Arquitectura Colab y PostgreSQL](colab-postgresql-architecture.md)
 - [Modelo relacional resumido](erd.md)
 - [Modelo relacional completo](erd-phase2.md)
 

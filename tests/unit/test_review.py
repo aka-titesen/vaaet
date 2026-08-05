@@ -1,0 +1,108 @@
+"""Tests for append-only human-review rules."""
+
+from __future__ import annotations
+
+import pandas as pd
+import pytest
+
+from vaaet.data.ingestion import load_dataset_package
+from vaaet.data.review import (
+    HumanValidation,
+    export_offline_review_package,
+    select_review_queue,
+)
+from vaaet.settings import FEATURE_COLS
+
+
+def test_accident_requires_context_and_note() -> None:
+    with pytest.raises(ValueError, match="temporal-context"):
+        HumanValidation(1, 3, "reviewer")
+    with pytest.raises(ValueError, match="non-empty review note"):
+        HumanValidation(1, 3, "reviewer", incident_context_reviewed=True)
+
+
+def test_accident_can_be_confirmed_by_human() -> None:
+    decision = HumanValidation(
+        1,
+        3,
+        "reviewer",
+        notes="Collision visible in current and adjacent minute.",
+        incident_context_reviewed=True,
+    )
+    assert decision.validated_state == 3
+
+
+def test_priority_queue_filters_ordinary_high_confidence_rows() -> None:
+    frame = pd.DataFrame(
+        [
+            {
+                "clip_id": "a",
+                "traffic_state": 0,
+                "confidence": 0.98,
+                "probability_margin": 0.70,
+                "accident_rule_triggered": False,
+                "decision_abstained": False,
+            },
+            {
+                "clip_id": "a",
+                "traffic_state": 1,
+                "confidence": 0.60,
+                "probability_margin": 0.10,
+                "accident_rule_triggered": False,
+                "decision_abstained": False,
+            },
+            {
+                "clip_id": "a",
+                "traffic_state": 2,
+                "confidence": 0.90,
+                "probability_margin": 0.40,
+                "accident_rule_triggered": True,
+                "decision_abstained": False,
+            },
+        ]
+    )
+    priority = select_review_queue(frame, mode="priority")
+    assert priority.index.tolist() == [0, 1]
+    assert priority["traffic_state"].tolist() == [1, 2]
+    assert len(select_review_queue(frame, mode="all")) == 3
+
+
+def test_priority_excludes_reviewed_but_all_allows_correction() -> None:
+    frame = pd.DataFrame(
+        [
+            {
+                "traffic_state": 2,
+                "confidence": 0.2,
+                "accident_rule_triggered": True,
+                "latest_validation_id": "7a8f7af9-6075-4e8b-a579-5fe15707d818",
+                "current_validated_state": 1,
+            }
+        ]
+    )
+    assert select_review_queue(frame, mode="priority").empty
+    assert len(select_review_queue(frame, mode="all")) == 1
+
+
+def test_unknown_review_mode_is_rejected() -> None:
+    with pytest.raises(ValueError, match="priority.*all"):
+        select_review_queue(pd.DataFrame(), mode="random")
+
+
+def test_offline_review_exports_importable_contract(tmp_path) -> None:
+    row = {column: 1.0 for column in FEATURE_COLS}
+    row.update(
+        prediction_id=1,
+        clip_id="clip-a",
+        record_time="2026-08-04T12:00:00Z",
+        model_version="mlp-v2.0",
+        traffic_state=1,
+    )
+    decision = HumanValidation(1, 1, "reviewer")
+    package = export_offline_review_package(
+        tmp_path / "feedback.zip",
+        classified=pd.DataFrame([row]),
+        validations=[decision],
+    )
+    frames = load_dataset_package(package)
+    assert set(frames) == {"features", "predictions", "validations"}
+    assert frames["validations"].iloc[0]["validated_state"] == 1

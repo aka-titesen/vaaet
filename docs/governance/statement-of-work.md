@@ -75,7 +75,7 @@ VAAET es un sistema de análisis vehicular avanzado que procesa video de vigilan
 | Recurso | Proveedor | Costo |
 |---|---|---|
 | GPU T4/V100 | Google Colab Free | $0 |
-| PostgreSQL | AWS RDS db.t3.micro | ~$15 USD/mes |
+| PostgreSQL | Proveedor compatible, tamaño inicial pequeño | Variable |
 | Repositorio | GitHub (público) | $0 |
 | CI/CD | GitHub Actions (gratuito) | $0 |
 
@@ -85,7 +85,7 @@ VAAET es un sistema de análisis vehicular avanzado que procesa video de vigilan
 
 1. Los videos de vigilancia SISE están disponibles bajo autorización del ente correspondiente
 2. Google Colab Free proporciona acceso a GPU de forma razonable para el procesamiento
-3. La conexión a AWS RDS es estable durante las sesiones de procesamiento
+3. El endpoint PostgreSQL elegido es accesible y estable durante las sesiones de Colab
 4. Los umbrales de auto-etiquetado son calibrados para el Puente Belgrano específicamente
 5. Congested sintético sólo aumenta train; Accident permanece fuera del MLP y exige confirmación humana
 

@@ -1,24 +1,27 @@
-"""Database connection utilities for the VAAET intelligence layer.
-
-Provides a reusable SQLAlchemy engine factory and helper functions used by
-both the data-preparation and production notebooks. Credentials are obtained
-from environment variables or interactive input — never hard-coded.
-"""
+"""Secure PostgreSQL configuration, connectivity, and portable backup readers."""
 
 from __future__ import annotations
 
-import getpass
 import io
 import os
 import re
 import shutil
+import stat
 import subprocess
+import tempfile
+import time
+import warnings
+from contextlib import contextmanager
+from dataclasses import dataclass, field
+from enum import Enum
 from pathlib import Path
+from typing import Iterator, Mapping, Sequence
 
 import pandas as pd
-from sqlalchemy import create_engine, text
+from sqlalchemy import URL, create_engine, text
 from sqlalchemy.engine import Engine
-from sqlalchemy.exc import ProgrammingError
+from sqlalchemy.exc import OperationalError, ProgrammingError
+from sqlalchemy.pool import QueuePool
 
 from vaaet.exceptions import (
     ArtifactNotFoundError,
@@ -26,159 +29,393 @@ from vaaet.exceptions import (
     DatabaseNotConfiguredError,
 )
 from vaaet.logging import get_logger
-from vaaet.settings import DB_ENV_VARS, DEFAULT_DB_PORT
+from vaaet.settings import DATABASE_SCHEMAS, DEFAULT_DB_PORT
 
 logger = get_logger(__name__)
 
-__all__ = [
-    "get_db_config",
-    "get_engine",
-    "get_optional_db_config",
-    "hydrate_db_environment_from_colab",
-    "load_from_backup",
-    "load_human_ground_truth",
-    "load_telemetry",
-    "parse_sql_dump",
-    "restore_backup_to_sql",
-    "test_connection",
-]
+RAW_TABLE = "vaaet_raw.traffic_data"
+FEATURE_TABLE = "vaaet_ml.telemetry_features"
+PREDICTION_TABLE = "vaaet_ml.traffic_predictions"
+VALIDATION_TABLE = "vaaet_feedback.human_validations"
+EFFECTIVE_LABELS_VIEW = "vaaet_feedback.effective_human_labels"
 
 
-def hydrate_db_environment_from_colab() -> tuple[str, ...]:
-    """Copy available Colab Secrets into missing database environment variables.
+class DatabaseProfile(str, Enum):
+    """Least-privilege database identity used by a workflow."""
 
-    Outside Colab this is a no-op. Environment variables remain a supported
-    fallback, and existing values always win.
-    """
+    COLLECTION = "collection"
+    INFERENCE = "inference"
+    TRAINING = "training"
+    REVIEW = "review"
+
+
+_PROFILE_ENV_PREFIX = {
+    DatabaseProfile.COLLECTION: "VAAET_COLLECTION_DB",
+    DatabaseProfile.INFERENCE: "VAAET_INFERENCE_DB",
+    DatabaseProfile.TRAINING: "VAAET_TRAINING_DB",
+    DatabaseProfile.REVIEW: "VAAET_REVIEW_DB",
+}
+_LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1"}
+_SSL_MODES = {"disable", "allow", "prefer", "require", "verify-ca", "verify-full"}
+
+
+@dataclass(frozen=True, repr=False)
+class DatabaseSettings:
+    """Validated connection settings whose representation never exposes secrets."""
+
+    profile: DatabaseProfile
+    host: str
+    port: int
+    database: str
+    username: str
+    password: str = field(repr=False)
+    sslmode: str = "verify-full"
+    sslrootcert: str | None = None
+    connect_timeout_seconds: int = 10
+    application_name: str | None = None
+    _temporary_root_cert: bool = field(default=False, repr=False, compare=False)
+
+    def __post_init__(self) -> None:
+        if not self.host or not self.database or not self.username or not self.password:
+            raise DatabaseNotConfiguredError(
+                f"Incomplete PostgreSQL configuration for profile={self.profile.value}."
+            )
+        if not 1 <= int(self.port) <= 65535:
+            raise ValueError("PostgreSQL port must be between 1 and 65535.")
+        if self.sslmode not in _SSL_MODES:
+            raise ValueError(f"Unsupported PostgreSQL sslmode: {self.sslmode}")
+        if self.sslmode == "disable" and self.host.lower() not in _LOCAL_HOSTS:
+            raise ValueError("sslmode=disable is allowed only for an explicit localhost endpoint.")
+        if self.sslmode == "verify-full" and not self.sslrootcert:
+            raise DatabaseNotConfiguredError(
+                "sslmode=verify-full requires VAAET_DB_SSLROOTCERT or "
+                "VAAET_DB_SSLROOTCERT_PEM. Use sslmode=require only as an explicit, "
+                "documented fallback when the provider cannot expose a CA certificate."
+            )
+
+    def __repr__(self) -> str:
+        return (
+            "DatabaseSettings("
+            f"profile={self.profile.value!r}, host={self.host!r}, port={self.port!r}, "
+            f"database={self.database!r}, username='<redacted>', password='<redacted>', "
+            f"sslmode={self.sslmode!r})"
+        )
+
+    @property
+    def application(self) -> str:
+        return self.application_name or f"vaaet-{self.profile.value}-4.1.0"
+
+
+@dataclass(frozen=True)
+class DatabaseHealth:
+    """Non-secret connection diagnostics safe to display in notebook output."""
+
+    profile: str
+    host: str
+    port: int
+    database: str
+    server_version: str
+    current_role: str
+    ssl_enabled: bool
+    available_schemas: tuple[str, ...]
+
+
+def _colab_secret(name: str) -> str | None:
     try:
         from google.colab import userdata
     except ImportError:
-        return ()
-
-    loaded: list[str] = []
-    for name in DB_ENV_VARS:
-        if os.environ.get(name):
-            continue
-        try:
-            value = userdata.get(name)
-        except Exception:  # Colab raises when a secret is absent or inaccessible.
-            continue
-        if value:
-            os.environ[name] = str(value)
-            loaded.append(name)
-    return tuple(loaded)
-
-
-# Credential helpers
-
-
-def get_db_config(*, interactive: bool = True) -> dict[str, str]:
-    """Obtain database configuration from env vars or interactive input."""
-    config: dict[str, str] = {
-        "host": os.environ.get("DB_HOST", ""),
-        "port": os.environ.get("DB_PORT", DEFAULT_DB_PORT),
-        "dbname": os.environ.get("DB_NAME", ""),
-        "user": os.environ.get("DB_USER", ""),
-        "password": os.environ.get("DB_PASSWORD", ""),
-    }
-
-    if not config["host"]:
-        if not interactive:
-            raise DatabaseNotConfiguredError(
-                "DB credentials not found in environment variables "
-                "(DB_HOST, DB_NAME, DB_USER, DB_PASSWORD). "
-                "Set them or use interactive=True to prompt for input."
-            )
-        logger.info("PostgreSQL configuration not found in env vars; prompting interactively")
-        config["host"] = input("Host: ").strip()
-        config["port"] = input(f"Port [{DEFAULT_DB_PORT}]: ").strip() or DEFAULT_DB_PORT
-        config["dbname"] = input("Database: ").strip()
-        config["user"] = input("User: ").strip()
-        config["password"] = getpass.getpass("Password: ")
-
-    return config
-
-
-def get_optional_db_config(*, interactive: bool = False) -> dict[str, str] | None:
-    """Return DB config when available, otherwise ``None`` without raising."""
-    try:
-        return get_db_config(interactive=interactive)
-    except DatabaseNotConfiguredError:
-        logger.info("Optional database configuration not found; continuing without DB")
         return None
+    try:
+        value = userdata.get(name)
+    except Exception:
+        return None
+    return str(value).strip() if value else None
 
 
-def _build_connection_string(config: dict[str, str]) -> str:
-    """Build a PostgreSQL connection string from a config dict."""
-    return (
-        f"postgresql://{config['user']}:{config['password']}"
-        f"@{config['host']}:{config['port']}/{config['dbname']}"
+def _setting(name: str) -> str | None:
+    """Read Colab Secrets first and process environment second."""
+    return _colab_secret(name) or (os.environ.get(name) or "").strip() or None
+
+
+def _materialize_root_certificate(pem: str) -> str:
+    fd, path = tempfile.mkstemp(prefix="vaaet-postgres-ca-", suffix=".pem")
+    try:
+        os.write(fd, pem.encode("utf-8"))
+    finally:
+        os.close(fd)
+    os.chmod(path, stat.S_IRUSR | stat.S_IWUSR)
+    return path
+
+
+def load_database_settings(
+    profile: DatabaseProfile | str,
+    *,
+    env_file: str | Path | None = None,
+    allow_legacy: bool = True,
+) -> DatabaseSettings:
+    """Load a workflow profile from Colab Secrets or local environment.
+
+    ``.env`` loading is explicit and unavailable as an implicit notebook side
+    effect. Legacy ``DB_*`` names remain a deprecated VAAET 4.x fallback.
+    """
+    active_profile = DatabaseProfile(profile)
+    if env_file is not None:
+        try:
+            from dotenv import load_dotenv
+        except ImportError as exc:  # pragma: no cover - optional dependency guard
+            raise DatabaseNotConfiguredError(
+                "python-dotenv is required when env_file is supplied."
+            ) from exc
+        load_dotenv(dotenv_path=Path(env_file), override=False)
+
+    prefix = _PROFILE_ENV_PREFIX[active_profile]
+    host = _setting("VAAET_DB_HOST")
+    port = _setting("VAAET_DB_PORT") or DEFAULT_DB_PORT
+    database = _setting("VAAET_DB_NAME")
+    username = _setting(f"{prefix}_USER")
+    password = _setting(f"{prefix}_PASSWORD")
+
+    if allow_legacy and not all((host, database, username, password)):
+        legacy = {
+            "host": _setting("DB_HOST"),
+            "port": _setting("DB_PORT") or DEFAULT_DB_PORT,
+            "database": _setting("DB_NAME"),
+            "username": _setting("DB_USER"),
+            "password": _setting("DB_PASSWORD"),
+        }
+        if all((legacy["host"], legacy["database"], legacy["username"], legacy["password"])):
+            warnings.warn(
+                "DB_* variables are deprecated and will be removed in VAAET 5.0; "
+                "use VAAET_DB_* plus profile-specific credentials.",
+                FutureWarning,
+                stacklevel=2,
+            )
+            host = host or legacy["host"]
+            port = port or legacy["port"]
+            database = database or legacy["database"]
+            username = username or legacy["username"]
+            password = password or legacy["password"]
+
+    missing = [
+        name
+        for name, value in {
+            "VAAET_DB_HOST": host,
+            "VAAET_DB_NAME": database,
+            f"{prefix}_USER": username,
+            f"{prefix}_PASSWORD": password,
+        }.items()
+        if not value
+    ]
+    if missing:
+        raise DatabaseNotConfiguredError(
+            f"PostgreSQL profile={active_profile.value} is not configured; missing: "
+            + ", ".join(missing)
+        )
+
+    sslmode = (_setting("VAAET_DB_SSLMODE") or "verify-full").lower()
+    sslrootcert = _setting("VAAET_DB_SSLROOTCERT")
+    temporary_cert = False
+    pem = _setting("VAAET_DB_SSLROOTCERT_PEM")
+    if pem and not sslrootcert:
+        sslrootcert = _materialize_root_certificate(pem.replace("\\n", "\n"))
+        temporary_cert = True
+    if sslmode == "require":
+        logger.warning(
+            "PostgreSQL TLS encrypts transport but does not verify server identity (sslmode=require)."
+        )
+
+    return DatabaseSettings(
+        profile=active_profile,
+        host=str(host),
+        port=int(port),
+        database=str(database),
+        username=str(username),
+        password=str(password),
+        sslmode=sslmode,
+        sslrootcert=sslrootcert,
+        connect_timeout_seconds=int(_setting("VAAET_DB_CONNECT_TIMEOUT") or "10"),
+        _temporary_root_cert=temporary_cert,
     )
 
 
-# Engine factory
+def get_optional_database_settings(
+    profile: DatabaseProfile | str,
+    *,
+    env_file: str | Path | None = None,
+) -> DatabaseSettings | None:
+    try:
+        return load_database_settings(profile, env_file=env_file)
+    except DatabaseNotConfiguredError:
+        logger.info("Optional PostgreSQL profile=%s is not configured", DatabaseProfile(profile).value)
+        return None
 
 
-def get_engine(config: dict[str, str] | None = None) -> Engine:
-    """Create a disposable SQLAlchemy engine."""
-    if config is None:
-        config = get_db_config()
-    return create_engine(_build_connection_string(config))
+def load_reviewer_id() -> str:
+    """Load the stable pseudonymous reviewer identifier without logging it."""
+    reviewer_id = _setting("VAAET_REVIEWER_ID")
+    if not reviewer_id:
+        raise DatabaseNotConfiguredError(
+            "VAAET_REVIEWER_ID is required in Colab Secrets or the local environment."
+        )
+    return reviewer_id
+
+
+def _settings_url(settings: DatabaseSettings) -> URL:
+    return URL.create(
+        "postgresql+psycopg2",
+        username=settings.username,
+        password=settings.password,
+        host=settings.host,
+        port=settings.port,
+        database=settings.database,
+    )
+
+
+def get_engine(settings: DatabaseSettings | Mapping[str, str] | None = None) -> Engine:
+    """Create a redacted, resilient SQLAlchemy engine.
+
+    Mapping support is retained only for VAAET 4.x callers.
+    """
+    if settings is None:
+        settings = load_database_settings(DatabaseProfile.TRAINING)
+    if not isinstance(settings, DatabaseSettings):
+        warnings.warn("Dictionary DB configs are deprecated; use DatabaseSettings.", DeprecationWarning)
+        host = settings.get("host", "")
+        sslmode = settings.get("sslmode", "disable" if host in _LOCAL_HOSTS else "require")
+        settings = DatabaseSettings(
+            profile=DatabaseProfile.TRAINING,
+            host=host,
+            port=int(settings.get("port", DEFAULT_DB_PORT)),
+            database=settings.get("dbname", settings.get("database", "")),
+            username=settings.get("user", settings.get("username", "")),
+            password=settings.get("password", ""),
+            sslmode=sslmode,
+            sslrootcert=settings.get("sslrootcert"),
+        )
+    connect_args: dict[str, object] = {
+        "connect_timeout": settings.connect_timeout_seconds,
+        "application_name": settings.application,
+        "sslmode": settings.sslmode,
+    }
+    if settings.sslrootcert:
+        connect_args["sslrootcert"] = settings.sslrootcert
+    return create_engine(
+        _settings_url(settings),
+        connect_args=connect_args,
+        poolclass=QueuePool,
+        pool_size=2,
+        max_overflow=0,
+        pool_pre_ping=True,
+        pool_recycle=300,
+        hide_parameters=True,
+    )
+
+
+@contextmanager
+def database_engine(settings: DatabaseSettings) -> Iterator[Engine]:
+    engine = get_engine(settings)
+    try:
+        def probe() -> None:
+            with engine.connect() as connection:
+                connection.execute(text("SELECT 1"))
+
+        execute_with_retry(probe)
+        yield engine
+    finally:
+        engine.dispose()
+        if settings._temporary_root_cert and settings.sslrootcert:
+            Path(settings.sslrootcert).unlink(missing_ok=True)
+
+
+def inspect_database(engine: Engine, profile: DatabaseProfile | str) -> DatabaseHealth:
+    with engine.connect() as connection:
+        row = connection.execute(
+            text(
+                "SELECT current_setting('server_version'), current_user, "
+                "COALESCE((SELECT ssl FROM pg_stat_ssl WHERE pid = pg_backend_pid()), FALSE)"
+            )
+        ).one()
+        available = tuple(
+            schema
+            for schema in DATABASE_SCHEMAS
+            if connection.execute(text("SELECT to_regnamespace(:schema)"), {"schema": schema}).scalar()
+        )
+    url = engine.url
+    return DatabaseHealth(
+        profile=DatabaseProfile(profile).value,
+        host=str(url.host or ""),
+        port=int(url.port or DEFAULT_DB_PORT),
+        database=str(url.database or ""),
+        server_version=str(row[0]),
+        current_role=str(row[1]),
+        ssl_enabled=bool(row[2]),
+        available_schemas=available,
+    )
 
 
 def test_connection(engine: Engine) -> bool:
-    """Return ``True`` if the engine can connect to the database."""
     try:
-        with engine.connect() as conn:
-            conn.execute(text("SELECT 1"))
+        def probe() -> None:
+            with engine.connect() as connection:
+                connection.execute(text("SELECT 1"))
+
+        execute_with_retry(probe)
         return True
-    except Exception as exc:  # pragma: no cover - depends on real DB
-        logger.warning("Connection test failed: %s", exc)
+    except Exception as exc:  # pragma: no cover - depends on external service
+        logger.warning("PostgreSQL connection test failed: %s", type(exc).__name__)
         return False
 
 
-# Data loaders
+def execute_with_retry(operation, *, attempts: int = 3):
+    """Retry a short idempotent database operation on transient connection loss."""
+    for attempt in range(1, attempts + 1):
+        try:
+            return operation()
+        except OperationalError:
+            if attempt == attempts:
+                raise
+            time.sleep(0.5 * (2 ** (attempt - 1)))
+    raise AssertionError("unreachable")
 
 
-TELEMETRY_QUERY: str = """
-    SELECT id, clip_id, record_time, avg_speed,
-           count_car, count_truck, count_bus,
-           count_motorcycle, count_bicycle, total_vehicles,
-           near_zero_motion_count, stationary_confirmed_count,
-           rejected_speed_count, recovered_track_count, speed_sample_count,
-           speed_measurement_quality, optical_flow_tracking_ratio,
-           telemetry_schema_version
-    FROM traffic_data
-    ORDER BY record_time
+TELEMETRY_QUERY = f"""
+SELECT id, pipeline_run_id, clip_id, record_time, avg_speed,
+       count_car, count_truck, count_bus, count_motorcycle, count_bicycle,
+       total_vehicles, near_zero_motion_count, stationary_confirmed_count,
+       rejected_speed_count, recovered_track_count, speed_sample_count,
+       speed_measurement_quality, optical_flow_tracking_ratio,
+       telemetry_schema_version
+FROM {RAW_TABLE}
+ORDER BY clip_id, record_time
 """
 
-LEGACY_TELEMETRY_QUERY: str = """
-    SELECT id, clip_id, record_time, avg_speed,
-           count_car, count_truck, count_bus,
-           count_motorcycle, count_bicycle, total_vehicles
-    FROM traffic_data
-    ORDER BY record_time
+LEGACY_TELEMETRY_QUERY = """
+SELECT id, clip_id, record_time, avg_speed, count_car, count_truck, count_bus,
+       count_motorcycle, count_bicycle, total_vehicles
+FROM public.traffic_data
+ORDER BY clip_id, record_time
+"""
+
+HUMAN_GROUND_TRUTH_QUERY = f"""
+SELECT * FROM {EFFECTIVE_LABELS_VIEW}
+ORDER BY clip_id, record_time
 """
 
 
 def load_telemetry(
-    config: dict[str, str] | None = None,
+    settings: DatabaseSettings | Mapping[str, str] | None = None,
     engine: Engine | None = None,
 ) -> pd.DataFrame:
-    """Load raw telemetry from the ``traffic_data`` table."""
+    """Load raw telemetry from the versioned schema, with a legacy view fallback."""
     owns_engine = engine is None
-    active_engine = engine or get_engine(config)
-
+    active_engine = engine or get_engine(settings)
     try:
         try:
             return pd.read_sql(text(TELEMETRY_QUERY), active_engine)
-        except ProgrammingError as exc:
-            logger.warning(
-                "Modern telemetry columns are unavailable; loading schema v1 with NULL quality fields: %s",
-                exc,
-            )
+        except ProgrammingError:
             legacy = pd.read_sql(text(LEGACY_TELEMETRY_QUERY), active_engine)
             for column in (
+                "pipeline_run_id",
                 "near_zero_motion_count",
                 "stationary_confirmed_count",
                 "rejected_speed_count",
@@ -195,26 +432,13 @@ def load_telemetry(
             active_engine.dispose()
 
 
-HUMAN_GROUND_TRUTH_QUERY: str = """
-    SELECT tr.*,
-           COALESCE(tc.human_override_state, tc.traffic_state) AS traffic_state,
-           tc.is_human_validated,
-           tc.human_override_state,
-           tc.validated_at
-    FROM telemetry_raw AS tr
-    JOIN traffic_classifications AS tc ON tc.telemetry_id = tr.id
-    WHERE tc.is_human_validated = TRUE
-    ORDER BY tr.clip_id, tr.record_time
-"""
-
-
 def load_human_ground_truth(
-    config: dict[str, str] | None = None,
+    settings: DatabaseSettings | Mapping[str, str] | None = None,
     engine: Engine | None = None,
 ) -> pd.DataFrame:
-    """Load only validated feedback using the effective human label."""
+    """Load only effective append-only human validations and their 19 features."""
     owns_engine = engine is None
-    active_engine = engine or get_engine(config)
+    active_engine = engine or get_engine(settings)
     try:
         return pd.read_sql(text(HUMAN_GROUND_TRUTH_QUERY), active_engine)
     finally:
@@ -222,187 +446,148 @@ def load_human_ground_truth(
             active_engine.dispose()
 
 
-# Backup restoration helpers
+# Backup helpers
+def _resolve_pg_restore(pg_restore_path: str | Path | None) -> Path:
+    if pg_restore_path is None:
+        discovered = shutil.which("pg_restore")
+        if not discovered:
+            raise ArtifactNotFoundError("pg_restore not found; install PostgreSQL client 17.")
+        return Path(discovered).resolve()
+    resolved = Path(pg_restore_path).expanduser().resolve()
+    if not resolved.is_file():
+        raise ArtifactNotFoundError(f"Explicit pg_restore binary not found: {resolved}")
+    if not os.access(resolved, os.X_OK):
+        raise ArtifactValidationError(f"Explicit pg_restore path is not executable: {resolved}")
+    return resolved
+
+
+def inspect_backup_catalog(
+    backup_path: str | Path,
+    *,
+    pg_restore_path: str | Path | None = None,
+) -> tuple[str, ...]:
+    backup = Path(backup_path)
+    if not backup.is_file():
+        raise ArtifactNotFoundError(f"Backup file not found: {backup}")
+    binary = _resolve_pg_restore(pg_restore_path)
+    result = subprocess.run(
+        [str(binary), "-l", str(backup)], capture_output=True, text=True, check=False
+    )
+    if result.returncode:
+        raise ArtifactValidationError(
+            f"Cannot inspect PostgreSQL backup with {binary}: {result.stderr.strip()}"
+        )
+    recognized: set[str] = set()
+    for schema, table in re.findall(
+        r"TABLE DATA\s+(\S+)\s+(\S+)", result.stdout, flags=re.IGNORECASE
+    ):
+        normalized = f"{schema.strip(chr(34))}.{table.strip(chr(34))}"
+        if normalized in {
+            RAW_TABLE,
+            FEATURE_TABLE,
+            PREDICTION_TABLE,
+            VALIDATION_TABLE,
+            "public.traffic_data",
+            "public.telemetry_raw",
+            "public.traffic_classifications",
+        }:
+            recognized.add(normalized)
+    return tuple(sorted(recognized))
 
 
 def restore_backup_to_sql(
     backup_path: str | Path,
     output_path: str | Path | None = None,
     pg_restore_path: str | Path | None = None,
+    tables: Sequence[str] | None = None,
 ) -> Path:
-    """Convert a binary ``pg_dump`` backup to a plain SQL text file.
-
-    ``pg_restore_path`` selects an exact client binary when multiple PostgreSQL
-    versions coexist. When omitted, the executable is discovered from ``PATH``.
-    """
-    backup_path = Path(backup_path)
-    if not backup_path.is_file():
-        raise ArtifactNotFoundError(f"Backup file not found: {backup_path}")
-
-    if pg_restore_path is None:
-        discovered_path = shutil.which("pg_restore")
-        if discovered_path is None:
-            raise ArtifactNotFoundError(
-                "pg_restore not found. Install a PostgreSQL client compatible "
-                "with the backup format and add it to PATH."
-            )
-        resolved_pg_restore = Path(discovered_path).resolve()
-    else:
-        resolved_pg_restore = Path(pg_restore_path).expanduser().resolve()
-        if not resolved_pg_restore.is_file():
-            raise ArtifactNotFoundError(
-                f"Explicit pg_restore binary not found: {resolved_pg_restore}"
-            )
-        if not os.access(resolved_pg_restore, os.X_OK):
-            raise ArtifactValidationError(
-                f"Explicit pg_restore path is not executable: {resolved_pg_restore}"
-            )
-
-    pg_restore_command = str(resolved_pg_restore)
-
-    ver_result = subprocess.run(
-        [pg_restore_command, "--version"],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    pg_version = ver_result.stdout.strip() if ver_result.returncode == 0 else "unknown"
-    logger.info("Using %s", pg_version)
-
-    if output_path is None:
-        output_path = backup_path.with_suffix(".sql")
-    output_path = Path(output_path)
-
-    result = subprocess.run(
-        [
-            pg_restore_command,
-            "--no-owner",
-            "--no-acl",
-            "--no-comments",
-            "-f",
-            str(output_path),
-            str(backup_path),
-        ],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-
-    stderr = result.stderr.strip()
-    version_error_patterns = [
-        "unsupported version",
-        "unsupported archive",
-        "unrecognized archive format",
+    backup = Path(backup_path)
+    if not backup.is_file():
+        raise ArtifactNotFoundError(f"Backup file not found: {backup}")
+    binary = _resolve_pg_restore(pg_restore_path)
+    version = subprocess.run(
+        [str(binary), "--version"], capture_output=True, text=True, check=False
+    ).stdout.strip()
+    destination = Path(output_path) if output_path else backup.with_suffix(".sql")
+    command = [
+        str(binary),
+        "--data-only",
+        "--no-owner",
+        "--no-acl",
+        "--no-comments",
     ]
-    if any(pattern in stderr.lower() for pattern in version_error_patterns):
+    for table_name in tables or ():
+        command.extend(["--table", table_name])
+    command.extend(["-f", str(destination), str(backup)])
+    result = subprocess.run(command, capture_output=True, text=True, check=False)
+    stderr = result.stderr.strip()
+    if any(value in stderr.lower() for value in ("unsupported version", "unsupported archive")):
         raise RuntimeError(
-            f"pg_restore version mismatch ({pg_version}, binary={pg_restore_command}).\n"
-            "The backup was created with a newer PostgreSQL version.\n"
-            "Install a newer postgresql-client (e.g. postgresql-client-17).\n"
-            f"stderr: {stderr}"
+            f"pg_restore version mismatch ({version}, binary={binary}).\nstderr: {stderr}"
         )
-
     if result.returncode not in (0, 1):
         raise RuntimeError(f"pg_restore failed (exit {result.returncode}):\n{stderr}")
-
-    if stderr and result.returncode == 1:
-        logger.warning("pg_restore warnings: %s", stderr[:200])
-
-    if not output_path.is_file() or output_path.stat().st_size == 0:
-        raise RuntimeError(
-            f"pg_restore produced an empty or missing file: {output_path}\nstderr: {stderr}"
-        )
-
-    logger.info(
-        "Backup converted to SQL: %s (%.0f KB)",
-        output_path,
-        output_path.stat().st_size / 1024,
-    )
-    return output_path
+    if not destination.is_file() or destination.stat().st_size == 0:
+        raise RuntimeError(f"pg_restore produced an empty or missing file: {destination}")
+    return destination
 
 
-_TRAFFIC_DATA_COLUMNS: list[str] = [
-    "id",
-    "clip_id",
-    "record_time",
-    "avg_speed",
-    "count_car",
-    "count_truck",
-    "count_bus",
-    "count_motorcycle",
-    "count_bicycle",
-    "total_vehicles",
-]
+_COPY_PATTERN = re.compile(
+    r"COPY\s+(?:(?P<schema>[\w\"]+)\.)?(?P<table>[\w\"]+)\s*"
+    r"\((?P<columns>[^)]+)\)\s+FROM\s+stdin;",
+    re.IGNORECASE,
+)
+
+
+def parse_sql_dump_tables(sql_path: str | Path) -> dict[str, pd.DataFrame]:
+    """Read recognized COPY blocks without executing dump SQL."""
+    path = Path(sql_path)
+    if not path.is_file():
+        raise ArtifactNotFoundError(f"SQL file not found: {path}")
+    lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+    frames: dict[str, pd.DataFrame] = {}
+    index = 0
+    while index < len(lines):
+        match = _COPY_PATTERN.match(lines[index].strip())
+        if not match:
+            index += 1
+            continue
+        schema = (match.group("schema") or "public").strip('"')
+        table_name = match.group("table").strip('"')
+        columns = [column.strip().strip('"') for column in match.group("columns").split(",")]
+        rows: list[str] = []
+        index += 1
+        while index < len(lines) and lines[index].strip() != "\\.":
+            if lines[index]:
+                rows.append(lines[index])
+            index += 1
+        if rows:
+            frames[f"{schema}.{table_name}"] = pd.read_csv(
+                io.StringIO("\n".join(rows)),
+                sep="\t",
+                header=None,
+                names=columns,
+                na_values=["\\N"],
+            )
+        index += 1
+    return frames
 
 
 def parse_sql_dump(sql_path: str | Path) -> pd.DataFrame:
-    """Parse a plain-text SQL dump and extract ``traffic_data`` rows."""
-    sql_path = Path(sql_path)
-    if not sql_path.is_file():
-        raise ArtifactNotFoundError(f"SQL file not found: {sql_path}")
-
-    text_content = sql_path.read_text(encoding="utf-8", errors="replace")
-    copy_pattern = re.compile(
-        r"COPY\s+(?:public\.)?traffic_data\s*\(([^)]+)\)\s+FROM\s+stdin;",
-        re.IGNORECASE,
-    )
-
-    rows: list[str] = []
-    columns: list[str] | None = None
-    lines = text_content.splitlines()
-    i = 0
-    while i < len(lines):
-        line = lines[i]
-        match = copy_pattern.match(line.strip())
-        if match:
-            columns = [col.strip() for col in match.group(1).split(",")]
-            i += 1
-            while i < len(lines) and lines[i].strip() != "\\.":
-                row = lines[i].strip()
-                if row:
-                    rows.append(row)
-                i += 1
-        i += 1
-
-    if not rows:
-        raise ValueError(
-            f"No COPY block for traffic_data found in {sql_path}. "
-            "Ensure the backup contains the traffic_data table."
-        )
-
-    assert columns is not None
-    tsv = "\n".join(rows)
-    df = pd.read_csv(
-        io.StringIO(tsv),
-        sep="\t",
-        header=None,
-        names=columns,
-        na_values=["\\N"],
-    )
-
-    int_cols = [
-        "id",
-        "count_car",
-        "count_truck",
-        "count_bus",
-        "count_motorcycle",
-        "count_bicycle",
-        "total_vehicles",
-    ]
-    for col in int_cols:
-        if col in df.columns:
-            df[col] = pd.to_numeric(df[col], errors="coerce").astype("Int64")
-
-    if "avg_speed" in df.columns:
-        df["avg_speed"] = pd.to_numeric(df["avg_speed"], errors="coerce")
-
-    if "record_time" in df.columns:
-        df["record_time"] = pd.to_datetime(df["record_time"], errors="coerce")
-
-    available = [c for c in _TRAFFIC_DATA_COLUMNS if c in df.columns]
-    df = df[available]
-    logger.info("Parsed %s records from SQL dump", len(df))
-    return df
+    frames = parse_sql_dump_tables(sql_path)
+    raw = frames.get(RAW_TABLE)
+    if raw is None:
+        raw = frames.get("public.traffic_data")
+    if raw is None:
+        raise ValueError("No COPY block for a recognized traffic_data table was found.")
+    for column in raw.columns:
+        if column == "record_time":
+            raw[column] = pd.to_datetime(raw[column], errors="coerce", utc=False)
+        elif column not in {"clip_id", "telemetry_schema_version", "pipeline_run_id"}:
+            converted = pd.to_numeric(raw[column], errors="coerce")
+            if raw[column].isna().equals(converted.isna()):
+                raw[column] = converted
+    return raw
 
 
 def load_from_backup(
@@ -410,24 +595,35 @@ def load_from_backup(
     cache_csv: str | Path | None = None,
     pg_restore_path: str | Path | None = None,
 ) -> pd.DataFrame:
-    """End-to-end: restore a binary backup → parse → return DataFrame."""
-    backup_path = Path(backup_path)
-    sql_path = restore_backup_to_sql(
-        backup_path,
-        pg_restore_path=pg_restore_path,
-    )
-
+    sql_path = restore_backup_to_sql(backup_path, pg_restore_path=pg_restore_path)
     try:
-        df = parse_sql_dump(sql_path)
+        frame = parse_sql_dump(sql_path)
     finally:
-        if sql_path.is_file():
-            sql_path.unlink()
-            logger.info("Temporary SQL file removed: %s", sql_path)
-
+        sql_path.unlink(missing_ok=True)
     if cache_csv is not None:
-        cache_csv = Path(cache_csv)
-        cache_csv.parent.mkdir(parents=True, exist_ok=True)
-        df.to_csv(cache_csv, index=False)
-        logger.info("CSV cache saved: %s", cache_csv)
+        destination = Path(cache_csv)
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        frame.to_csv(destination, index=False)
+    return frame
 
-    return df
+
+__all__ = [
+    "DatabaseHealth",
+    "DatabaseProfile",
+    "DatabaseSettings",
+    "database_engine",
+    "execute_with_retry",
+    "get_engine",
+    "get_optional_database_settings",
+    "inspect_backup_catalog",
+    "inspect_database",
+    "load_database_settings",
+    "load_from_backup",
+    "load_human_ground_truth",
+    "load_reviewer_id",
+    "load_telemetry",
+    "parse_sql_dump",
+    "parse_sql_dump_tables",
+    "restore_backup_to_sql",
+    "test_connection",
+]

@@ -6,139 +6,194 @@ and are marked with ``@pytest.mark.db`` (skipped by default).
 
 from __future__ import annotations
 
-import sys
 import textwrap
-import types
 from pathlib import Path
 
 import pandas as pd
 import pytest
 
-from vaaet.data.database import HUMAN_GROUND_TRUTH_QUERY, _build_connection_string
+from vaaet.data.database import (
+    HUMAN_GROUND_TRUTH_QUERY,
+    DatabaseProfile,
+    DatabaseSettings,
+    _settings_url,
+)
 
 
 def test_human_ground_truth_uses_effective_validated_label() -> None:
     normalized = " ".join(HUMAN_GROUND_TRUTH_QUERY.split())
-    assert "COALESCE(tc.human_override_state, tc.traffic_state)" in normalized
-    assert "tc.is_human_validated = TRUE" in normalized
+    assert "vaaet_feedback.effective_human_labels" in normalized
 
 
-def test_hydrate_db_environment_from_colab(monkeypatch: pytest.MonkeyPatch) -> None:
-    from vaaet.data.database import hydrate_db_environment_from_colab
-
-    class Secrets:
-        @staticmethod
-        def get(name: str) -> str:
-            return f"secret-{name.lower()}"
-
-    google = types.ModuleType("google")
-    colab = types.ModuleType("google.colab")
-    colab.userdata = Secrets()
-    google.colab = colab
-    monkeypatch.setitem(sys.modules, "google", google)
-    monkeypatch.setitem(sys.modules, "google.colab", colab)
-    for name in ("DB_HOST", "DB_PORT", "DB_NAME", "DB_USER", "DB_PASSWORD"):
-        monkeypatch.delenv(name, raising=False)
-
-    loaded = hydrate_db_environment_from_colab()
-
-    assert loaded == ("DB_HOST", "DB_PORT", "DB_NAME", "DB_USER", "DB_PASSWORD")
-
-
-class TestBuildConnectionString:
-    """Validate the connection string builder (pure function)."""
+class TestBuildConnectionUrl:
+    """Validate URL.create encoding and secret redaction."""
 
     def test_standard_config(self) -> None:
-        config = {
-            "user": "admin",
-            "password": "secret",
-            "host": "db.example.com",
-            "port": "5432",
-            "dbname": "traffic",
-        }
-        result = _build_connection_string(config)
-        assert result == "postgresql://admin:secret@db.example.com:5432/traffic"
+        settings = DatabaseSettings(
+            DatabaseProfile.TRAINING, "db.example.com", 5432, "traffic", "admin", "secret", "require"
+        )
+        result = _settings_url(settings)
+        assert result.drivername == "postgresql+psycopg2"
+        assert result.host == "db.example.com"
 
     def test_special_chars_in_password(self) -> None:
-        config = {
-            "user": "admin",
-            "password": "p@ss:w0rd",
-            "host": "localhost",
-            "port": "5432",
-            "dbname": "test",
-        }
-        result = _build_connection_string(config)
-        assert "p@ss:w0rd" in result
+        settings = DatabaseSettings(
+            DatabaseProfile.TRAINING, "localhost", 5432, "test", "admin", "p@ss:w0rd", "disable"
+        )
+        rendered = _settings_url(settings).render_as_string(hide_password=False)
+        assert "p%40ss%3Aw0rd" in rendered
+        assert "p@ss:w0rd" not in repr(settings)
 
     def test_custom_port(self) -> None:
-        config = {
-            "user": "u",
-            "password": "p",
-            "host": "h",
-            "port": "15432",
-            "dbname": "d",
+        settings = DatabaseSettings(
+            DatabaseProfile.TRAINING, "h", 15432, "d", "u", "p", "require"
+        )
+        assert _settings_url(settings).port == 15432
+
+    def test_rejects_insecure_remote_connection(self) -> None:
+        with pytest.raises(ValueError, match="localhost"):
+            DatabaseSettings(
+                DatabaseProfile.TRAINING, "db.example.com", 5432, "d", "u", "p", "disable"
+            )
+
+
+class TestDatabaseSettingsLoader:
+    """Test profile-specific environment resolution."""
+
+    def test_reads_colab_secrets_without_copying_to_environment(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        import os
+        import sys
+        import types
+
+        from vaaet.data.database import load_database_settings
+
+        values = {
+            "VAAET_DB_HOST": "db.example.com",
+            "VAAET_DB_NAME": "vaaet",
+            "VAAET_DB_SSLMODE": "require",
+            "VAAET_TRAINING_DB_USER": "trainer",
+            "VAAET_TRAINING_DB_PASSWORD": "secret",
         }
-        result = _build_connection_string(config)
-        assert ":15432/" in result
 
+        class Secrets:
+            @staticmethod
+            def get(name: str) -> str:
+                if name not in values:
+                    raise KeyError(name)
+                return values[name]
 
-class TestGetDbConfig:
-    """Test get_db_config() when environment variables are set."""
+        google = types.ModuleType("google")
+        colab = types.ModuleType("google.colab")
+        colab.userdata = Secrets()
+        google.colab = colab
+        monkeypatch.setitem(sys.modules, "google", google)
+        monkeypatch.setitem(sys.modules, "google.colab", colab)
+        for name in values:
+            monkeypatch.delenv(name, raising=False)
+
+        settings = load_database_settings(DatabaseProfile.TRAINING, allow_legacy=False)
+        assert settings.host == "db.example.com"
+        assert settings.username == "trainer"
+        assert "VAAET_TRAINING_DB_PASSWORD" not in os.environ
 
     def test_reads_from_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        from vaaet.data.database import get_db_config
+        from vaaet.data.database import load_database_settings
 
-        monkeypatch.setenv("DB_HOST", "test-host")
-        monkeypatch.setenv("DB_PORT", "5433")
-        monkeypatch.setenv("DB_NAME", "test-db")
-        monkeypatch.setenv("DB_USER", "test-user")
-        monkeypatch.setenv("DB_PASSWORD", "test-pass")
+        monkeypatch.setenv("VAAET_DB_HOST", "test-host")
+        monkeypatch.setenv("VAAET_DB_PORT", "5433")
+        monkeypatch.setenv("VAAET_DB_NAME", "test-db")
+        monkeypatch.setenv("VAAET_TRAINING_DB_USER", "test-user")
+        monkeypatch.setenv("VAAET_TRAINING_DB_PASSWORD", "test-pass")
+        monkeypatch.setenv("VAAET_DB_SSLMODE", "require")
 
-        config = get_db_config()
-        assert config["host"] == "test-host"
-        assert config["port"] == "5433"
-        assert config["dbname"] == "test-db"
-        assert config["user"] == "test-user"
-        assert config["password"] == "test-pass"
+        config = load_database_settings(DatabaseProfile.TRAINING, allow_legacy=False)
+        assert config.host == "test-host"
+        assert config.port == 5433
+        assert config.database == "test-db"
 
     def test_default_port(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        from vaaet.data.database import get_db_config
+        from vaaet.data.database import load_database_settings
         from vaaet.settings import DEFAULT_DB_PORT
 
-        monkeypatch.setenv("DB_HOST", "host")
-        monkeypatch.setenv("DB_NAME", "db")
-        monkeypatch.setenv("DB_USER", "user")
-        monkeypatch.setenv("DB_PASSWORD", "pass")
-        monkeypatch.delenv("DB_PORT", raising=False)
+        monkeypatch.setenv("VAAET_DB_HOST", "host")
+        monkeypatch.setenv("VAAET_DB_NAME", "db")
+        monkeypatch.setenv("VAAET_TRAINING_DB_USER", "user")
+        monkeypatch.setenv("VAAET_TRAINING_DB_PASSWORD", "pass")
+        monkeypatch.setenv("VAAET_DB_SSLMODE", "require")
+        monkeypatch.delenv("VAAET_DB_PORT", raising=False)
 
-        config = get_db_config()
-        assert config["port"] == DEFAULT_DB_PORT
+        config = load_database_settings(DatabaseProfile.TRAINING, allow_legacy=False)
+        assert config.port == int(DEFAULT_DB_PORT)
+
+    def test_legacy_environment_is_visible_and_deprecated(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from vaaet.data.database import load_database_settings
+
+        for name in (
+            "VAAET_DB_HOST",
+            "VAAET_DB_NAME",
+            "VAAET_TRAINING_DB_USER",
+            "VAAET_TRAINING_DB_PASSWORD",
+        ):
+            monkeypatch.delenv(name, raising=False)
+        monkeypatch.setenv("DB_HOST", "localhost")
+        monkeypatch.setenv("DB_NAME", "vaaet")
+        monkeypatch.setenv("DB_USER", "legacy")
+        monkeypatch.setenv("DB_PASSWORD", "legacy-secret")
+        monkeypatch.setenv("VAAET_DB_SSLMODE", "disable")
+        with pytest.warns(FutureWarning, match="removed in VAAET 5.0"):
+            settings = load_database_settings(DatabaseProfile.TRAINING)
+        assert settings.username == "legacy"
 
     def test_non_interactive_raises_without_env(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """interactive=False must raise RuntimeError when env vars are missing."""
-        from vaaet.data.database import get_db_config
+        from vaaet.data.database import load_database_settings
 
-        for var in ("DB_HOST", "DB_PORT", "DB_NAME", "DB_USER", "DB_PASSWORD"):
+        for var in (
+            "VAAET_DB_HOST", "VAAET_DB_PORT", "VAAET_DB_NAME",
+            "VAAET_TRAINING_DB_USER", "VAAET_TRAINING_DB_PASSWORD",
+            "DB_HOST", "DB_PORT", "DB_NAME", "DB_USER", "DB_PASSWORD",
+        ):
             monkeypatch.delenv(var, raising=False)
 
-        with pytest.raises(RuntimeError, match="DB credentials not found"):
-            get_db_config(interactive=False)
+        with pytest.raises(RuntimeError, match="not configured"):
+            load_database_settings(DatabaseProfile.TRAINING, allow_legacy=False)
 
-    def test_non_interactive_succeeds_with_env(
-        self, monkeypatch: pytest.MonkeyPatch
+    def test_env_file_is_loaded_only_when_explicit(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """interactive=False must succeed when env vars are set."""
-        from vaaet.data.database import get_db_config
+        pytest.importorskip("dotenv")
+        from vaaet.data.database import load_database_settings
 
-        monkeypatch.setenv("DB_HOST", "h")
-        monkeypatch.setenv("DB_NAME", "d")
-        monkeypatch.setenv("DB_USER", "u")
-        monkeypatch.setenv("DB_PASSWORD", "p")
-
-        config = get_db_config(interactive=False)
-        assert config["host"] == "h"
+        names = (
+            "VAAET_DB_HOST",
+            "VAAET_DB_NAME",
+            "VAAET_TRAINING_DB_USER",
+            "VAAET_TRAINING_DB_PASSWORD",
+            "VAAET_DB_SSLMODE",
+        )
+        for name in names:
+            monkeypatch.delenv(name, raising=False)
+        env_file = tmp_path / ".env"
+        env_file.write_text(
+            "VAAET_DB_HOST=localhost\n"
+            "VAAET_DB_NAME=vaaet\n"
+            "VAAET_TRAINING_DB_USER=trainer\n"
+            "VAAET_TRAINING_DB_PASSWORD=secret\n"
+            "VAAET_DB_SSLMODE=disable\n",
+            encoding="utf-8",
+        )
+        with pytest.raises(RuntimeError, match="not configured"):
+            load_database_settings(DatabaseProfile.TRAINING, allow_legacy=False)
+        settings = load_database_settings(
+            DatabaseProfile.TRAINING, env_file=env_file, allow_legacy=False
+        )
+        assert settings.host == "localhost"
 
 
 # Backup restoration tests
@@ -265,6 +320,59 @@ class TestRestoreBackupToSql:
                 restore_backup_to_sql(backup)
 
 
+def test_backup_catalog_recognizes_modern_and_legacy_tables(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from unittest.mock import MagicMock
+
+    from vaaet.data.database import inspect_backup_catalog
+
+    backup = tmp_path / "full.backup"
+    backup.write_bytes(b"PGDMP")
+    binary = tmp_path / "pg_restore"
+    binary.write_text("binary", encoding="utf-8")
+    monkeypatch.setattr("vaaet.data.database.os.access", lambda *_: True)
+    catalog = """
+    1; 0 1 TABLE DATA vaaet_raw traffic_data owner
+    2; 0 2 TABLE DATA vaaet_ml telemetry_features owner
+    3; 0 3 TABLE DATA vaaet_ml traffic_predictions owner
+    4; 0 4 TABLE DATA vaaet_feedback human_validations owner
+    5; 0 5 TABLE DATA public unrelated owner
+    """
+    monkeypatch.setattr(
+        "vaaet.data.database.subprocess.run",
+        lambda *_args, **_kwargs: MagicMock(returncode=0, stdout=catalog, stderr=""),
+    )
+    assert inspect_backup_catalog(backup, pg_restore_path=binary) == (
+        "vaaet_feedback.human_validations",
+        "vaaet_ml.telemetry_features",
+        "vaaet_ml.traffic_predictions",
+        "vaaet_raw.traffic_data",
+    )
+
+
+def test_backup_catalog_rejects_corrupt_archive(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from unittest.mock import MagicMock
+
+    from vaaet.data.database import inspect_backup_catalog
+
+    backup = tmp_path / "corrupt.backup"
+    backup.write_bytes(b"bad")
+    binary = tmp_path / "pg_restore"
+    binary.write_text("binary", encoding="utf-8")
+    monkeypatch.setattr("vaaet.data.database.os.access", lambda *_: True)
+    monkeypatch.setattr(
+        "vaaet.data.database.subprocess.run",
+        lambda *_args, **_kwargs: MagicMock(
+            returncode=1, stdout="", stderr="input file does not appear to be a valid archive"
+        ),
+    )
+    with pytest.raises(ValueError, match="Cannot inspect PostgreSQL backup"):
+        inspect_backup_catalog(backup, pg_restore_path=binary)
+
+
 def test_load_from_backup_propagates_explicit_pg_restore_path(tmp_path: Path) -> None:
     from unittest.mock import patch
 
@@ -383,3 +491,20 @@ class TestParseSqlDump:
         sql_file.write_text(content, encoding="utf-8")
         df = parse_sql_dump(sql_file)
         assert pd.isna(df["avg_speed"].iloc[0])
+
+    def test_preserves_telemetry_v2_columns(self, tmp_path: Path) -> None:
+        from vaaet.data.database import parse_sql_dump
+
+        sql_file = tmp_path / "v2.sql"
+        sql_file.write_text(
+            "COPY vaaet_raw.traffic_data (id, clip_id, record_time, avg_speed, "
+            "near_zero_motion_count, speed_measurement_quality, "
+            "optical_flow_tracking_ratio, telemetry_schema_version) FROM stdin;\n"
+            "1\tclip\t2026-08-04 12:00:00+00\t10.5\t3\t0.8\t0.9\ttraffic-telemetry-v2\n"
+            "\\.\n",
+            encoding="utf-8",
+        )
+        frame = parse_sql_dump(sql_file)
+        assert frame.iloc[0]["near_zero_motion_count"] == 3
+        assert frame.iloc[0]["speed_measurement_quality"] == pytest.approx(0.8)
+        assert frame.iloc[0]["telemetry_schema_version"] == "traffic-telemetry-v2"

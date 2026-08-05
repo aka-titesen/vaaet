@@ -12,7 +12,7 @@ El notebook que produjo la telemetría inicial estaba tratado como material arch
 - La adquisición es un tercer workflow de primer nivel: `notebooks/data-collection/collect_traffic_telemetry.ipynb`.
 - Su ejecución es opcional y bajo demanda, no una fase obsoleta.
 - El procesamiento visual compartido vive en `vaaet.vision.analysis.analyze_video` y sirve tanto a adquisición como a inferencia.
-- Adquisición genera video anotado y `data/raw/traffic_data_raw.csv`; PostgreSQL es opcional, explícito e idempotente sobre `(clip_id, record_time)`.
+- Adquisición genera video anotado y `data/raw/traffic_data_raw.csv`; PostgreSQL es opcional, explícito e idempotente en `vaaet_raw.traffic_data` sobre `(clip_id, record_time)`. La conexión vigente se rige por [ADR-0015](0015-postgresql-namespaces-security-and-hitl.md).
 - `record_time` proviene del nombre estándar del puente. Para nombres libres se usa una única hora de procesamiento y se declara su menor trazabilidad.
 - Los notebooks tienen una sola celda de preparación y consumen extras definidos únicamente en `pyproject.toml`. Colab instala un wheel local para evitar la colisión `/content/vaaet` ↔ paquete `vaaet`; desarrollo local usa modo editable.
 

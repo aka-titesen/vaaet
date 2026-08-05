@@ -8,7 +8,7 @@ Complementa BIAS_AND_LIMITATIONS.md y FEASIBILITY.md. -->
 | Campo | Detalles |
 |---|---|
 | **Nombre del Proyecto** | VAAET — Video Advanced Analysis of Traffic |
-| **Versión** | 4.0.0 |
+| **Versión** | 4.1.0 |
 | **Responsable Técnico** | Facundo Nicolás González |
 | **Última Revisión** | 2026-07-23 |
 
@@ -20,7 +20,7 @@ Complementa BIAS_AND_LIMITATIONS.md y FEASIBILITY.md. -->
 |---|---|---|---|---|---|---|---|
 | R-001 | **Desconexión de Google Colab** durante procesamiento de video largo | Infraestructura | Alta | Serio | 🔴 Crítico | Frame skipping y memory cleanup integrados; procesar clips < 3h | Guardar progreso en Drive; re-procesar desde el último minuto completo |
 | R-002 | **GPU no disponible** en Colab Free en horarios pico | Infraestructura | Media | Moderado | 🟡 Alto | Selección adaptativa de modelo YOLO (nano para clips largos) | Fallback a CPU (~10x más lento); programar ejecuciones en horarios off-peak |
-| R-003 | **Fallo de conexión a AWS RDS** | Infraestructura | Media | Bajo | 🟢 Medio | Degradación silenciosa en `src/vaaet/data/persistence.py` | Continúa procesamiento sin BD; exportar datos localmente |
+| R-003 | **Fallo de conexión PostgreSQL** | Infraestructura | Media | Bajo | 🟢 Medio | Error redactado y outputs locales preservados | Reintentar operaciones idempotentes; exportar paquete local |
 | R-004 | **Cambio de zoom/ángulo de cámara SISE** durante un clip | Dominio | Alta | Moderado | 🟡 Alto | Corrección de perspectiva adaptativa por zona Y; compensación de flujo óptico | Recalibrar `pixels_per_meter` si el error supera MAE > 10 km/h |
 | R-005 | **Accidente/Congested con soporte real insuficiente** | ML/Datos | Alta | Serio | 🔴 Crítico | Accident fuera del MLP; sintéticos sólo en train/estrés | Holdout humano, shadow mode y gates mínimos de episodios/exposición |
 | R-006 | **Drift del modelo** por cambios en patrones de tráfico | ML/Datos | Baja | Moderado | 🟢 Medio | Monitoreo de distribución de features en producción (futuro) | Re-entrenar con datos recientes cuando F1-macro caiga < 0.80 |

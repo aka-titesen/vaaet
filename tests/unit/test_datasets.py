@@ -5,6 +5,7 @@ from __future__ import annotations
 import pandas as pd
 
 from vaaet.data.datasets import (
+    RAW_TELEMETRY_V2_COLUMNS,
     build_group_ids,
     group_aware_train_test_split,
     merge_raw_telemetry_csv,
@@ -41,6 +42,41 @@ def test_merge_raw_telemetry_csv_is_cumulative_and_deduplicated(tmp_path) -> Non
     assert len(merged) == 2
     assert merged.loc[0, "avg_speed"] == 15.0
     assert destination.is_file()
+
+
+def test_merge_empty_raw_telemetry_does_not_create_csv(tmp_path) -> None:
+    destination = tmp_path / "traffic_data_raw.csv"
+
+    merged = merge_raw_telemetry_csv(pd.DataFrame(), destination)
+
+    assert merged.empty
+    assert tuple(merged.columns) == RAW_TELEMETRY_V2_COLUMNS
+    assert not destination.exists()
+
+
+def test_merge_empty_raw_telemetry_does_not_modify_existing_csv(tmp_path) -> None:
+    destination = tmp_path / "traffic_data_raw.csv"
+    merge_raw_telemetry_csv(
+        pd.DataFrame([_raw_row("2025-05-01 08:01:00")]),
+        destination,
+    )
+    original = destination.read_bytes()
+
+    merged = merge_raw_telemetry_csv(pd.DataFrame(), destination)
+
+    assert len(merged) == 1
+    assert destination.read_bytes() == original
+
+
+def test_merge_non_empty_invalid_raw_telemetry_is_rejected(tmp_path) -> None:
+    destination = tmp_path / "traffic_data_raw.csv"
+
+    try:
+        merge_raw_telemetry_csv(pd.DataFrame([{"clip_id": "incomplete"}]), destination)
+    except ValueError as error:
+        assert "missing required columns" in str(error)
+    else:
+        raise AssertionError("Invalid non-empty telemetry must be rejected")
 
 
 class TestBuildGroupIds:

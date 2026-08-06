@@ -34,6 +34,12 @@ Todos los cambios relevantes del proyecto VAAET se documentan en este archivo, s
   reserva para evaluar el detector y las predicciones sin revisar quedan excluidas.
 - Los notebooks ya no contienen DDL ni lógica propia de credenciales.
 
+### Corregido
+
+- Los clips sin una ventana completa de 60 segundos conservan el video anotado
+  y finalizan sin crear telemetría parcial, CSV vacío, escrituras PostgreSQL ni
+  sesiones HITL inválidas.
+
 ### Deprecado
 
 - Variables `DB_*` y vistas `public.*`, disponibles sólo durante VAAET 4.x.

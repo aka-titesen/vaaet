@@ -110,6 +110,22 @@ def test_collection_uses_shared_analysis_and_data_contracts() -> None:
     assert "merge_raw_telemetry_csv" in code
     assert "persist_raw_telemetry" in code
     assert "class VAAET" not in code
+    assert "if result.telemetry.empty:" in code
+    assert "if not result.telemetry.empty and RAW_CSV.is_file():" in code
+    assert "PostgreSQL persistence skipped" in code
+
+
+def test_notebooks_handle_clips_without_complete_minutes() -> None:
+    collection = _code(NOTEBOOKS["collection"])
+    inference = _code(NOTEBOOKS["inference"])
+
+    assert "minimum required: 60.0s" in collection
+    assert "minimum required: 60.0s" in inference
+    assert "df_classified = None" in inference
+    assert "INFERENCE_PIPELINE_RUN_ID = None" in inference
+    assert "Feature engineering, classification, persistence, and HITL review were skipped" in inference
+    assert "INFERENCE_PIPELINE_RUN_ID is not None" in inference
+    assert "HITL review skipped" in inference
 
 
 def test_training_uses_shared_feature_contracts() -> None:

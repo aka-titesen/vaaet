@@ -9,6 +9,7 @@ from pathlib import Path
 
 import pandas as pd
 
+from vaaet.data.datasets import RAW_TELEMETRY_V2_COLUMNS
 from vaaet.exceptions import VideoOpenError
 from vaaet.logging import get_logger
 from vaaet.settings import STATE_LABELS
@@ -66,6 +67,19 @@ class VideoAnalysisResult:
     video_path: Path
     telemetry: pd.DataFrame
     classifications: pd.DataFrame | None = None
+    complete_minutes: int = 0
+    processed_duration_seconds: float = 0.0
+    discarded_partial_seconds: float = 0.0
+
+
+_CLASSIFICATION_COLUMNS: tuple[str, ...] = (
+    "clip_id",
+    "record_time",
+    "traffic_state",
+    "state_label",
+    "confidence",
+    "evidence",
+)
 
 
 _TYPE_COLORS: dict[str, tuple[int, int, int]] = {
@@ -355,7 +369,7 @@ def analyze_video(
                     classification_records.append(_prediction_record(latest_prediction, record))
                 accumulator.rollover_minute()
 
-        if frame_index % frames_per_minute and accumulator.has_pending_data():
+        if frame_index % frames_per_minute:
             logger.info(
                 "Discarding final partial minute from classification and telemetry persistence"
             )
@@ -363,9 +377,20 @@ def analyze_video(
         capture.release()
         writer.release()
 
-    telemetry = pd.DataFrame(records)
+    processed_duration_seconds = frame_index / fps
+    complete_minutes = len(records)
+    discarded_partial_seconds = max(
+        processed_duration_seconds - complete_minutes * 60.0,
+        0.0,
+    )
+    telemetry = pd.DataFrame.from_records(records, columns=RAW_TELEMETRY_V2_COLUMNS)
     classifications = (
-        pd.DataFrame(classification_records) if prediction_provider is not None else None
+        pd.DataFrame.from_records(
+            classification_records,
+            columns=_CLASSIFICATION_COLUMNS,
+        )
+        if prediction_provider is not None
+        else None
     )
     logger.info(
         "Analysis complete: frames=%s telemetry_rows=%s output=%s",
@@ -377,4 +402,7 @@ def analyze_video(
         video_path=destination,
         telemetry=telemetry,
         classifications=classifications,
+        complete_minutes=complete_minutes,
+        processed_duration_seconds=processed_duration_seconds,
+        discarded_partial_seconds=discarded_partial_seconds,
     )

@@ -15,6 +15,7 @@ __all__ = [
     "GroupedTrainValidationTestSplit",
     "MODERN_TELEMETRY_COLUMNS",
     "RAW_TELEMETRY_COLUMNS",
+    "RAW_TELEMETRY_V2_COLUMNS",
     "build_group_ids",
     "group_aware_train_test_split",
     "grouped_temporal_train_validation_test_split",
@@ -277,6 +278,11 @@ MODERN_TELEMETRY_COLUMNS: tuple[str, ...] = (
     "telemetry_schema_version",
 )
 
+RAW_TELEMETRY_V2_COLUMNS: tuple[str, ...] = (
+    *RAW_TELEMETRY_COLUMNS,
+    *MODERN_TELEMETRY_COLUMNS,
+)
+
 
 def merge_raw_telemetry_csv(
     telemetry: pd.DataFrame,
@@ -288,6 +294,22 @@ def merge_raw_telemetry_csv(
     key. Extended quality columns are preserved for future feature engineering.
     """
     destination = Path(destination)
+    if telemetry.empty:
+        if not destination.is_file():
+            return pd.DataFrame(columns=RAW_TELEMETRY_V2_COLUMNS)
+
+        existing = pd.read_csv(destination)
+        missing_existing = set(RAW_TELEMETRY_COLUMNS) - set(existing.columns)
+        if missing_existing:
+            raise ValueError(
+                "Existing raw telemetry is missing required columns: "
+                f"{sorted(missing_existing)}"
+            )
+        for column in MODERN_TELEMETRY_COLUMNS:
+            if column not in existing:
+                existing[column] = pd.NA
+        return existing
+
     missing = set(RAW_TELEMETRY_COLUMNS) - set(telemetry.columns)
     if missing:
         raise ValueError(f"Raw telemetry is missing required columns: {sorted(missing)}")

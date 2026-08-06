@@ -1,4 +1,4 @@
-# Operación PostgreSQL — VAAET ML 4.1.0
+# Operación PostgreSQL — VAAET ML 4.2.0
 
 Esta guía aplica a PostgreSQL 14+ en AWS RDS, Neon, Supabase o un servidor
 propio. El endpoint debe ser accesible desde Colab; VPN y túneles quedan fuera de
@@ -46,7 +46,7 @@ localhost.
 
 ```bash
 pg_dump --format=custom --no-owner --no-acl \
-  --schema=vaaet_raw --schema=vaaet_ml --schema=vaaet_feedback \
+  --schema=vaaet_raw --schema=vaaet_ml --schema=vaaet_feedback --schema=vaaet_ops \
   --file=vaaet-db-v2.backup "$DATABASE_URL"
 
 pg_restore -l vaaet-db-v2.backup
@@ -74,6 +74,30 @@ El script verifica checksums, filas, columnas y rango temporal. El paquete puede
 contener además `--raw raw-telemetry.csv`; permanece fuera de Git.
 
 ## Diagnóstico
+
+Ejecutá la auditoría read-only con el perfil training:
+
+```bash
+python scripts/audit-postgres-database.py --output postgres-audit.json
+```
+
+El informe contiene revisión Alembic, TLS, owners, comentarios, constraints no
+validadas, índices, tamaños, autovacuum, controles de integridad y `EXPLAIN`
+sin `ANALYZE`. Nunca incluye DSN, contraseñas, certificados ni mensajes de error.
+
+## Continuidad y mantenimiento
+
+- habilitar cifrado en reposo y backups administrados en el proveedor;
+- conservar al menos 30 días y un RPO máximo de 24 horas;
+- probar trimestralmente la restauración en una base aislada y registrar el RTO;
+- revisar parches de PostgreSQL y del proveedor periódicamente;
+- auditar conexiones y DDL con logs del proveedor o `pgaudit` cuando esté disponible;
+- ejecutar el auditor después de cada migración y antes de promover un modelo.
+
+El backup lógico diario puede sustituirse por PITR administrado si cumple o
+mejora el RPO. Los backups nunca se restauran directamente sobre producción.
+
+## Diagnóstico rápido
 
 - timeout/red: confirmar allowlist/firewall y endpoint público del proveedor;
 - TLS: actualizar CA y hostname, sin degradar silenciosamente a `disable`;

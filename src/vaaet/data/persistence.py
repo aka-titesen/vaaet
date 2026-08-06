@@ -13,6 +13,7 @@ from sqlalchemy.exc import ProgrammingError
 
 from vaaet.artifacts import FEATURE_SCHEMA_VERSION
 from vaaet.data.database import DatabaseSettings, get_engine
+from vaaet.data.pipeline_runs import PipelineRunMetadata, PipelineWorkflow, pipeline_run
 from vaaet.logging import get_logger
 from vaaet.settings import MODEL_VERSION, STATE_LABELS, TELEMETRY_SCHEMA_VERSION
 
@@ -295,6 +296,30 @@ def persist_raw_telemetry(
     run_id = str(pipeline_run_id or uuid4())
     owns_engine = engine is None
     active_engine = engine or get_engine(settings or config)
+    if pipeline_run_id is None:
+        try:
+            clip_ids = df["clip_id"].dropna().astype(str).unique()
+            metadata = PipelineRunMetadata(
+                workflow=PipelineWorkflow.COLLECTION,
+                source_kind="dataframe",
+                clip_id=str(clip_ids[0]) if len(clip_ids) == 1 else None,
+                input_rows=len(df),
+                model_version=None,
+                feature_schema_version=None,
+            )
+            with pipeline_run(metadata, engine=active_engine) as run:
+                inserted = persist_raw_telemetry(
+                    df,
+                    engine=active_engine,
+                    pipeline_run_id=run.id,
+                )
+                run.set_output_rows(inserted)
+            return inserted
+        except ProgrammingError as exc:
+            raise _require_migrated_schema(exc) from exc
+        finally:
+            if owns_engine:
+                active_engine.dispose()
     inserted = 0
     try:
         with active_engine.begin() as connection:
@@ -327,6 +352,30 @@ def persist_classified_telemetry(
         raise ValueError(f"Classified telemetry is missing required columns: {sorted(missing)}")
     owns_engine = engine is None
     active_engine = engine or get_engine(settings or config)
+    if pipeline_run_id is None:
+        try:
+            clip_ids = df["clip_id"].dropna().astype(str).unique()
+            metadata = PipelineRunMetadata(
+                workflow=PipelineWorkflow.INFERENCE,
+                source_kind="dataframe",
+                clip_id=str(clip_ids[0]) if len(clip_ids) == 1 else None,
+                input_rows=len(df),
+                telemetry_schema_version=None,
+            )
+            with pipeline_run(metadata, engine=active_engine) as run:
+                persisted = persist_classified_telemetry(
+                    df,
+                    engine=active_engine,
+                    model_version=model_version,
+                    pipeline_run_id=run.id,
+                )
+                run.set_output_rows(persisted.classification_rows)
+            return persisted
+        except ProgrammingError as exc:
+            raise _require_migrated_schema(exc) from exc
+        finally:
+            if owns_engine:
+                active_engine.dispose()
     telemetry_rows = 0
     prediction_rows = 0
     try:

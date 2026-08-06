@@ -34,7 +34,7 @@ El presente acuerdo establece las obligaciones de confidencialidad para las part
 | Tipo | Ejemplos |
 |---|---|
 | **Datos de video** | Archivos `.mp4` de cámaras SISE |
-| **Datos de producción** | Registros de `vaaet_raw`, `vaaet_ml` y `vaaet_feedback` |
+| **Datos de producción** | Registros de `vaaet_raw`, `vaaet_ml`, `vaaet_feedback` y `vaaet_ops` |
 | **Credenciales** | Colab Secrets o variables `VAAET_*` específicas por perfil |
 | **Modelos entrenados** | Artefactos `.keras` y `.joblib` con datos propietarios |
 | **Parámetros de calibración** | `pixels_per_meter`, factores de perspectiva del puente |

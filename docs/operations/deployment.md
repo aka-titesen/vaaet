@@ -8,7 +8,7 @@ Complementa USER_GUIDE.md y SAD.md. -->
 | Campo | Detalles |
 |---|---|
 | **Nombre del Proyecto** | VAAET — Video Advanced Analysis of Traffic |
-| **Versión** | 4.1.0 |
+| **Versión** | 4.2.0 |
 | **Estado** | Aprobado |
 | **Responsable Técnico** | Facundo Nicolás González |
 | **Última Revisión** | 2026-07-23 |
@@ -125,7 +125,7 @@ comprueban el contrato y fallan con un mensaje claro si la migración falta.
 
 ### Backups
 
-- Backup administrativo de los schemas `vaaet_raw`, `vaaet_ml` y `vaaet_feedback`
+- Backup administrativo de `vaaet_raw`, `vaaet_ml`, `vaaet_feedback` y `vaaet_ops`
 - Script de conversión: `scripts/convert-postgres-backup.py`
 - Configurar backups automáticos, retención y restauraciones probadas en el proveedor
 

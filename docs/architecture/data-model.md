@@ -1,8 +1,9 @@
 # Modelo PostgreSQL — `vaaet-db-v2`
 
-VAAET ML 4.1.0 usa PostgreSQL 14+ y Alembic como única autoridad DDL. Los
-notebooks nunca crean ni alteran tablas. La migración vigente es
-[`20260804_0001_postgres_schemas_hitl.py`](../../migrations/versions/20260804_0001_postgres_schemas_hitl.py).
+VAAET ML 4.2.0 usa PostgreSQL 14+ y Alembic como única autoridad DDL. Los
+notebooks nunca crean ni alteran tablas. La revisión vigente encadena la
+[migración base](../../migrations/versions/20260804_0001_postgres_schemas_hitl.py)
+y el [hardening 4.2](../../migrations/versions/20260806_0002_postgres_hardening_pipeline_runs.py).
 
 ## Relaciones
 
@@ -11,6 +12,19 @@ erDiagram
     TRAFFIC_DATA ||--o{ TELEMETRY_FEATURES : "source_record_id (nullable)"
     TELEMETRY_FEATURES ||--o{ TRAFFIC_PREDICTIONS : "telemetry_feature_id"
     TRAFFIC_PREDICTIONS ||--o{ HUMAN_VALIDATIONS : "prediction_id"
+    PIPELINE_RUNS ||--o{ TRAFFIC_DATA : "pipeline_run_id"
+    PIPELINE_RUNS ||--o{ TELEMETRY_FEATURES : "pipeline_run_id"
+    PIPELINE_RUNS ||--o{ TRAFFIC_PREDICTIONS : "pipeline_run_id"
+    PIPELINE_RUNS ||--o{ HUMAN_VALIDATIONS : "pipeline_run_id (nullable)"
+
+    PIPELINE_RUNS {
+      uuid id PK
+      text workflow
+      text status
+      timestamptz started_at
+      timestamptz completed_at
+      text database_user
+    }
 
     TRAFFIC_DATA {
       bigint id PK
@@ -53,6 +67,7 @@ erDiagram
 | `vaaet_ml.telemetry_features` | Orden exacto de las 19 features y procedencia | `(clip_id, record_time, feature_schema_version)` |
 | `vaaet_ml.traffic_predictions` | MLP, política temporal y candidato de incidente | `(telemetry_feature_id, model_version)` |
 | `vaaet_feedback.human_validations` | Revisión humana append-only | UUID; sustitución explícita por FK |
+| `vaaet_ops.pipeline_runs` | Ciclo redactado y auditable de cada workflow | UUID |
 
 Todas las fechas son `TIMESTAMPTZ` UTC. Ratios están restringidos a `[0,1]`,
 conteos a valores no negativos y estados automáticos a `0–2`. El estado público
@@ -83,13 +98,29 @@ El administrador aplica `alembic upgrade head` y
 [`provision-roles.sql`](../../migrations/provision-roles.sql), luego crea usuarios
 LOGIN específicos del proveedor y les concede un solo rol de grupo.
 
+Las funciones `vaaet_ops.start_pipeline_run` y
+`vaaet_ops.finish_pipeline_run` son la única escritura operacional disponible
+para los workflows. Verifican membresía del rol y no aceptan metadata arbitraria.
+
+## Normalización e índices
+
+Las entidades operativas mantienen PK, FK y claves naturales. La tabla de
+features es una excepción deliberada a 3FN: conserva el snapshot exacto usado
+por cada versión para reproducibilidad ML. Códigos y etiquetas están unidos por
+constraints, y los índices se limitan a claves naturales, ejecución, modelo y
+resolución de la última validación.
+
+No se aplicará particionamiento antes de diez millones de filas o de evidencia
+medida mediante tamaño y planes. Alcanzado ese umbral se evaluarán particiones
+mensuales por `record_time`.
+
 ## Backups
 
 Backup canónico:
 
 ```bash
 pg_dump --format=custom --no-owner --no-acl \
-  --schema=vaaet_raw --schema=vaaet_ml --schema=vaaet_feedback \
+  --schema=vaaet_raw --schema=vaaet_ml --schema=vaaet_feedback --schema=vaaet_ops \
   --file=vaaet-db-v2.backup "$DATABASE_URL"
 ```
 

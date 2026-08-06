@@ -1,4 +1,14 @@
-# Política de seguridad y privacidad — VAAET ML 4.1.0
+# Política de seguridad y privacidad — VAAET ML 4.2.0
+
+PostgreSQL usa identidades separadas por workflow, TLS `verify-full`, permisos
+mínimos y funciones operativas con `search_path` fijo. La base exclusiva revoca
+`CREATE` global sobre `public` y los default privileges niegan acceso a objetos
+nuevos hasta que una migración conceda permisos explícitos.
+
+El cifrado en reposo, logs de conexión/DDL, retención y parcheo corresponden al
+proveedor o al administrador de la instancia. VAAET exige backups con retención
+de 30 días, RPO máximo de 24 horas y una restauración trimestral documentada.
+`pipeline_runs` guarda categorías de error, nunca mensajes, secretos o DSN.
 
 ## Principios
 

@@ -103,7 +103,7 @@ class DatabaseSettings:
 
     @property
     def application(self) -> str:
-        return self.application_name or f"vaaet-{self.profile.value}-4.1.0"
+        return self.application_name or f"vaaet-{self.profile.value}-4.2.0"
 
 
 @dataclass(frozen=True)
@@ -397,7 +397,20 @@ ORDER BY clip_id, record_time
 """
 
 HUMAN_GROUND_TRUTH_QUERY = f"""
-SELECT * FROM {EFFECTIVE_LABELS_VIEW}
+SELECT id, source_record_id, pipeline_run_id, clip_id, record_time,
+       feature_schema_version, avg_speed, total_vehicles, count_car,
+       count_truck, count_bus, count_motorcycle, count_bicycle,
+       heavy_vehicle_ratio, delta_speed, delta_count, transition_flag,
+       speed_variance, cumulative_delta_speed, low_speed_persistence,
+       speed_measurement_quality, optical_flow_tracking_ratio,
+       near_zero_motion_ratio, stationary_confirmed_ratio,
+       near_zero_motion_count, stationary_confirmed_count,
+       rejected_speed_count, recovered_track_count, speed_sample_count,
+       telemetry_schema_version, data_origin, synthetic_scenario,
+       hour_of_day, weather_condition, created_at, prediction_id,
+       model_version, traffic_state, is_human_validated, reviewer_id,
+       reviewed_at, notes
+FROM {EFFECTIVE_LABELS_VIEW}
 ORDER BY clip_id, record_time
 """
 

@@ -36,7 +36,7 @@ jobs:
           python -c "import cv2, imblearn, joblib, numpy, pandas, psycopg2, sklearn, sqlalchemy, tensorflow, ultralytics"
 
       - name: Ejecutar Ruff
-        run: ruff check src tests scripts
+        run: ruff check src tests scripts migrations
 
       - name: Compilar módulos Python
         run: python -m compileall -q src tests scripts migrations
@@ -144,6 +144,18 @@ jobs:
 
       - name: Probar schema, constraints y mínimo privilegio
         run: pytest tests/integration -v --tb=short -m postgres
+
+      - name: Auditar PostgreSQL sin mutaciones
+        env:
+          VAAET_DB_HOST: localhost
+          VAAET_DB_PORT: "5432"
+          VAAET_DB_NAME: vaaet
+          VAAET_DB_SSLMODE: disable
+          VAAET_TRAINING_DB_USER: postgres
+          VAAET_TRAINING_DB_PASSWORD: postgres
+        run: |
+          python scripts/audit-postgres-database.py --output /tmp/postgres-audit.json
+          python -c "import json; r=json.load(open('/tmp/postgres-audit.json')); assert r['alembic_revision']=='20260806_0002'; assert r['integrity']['automatic_accident_states']==0"
 
       - name: Probar migración desde base vacía
         run: |

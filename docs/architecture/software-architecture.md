@@ -1,4 +1,4 @@
-# Arquitectura de software — VAAET ML 4.1.0
+# Arquitectura de software — VAAET ML 4.2.0
 
 VAAET ML es un pipeline MLOps batch con adquisición bajo demanda, entrenamiento, inferencia y feedback. Colab orquesta ejecuciones manuales; el paquete `vaaet` concentra lógica comprobable y `pyproject.toml` es la única fuente de dependencias.
 
@@ -33,7 +33,7 @@ flowchart LR
 
 ## Integraciones
 
-- PostgreSQL es opcional y portable entre proveedores. Los schemas `vaaet_raw`, `vaaet_ml` y `vaaet_feedback` separan adquisición, inferencia y ground truth; cuatro perfiles aplican mínimo privilegio.
+- PostgreSQL es opcional y portable entre proveedores. `vaaet_raw`, `vaaet_ml` y `vaaet_feedback` separan adquisición, inferencia y ground truth; `vaaet_ops` registra ejecuciones redactadas y cuatro perfiles aplican mínimo privilegio.
 - Google Drive transporta el bundle completo entre sesiones Colab.
 - DVC versiona el directorio `artifacts/traffic-state` como una unidad.
 - Los pesos YOLO se descargan en runtime y no pertenecen al repositorio.
@@ -43,6 +43,6 @@ flowchart LR
 
 GitHub Actions cubre Python 3.10–3.12, instalación de todos los extras, `pip check`, smoke imports, Ruff, pytest, compilación de tres notebooks, enlaces, DVC y ausencia de binarios ML en Git. GPU, Drive, videos reales y PostgreSQL se validan manualmente en Colab.
 
-Decisiones principales: [ADR-0009](decisions/0009-modular-three-stage-architecture.md), [ADR-0010](decisions/0010-mlops-pipeline-19-features.md), [ADR-0012](decisions/0012-ml-web-boundary-and-artifact-contract.md), [ADR-0013](decisions/0013-on-demand-data-collection-workflow.md), [ADR-0014](decisions/0014-hierarchical-traffic-state-and-incident-policy.md) y [ADR-0015](decisions/0015-postgresql-namespaces-security-and-hitl.md).
+Decisiones principales: [ADR-0009](decisions/0009-modular-three-stage-architecture.md), [ADR-0010](decisions/0010-mlops-pipeline-19-features.md), [ADR-0012](decisions/0012-ml-web-boundary-and-artifact-contract.md), [ADR-0013](decisions/0013-on-demand-data-collection-workflow.md), [ADR-0014](decisions/0014-hierarchical-traffic-state-and-incident-policy.md), [ADR-0015](decisions/0015-postgresql-namespaces-security-and-hitl.md) y [ADR-0016](decisions/0016-postgresql-hardening-and-pipeline-runs.md).
 
 Los diagramas complementarios están en el [índice de diagramas](diagrams/index.md).

@@ -1,4 +1,4 @@
-# Documentación de VAAET ML 4.1.0
+# Documentación de VAAET ML 4.2.0
 
 ## Puntos de entrada
 
@@ -13,6 +13,7 @@
 - [Plan de pruebas](quality/test-plan.md)
 - [Modelo PostgreSQL](architecture/data-model.md)
 - [ADR-0015: PostgreSQL seguro e HITL](architecture/decisions/0015-postgresql-namespaces-security-and-hitl.md)
+- [ADR-0016: hardening PostgreSQL y ejecuciones](architecture/decisions/0016-postgresql-hardening-and-pipeline-runs.md)
 
 ## Mapa documental
 

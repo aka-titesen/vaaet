@@ -7,7 +7,7 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-from vaaet.data.datasets import RAW_TELEMETRY_V2_COLUMNS
+from vaaet.data.datasets import CANONICAL_RAW_TELEMETRY_COLUMNS
 from vaaet.vision import analysis
 from vaaet.vision.analysis import TrafficStatePrediction, analyze_video
 from vaaet.vision.detector import Detection
@@ -97,7 +97,7 @@ def test_analyze_video_returns_canonical_empty_frames_for_short_clip(
 
     assert result.video_path.is_file()
     assert result.telemetry.empty
-    assert tuple(result.telemetry.columns) == RAW_TELEMETRY_V2_COLUMNS
+    assert tuple(result.telemetry.columns) == CANONICAL_RAW_TELEMETRY_COLUMNS
     assert result.classifications is not None
     assert result.classifications.empty
     assert tuple(result.classifications.columns) == (

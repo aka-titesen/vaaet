@@ -139,7 +139,12 @@ DB_ENV_VARS: tuple[str, ...] = (
 
 DEFAULT_DB_PORT: str = "5432"
 DATABASE_SCHEMA_VERSION: str = "vaaet-db-v2"
-DATABASE_SCHEMAS: tuple[str, ...] = ("vaaet_raw", "vaaet_ml", "vaaet_feedback")
+DATABASE_SCHEMAS: tuple[str, ...] = (
+    "vaaet_raw",
+    "vaaet_ml",
+    "vaaet_feedback",
+    "vaaet_ops",
+)
 
 # Model versioning
 MODEL_VERSION: str = "mlp-v2.0"

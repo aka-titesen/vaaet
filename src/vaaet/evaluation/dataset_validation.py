@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 import pandas as pd
 
-from vaaet.data.datasets import MODERN_TELEMETRY_COLUMNS, build_group_ids
+from vaaet.data.datasets import TELEMETRY_QUALITY_COLUMNS, build_group_ids
 from vaaet.settings import FEATURE_COLS, TELEMETRY_SCHEMA_VERSION
 
 __all__ = ["DatasetAudit", "audit_training_dataset", "validate_training_partitions"]
@@ -87,10 +87,10 @@ def audit_training_dataset(
     real_frame = df.loc[real_mask]
     if real_frame.empty:
         raise ValueError("Dataset contract failed; no real telemetry is available.")
-    modern_present = [column for column in MODERN_TELEMETRY_COLUMNS if column in df]
+    modern_present = [column for column in TELEMETRY_QUALITY_COLUMNS if column in df]
     coverage = {
         column: round(float(real_frame[column].notna().mean()), 4) if column in df else 0.0
-        for column in MODERN_TELEMETRY_COLUMNS
+        for column in TELEMETRY_QUALITY_COLUMNS
     }
     schema = df.get("telemetry_schema_version", pd.Series(pd.NA, index=df.index))
     v2_coverage = float(schema.loc[real_mask].eq(TELEMETRY_SCHEMA_VERSION).mean())

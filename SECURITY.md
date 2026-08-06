@@ -15,21 +15,25 @@ Si descubrís una vulnerabilidad de seguridad en VAAET, por favor **no** la repo
 - Exposición de credenciales de base de datos en outputs de notebooks
 - Vulnerabilidades en dependencias declaradas en `pyproject.toml`
 - Inyección SQL en `src/vaaet/data/persistence.py` o `src/vaaet/data/database.py`
-- Acceso no autorizado a la instancia de AWS RDS
+- Acceso no autorizado a cualquier instancia PostgreSQL configurada para VAAET
 
 ### Fuera del alcance
 - Seguridad de la infraestructura de Google Colab (responsabilidad de Google)
-- Seguridad de AWS RDS (responsabilidad del administrador de la instancia)
+- Cifrado en reposo, parcheo y logs del proveedor PostgreSQL (responsabilidad administrativa)
 - Contenido de los videos de vigilancia SISE (datos de terceros)
 
 ## Prácticas de Seguridad Implementadas
 
-- Las credenciales se obtienen exclusivamente por variables de entorno o `getpass`
+- Las credenciales se obtienen mediante Colab Secrets o variables de entorno;
+  `.env` sólo se carga explícitamente en desarrollo local
 - Ningún secreto es hardcodeado en el código fuente
 - El archivo `.env` está en `.gitignore`
 - Los archivos de modelo (`.keras`, `.joblib`, `.pt`) están en `.gitignore`
 - La persistencia en BD usa consultas parametrizadas vía SQLAlchemy (prevención de inyección SQL)
-- El sistema degrada silenciosamente si las credenciales no están presentes
+- TLS `verify-full` es el valor recomendado y `disable` sólo funciona en localhost
+- Cuatro roles aplican mínimo privilegio; Alembic y el administrador no se usan en Colab
+- `vaaet_ops.pipeline_runs` registra categorías de error sin mensajes, DSN ni secretos
+- La ausencia de credenciales deshabilita la persistencia de forma visible y conserva outputs locales
 
 ## Dependencias y Actualizaciones
 
@@ -51,4 +55,4 @@ pip audit
 ---
 
 Responsable: Facundo Nicolás González
-Fecha de revisión: 2026-08-01
+Fecha de revisión: 2026-08-06

@@ -1,4 +1,4 @@
-# VAAET ML 4.1.0
+# VAAET ML 4.2.0
 
 Repositorio ML para análisis vehicular del Puente General Manuel Belgrano. Distribución: `vaaet-ml`; paquete: `vaaet`; URL: https://github.com/zgfnicolas/vaaet.
 
@@ -6,4 +6,4 @@ Tres workflows Colab: adquisición opcional en `notebooks/data-collection/collec
 
 Invariantes: 19 `FEATURE_COLS` v2 en orden exacto; cuatro estados públicos; MLP con tres salidas estables; Accident sólo mediante validación humana append-only. PostgreSQL usa `vaaet_raw`, `vaaet_ml` y `vaaet_feedback`, cuatro perfiles de mínimo privilegio y Alembic fuera de Colab. El entrenamiento sólo acepta fuentes explícitas y jamás usa predicciones no validadas como etiquetas. El bundle DVC v2 tiene modelo Keras, scaler, mapping y manifiesto jerárquico; validar antes de deserializar.
 
-Validación: Ruff, pytest, integración PostgreSQL 17, compileall, `ast.parse()` de los tres notebooks, enlaces y `git diff --check`. GPU, Drive, YOLO y DVC remoto son manuales en Colab. Leer `AGENTS.md`, `docs/index.md`, ADR-0014 y ADR-0015.
+Validación: Ruff, pytest, integración PostgreSQL 17, compileall, `ast.parse()` de los tres notebooks, enlaces y `git diff --check`. GPU, Drive, YOLO y DVC remoto son manuales en Colab. Leer `AGENTS.md`, `docs/index.md`, ADR-0014, ADR-0015 y ADR-0016.

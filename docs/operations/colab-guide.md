@@ -79,6 +79,11 @@ el tipo correspondiente de forma explícita.
 
 Descargá los outputs antes de cerrar la sesión. El backup canónico usa el formato de archivo `1.16`, que requiere PostgreSQL 17 o posterior. Cuando debe procesarlo, el notebook de entrenamiento configura de forma visible el repositorio APT oficial PGDG, instala únicamente `postgresql-client-17` y ejecuta directamente `/usr/lib/postgresql/17/bin/pg_restore`. La clave, URL, codename y arquitectura del repositorio se declaran explícitamente en la celda; no se instala el servidor PostgreSQL.
 
+Cada workflow registra un `pipeline_run_id`. Con PostgreSQL usa el schema
+`vaaet_ops`; sin conexión genera un manifiesto JSON redactado en
+`data/processed/pipeline-runs/`. Estos manifiestos no contienen rutas privadas,
+credenciales, DSN, certificados ni mensajes de excepción.
+
 El cliente es una dependencia del sistema operativo y por eso no forma parte de `pyproject.toml`. Si PGDG no está disponible o la instalación falla, cargá `traffic_data_raw.csv`; el notebook conserva el diagnóstico original y no continúa con datos vacíos.
 
 ## Checklist manual

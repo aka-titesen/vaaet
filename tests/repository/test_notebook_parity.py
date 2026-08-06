@@ -217,3 +217,12 @@ def test_notebooks_use_profile_specific_database_api() -> None:
         assert "hydrate_db_environment_from_colab" not in code
         assert 'os.environ["DB_PASSWORD"]' not in code
         assert "getpass(" not in code
+
+
+def test_all_workflows_record_redacted_pipeline_runs() -> None:
+    for workflow, path in NOTEBOOKS.items():
+        code = _code(path)
+        assert "PipelineRunMetadata" in code, workflow
+        assert "PipelineWorkflow" in code, workflow
+        assert "pipeline_run(" in code, workflow
+        assert "data/processed/pipeline-runs" in code, workflow

@@ -13,10 +13,16 @@ from sqlalchemy.engine import Engine
 
 from vaaet.data.database import DatabaseSettings, get_engine
 from vaaet.data.ingestion import create_dataset_package
+from vaaet.data.pipeline_runs import PipelineRunMetadata, PipelineWorkflow, pipeline_run
 from vaaet.settings import STATE_LABELS
 
 REVIEW_QUEUE_QUERY = """
-SELECT * FROM vaaet_feedback.review_queue
+SELECT prediction_id, pipeline_run_id, clip_id, record_time, traffic_state,
+       state_label, confidence, model_version, probability_margin,
+       decision_abstained, measurement_reliable, accident_rule_triggered,
+       accident_alert_started, accident_evidence_score, latest_validation_id,
+       current_validated_state, current_reviewer_id, current_reviewed_at
+FROM vaaet_feedback.review_queue
 WHERE (:pipeline_run_id IS NULL OR pipeline_run_id = CAST(:pipeline_run_id AS UUID))
 ORDER BY record_time
 """
@@ -24,10 +30,12 @@ ORDER BY record_time
 INSERT_VALIDATION_QUERY = """
 INSERT INTO vaaet_feedback.human_validations (
     id, prediction_id, validated_state, reviewer_id, reviewed_at, notes,
-    review_source, incident_context_reviewed, supersedes_validation_id
+    review_source, incident_context_reviewed, supersedes_validation_id,
+    pipeline_run_id
 ) VALUES (
     :id, :prediction_id, :validated_state, :reviewer_id, CURRENT_TIMESTAMP, :notes,
-    :review_source, :incident_context_reviewed, :supersedes_validation_id
+    :review_source, :incident_context_reviewed, :supersedes_validation_id,
+    CAST(:pipeline_run_id AS UUID)
 )
 """
 
@@ -102,7 +110,32 @@ def persist_human_validation(
     *,
     settings: DatabaseSettings | Mapping[str, str] | None = None,
     engine: Engine | None = None,
+    pipeline_run_id: UUID | str | None = None,
 ) -> UUID:
+    owns_engine = engine is None
+    active_engine = engine or get_engine(settings)
+    if pipeline_run_id is None:
+        try:
+            metadata = PipelineRunMetadata(
+                workflow=PipelineWorkflow.REVIEW,
+                source_kind=decision.review_source,
+                input_rows=1,
+                telemetry_schema_version=None,
+                feature_schema_version=None,
+                model_version=None,
+            )
+            with pipeline_run(metadata, engine=active_engine) as run:
+                validation_id = persist_human_validation(
+                    decision,
+                    engine=active_engine,
+                    pipeline_run_id=run.id,
+                )
+                run.set_output_rows(1)
+            return validation_id
+        finally:
+            if owns_engine:
+                active_engine.dispose()
+
     validation_id = decision.validation_id or uuid4()
     payload = {
         "id": str(validation_id),
@@ -115,9 +148,8 @@ def persist_human_validation(
         "supersedes_validation_id": (
             str(decision.supersedes_validation_id) if decision.supersedes_validation_id else None
         ),
+        "pipeline_run_id": str(pipeline_run_id),
     }
-    owns_engine = engine is None
-    active_engine = engine or get_engine(settings)
     try:
         with active_engine.begin() as connection:
             connection.execute(text(INSERT_VALIDATION_QUERY), payload)

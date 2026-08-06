@@ -8,7 +8,7 @@ Complementa SOW.md y RISK_MATRIX.md. -->
 | Campo | Detalles |
 |---|---|
 | **Nombre del Proyecto** | VAAET — Video Advanced Analysis of Traffic |
-| **Versión** | 4.1.0 |
+| **Versión** | 4.2.0 |
 | **Estado** | Aprobado |
 | **Responsable Técnico** | Facundo Nicolás González |
 | **Última Revisión** | 2026-07-23 |
@@ -93,7 +93,7 @@ gantt
 | **Rama principal** | `main` |
 | **Ramas de feature** | `feature/*` |
 | **Convención de commits** | Conventional Commits (`feat:`, `fix:`, `docs:`, `refactor:`) |
-| **Versionado** | SemVer (4.1.0 actual) |
+| **Versionado** | SemVer (4.2.0 actual) |
 
 ### 3.2 Artefactos Versionados
 

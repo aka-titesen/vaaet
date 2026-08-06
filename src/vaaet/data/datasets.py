@@ -13,9 +13,10 @@ from vaaet.settings import RANDOM_SEED
 __all__ = [
     "GroupedSplit",
     "GroupedTrainValidationTestSplit",
-    "MODERN_TELEMETRY_COLUMNS",
-    "RAW_TELEMETRY_COLUMNS",
-    "RAW_TELEMETRY_V2_COLUMNS",
+    "BASE_RAW_TELEMETRY_COLUMNS",
+    "CANONICAL_RAW_TELEMETRY_COLUMNS",
+    "TELEMETRY_METADATA_COLUMNS",
+    "TELEMETRY_QUALITY_COLUMNS",
     "build_group_ids",
     "group_aware_train_test_split",
     "grouped_temporal_train_validation_test_split",
@@ -255,7 +256,7 @@ def grouped_temporal_train_validation_test_split(
     )
 
 
-RAW_TELEMETRY_COLUMNS: tuple[str, ...] = (
+BASE_RAW_TELEMETRY_COLUMNS: tuple[str, ...] = (
     "clip_id",
     "record_time",
     "avg_speed",
@@ -267,7 +268,7 @@ RAW_TELEMETRY_COLUMNS: tuple[str, ...] = (
     "total_vehicles",
 )
 
-MODERN_TELEMETRY_COLUMNS: tuple[str, ...] = (
+TELEMETRY_QUALITY_COLUMNS: tuple[str, ...] = (
     "near_zero_motion_count",
     "stationary_confirmed_count",
     "rejected_speed_count",
@@ -275,12 +276,16 @@ MODERN_TELEMETRY_COLUMNS: tuple[str, ...] = (
     "speed_sample_count",
     "speed_measurement_quality",
     "optical_flow_tracking_ratio",
+)
+
+TELEMETRY_METADATA_COLUMNS: tuple[str, ...] = (
     "telemetry_schema_version",
 )
 
-RAW_TELEMETRY_V2_COLUMNS: tuple[str, ...] = (
-    *RAW_TELEMETRY_COLUMNS,
-    *MODERN_TELEMETRY_COLUMNS,
+CANONICAL_RAW_TELEMETRY_COLUMNS: tuple[str, ...] = (
+    *BASE_RAW_TELEMETRY_COLUMNS,
+    *TELEMETRY_QUALITY_COLUMNS,
+    *TELEMETRY_METADATA_COLUMNS,
 )
 
 
@@ -296,32 +301,32 @@ def merge_raw_telemetry_csv(
     destination = Path(destination)
     if telemetry.empty:
         if not destination.is_file():
-            return pd.DataFrame(columns=RAW_TELEMETRY_V2_COLUMNS)
+            return pd.DataFrame(columns=CANONICAL_RAW_TELEMETRY_COLUMNS)
 
         existing = pd.read_csv(destination)
-        missing_existing = set(RAW_TELEMETRY_COLUMNS) - set(existing.columns)
+        missing_existing = set(BASE_RAW_TELEMETRY_COLUMNS) - set(existing.columns)
         if missing_existing:
             raise ValueError(
                 "Existing raw telemetry is missing required columns: "
                 f"{sorted(missing_existing)}"
             )
-        for column in MODERN_TELEMETRY_COLUMNS:
+        for column in (*TELEMETRY_QUALITY_COLUMNS, *TELEMETRY_METADATA_COLUMNS):
             if column not in existing:
                 existing[column] = pd.NA
         return existing
 
-    missing = set(RAW_TELEMETRY_COLUMNS) - set(telemetry.columns)
+    missing = set(BASE_RAW_TELEMETRY_COLUMNS) - set(telemetry.columns)
     if missing:
         raise ValueError(f"Raw telemetry is missing required columns: {sorted(missing)}")
 
     incoming = telemetry.copy()
-    for column in MODERN_TELEMETRY_COLUMNS:
+    for column in (*TELEMETRY_QUALITY_COLUMNS, *TELEMETRY_METADATA_COLUMNS):
         if column not in incoming:
             incoming[column] = pd.NA
     frames = [incoming]
     if destination.is_file():
         existing = pd.read_csv(destination)
-        for column in MODERN_TELEMETRY_COLUMNS:
+        for column in (*TELEMETRY_QUALITY_COLUMNS, *TELEMETRY_METADATA_COLUMNS):
             if column not in existing:
                 existing[column] = pd.NA
         frames.insert(0, existing)

@@ -1,4 +1,8 @@
-# VAAET ML 4.1.0
+# VAAET ML 4.2.0
+
+PostgreSQL se organiza en `vaaet_raw`, `vaaet_ml`, `vaaet_feedback` y
+`vaaet_ops`. Este último registra el ciclo de cada workflow sin almacenar
+credenciales ni mensajes sensibles; Alembic es la única autoridad DDL.
 
 VAAET ML es el repositorio de machine learning para analizar el tránsito del Puente General Manuel Belgrano. Implementa adquisición de telemetría bajo demanda, entrenamiento batch e inferencia batch con feedback. La ejecución y promoción del modelo siguen siendo manuales en Google Colab; por eso es una base de MLOps Nivel 1, no un sistema de Continuous Training autónomo.
 
@@ -38,8 +42,8 @@ La futura Web App pertenece a otro repositorio y consumirá únicamente bundles 
 
 ## PostgreSQL e HITL
 
-Una única base PostgreSQL 14+ usa tres schemas: `vaaet_raw`, `vaaet_ml` y
-`vaaet_feedback`. Cada notebook carga un perfil de mínimo privilegio desde Colab
+Una única base PostgreSQL 14+ usa `vaaet_raw`, `vaaet_ml`, `vaaet_feedback` y
+`vaaet_ops`. Cada notebook carga un perfil de mínimo privilegio desde Colab
 Secrets o variables locales; las URLs se construyen con SQLAlchemy y TLS
 `verify-full` es el valor recomendado. Alembic y el rol administrador quedan fuera
 de Colab. Aplicación inicial:
@@ -53,6 +57,6 @@ psql 'postgresql://admin:...@host:5432/vaaet' -f migrations/provision-roles.sql
 El entrenamiento declara sus fuentes mediante `TrainingIngestionPlan`: puede
 combinar PostgreSQL, backups, CSV raw y `vaaet-training-dataset-v1.zip`. Sólo
 `human_validations` efectivas ingresan como etiquetas; predicciones sin revisar
-nunca se convierten en ground truth. Consultá [ADR-0015](docs/architecture/decisions/0015-postgresql-namespaces-security-and-hitl.md).
+nunca se convierten en ground truth. Consultá [ADR-0015](docs/architecture/decisions/0015-postgresql-namespaces-security-and-hitl.md) y [ADR-0016](docs/architecture/decisions/0016-postgresql-hardening-and-pipeline-runs.md).
 El provisionamiento, backup, rotación y recuperación están en la
 [guía PostgreSQL](docs/operations/postgresql-guide.md).

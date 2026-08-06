@@ -8,7 +8,7 @@ Proyección comercial futura del proyecto. -->
 | Campo | Detalles |
 |---|---|
 | **Nombre del Proyecto** | VAAET — Video Advanced Analysis of Traffic |
-| **Versión** | 4.1.0 |
+| **Versión** | 4.2.0 |
 | **Estado** | Borrador (visión futura) |
 | **Responsable Técnico** | Facundo Nicolás González |
 | **Última Revisión** | 2026-07-23 |

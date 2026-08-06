@@ -35,6 +35,7 @@ def test_migrated_schemas_tables_and_views_exist(engine) -> None:
         "vaaet_feedback.human_validations",
         "vaaet_feedback.review_queue",
         "vaaet_feedback.effective_human_labels",
+        "vaaet_ops.pipeline_runs",
         "public.traffic_data",
         "public.telemetry_raw",
         "public.traffic_classifications",
@@ -81,6 +82,18 @@ def test_legacy_hitl_and_buenos_aires_timestamps_are_migrated(engine) -> None:
 
 def test_automatic_accident_is_rejected_by_database(engine) -> None:
     with engine.begin() as connection:
+        connection.execute(
+            text(
+                """
+                INSERT INTO vaaet_ops.pipeline_runs
+                  (id, workflow, status, completed_at, application_version)
+                VALUES
+                  ('00000000-0000-0000-0000-000000000001', 'inference',
+                   'succeeded', CURRENT_TIMESTAMP, 'integration-test')
+                ON CONFLICT (id) DO NOTHING
+                """
+            )
+        )
         feature_id = connection.execute(
             text(
                 """
@@ -113,7 +126,7 @@ def test_automatic_accident_is_rejected_by_database(engine) -> None:
 def test_group_roles_follow_least_privilege(engine) -> None:
     checks = {
         "vaaet_collection_role": {
-            "vaaet_raw.traffic_data": ("SELECT", "INSERT"),
+            "vaaet_raw.traffic_data": ("INSERT",),
         },
         "vaaet_inference_role": {
             "vaaet_ml.telemetry_features": ("SELECT", "INSERT", "UPDATE"),
@@ -123,6 +136,7 @@ def test_group_roles_follow_least_privilege(engine) -> None:
             "vaaet_raw.traffic_data": ("SELECT",),
             "vaaet_ml.traffic_predictions": ("SELECT",),
             "vaaet_feedback.human_validations": ("SELECT",),
+            "vaaet_ops.pipeline_runs": ("SELECT",),
         },
         "vaaet_reviewer_role": {
             "vaaet_ml.traffic_predictions": ("SELECT",),
@@ -145,10 +159,103 @@ def test_group_roles_follow_least_privilege(engine) -> None:
         ).scalar()
         assert not connection.execute(
             text(
+                "SELECT has_table_privilege('vaaet_collection_role', "
+                "'vaaet_raw.traffic_data', 'SELECT')"
+            )
+        ).scalar()
+        assert not connection.execute(
+            text(
                 "SELECT has_table_privilege('vaaet_training_role', "
                 "'vaaet_raw.traffic_data', 'INSERT')"
             )
         ).scalar()
+        for role in (
+            "vaaet_collection_role",
+            "vaaet_inference_role",
+            "vaaet_training_role",
+            "vaaet_reviewer_role",
+        ):
+            assert connection.execute(
+                text(
+                    "SELECT has_function_privilege(:role, "
+                    "'vaaet_ops.start_pipeline_run(uuid,text,text,text,text,text,text,text,text,bigint)', "
+                    "'EXECUTE')"
+                ),
+                {"role": role},
+            ).scalar()
+            assert not connection.execute(
+                text(
+                    "SELECT has_table_privilege(:role, 'vaaet_ops.pipeline_runs', 'INSERT')"
+                ),
+                {"role": role},
+            ).scalar()
+
+
+def test_hardening_constraints_comments_and_indexes(engine) -> None:
+    with engine.connect() as connection:
+        revision = connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one()
+        undocumented = connection.execute(
+            text(
+                """
+                SELECT count(*) FROM pg_attribute a
+                JOIN pg_class c ON c.oid=a.attrelid
+                JOIN pg_namespace n ON n.oid=c.relnamespace
+                LEFT JOIN pg_description d ON d.objoid=c.oid AND d.objsubid=a.attnum
+                WHERE n.nspname LIKE 'vaaet_%' AND c.relkind='r'
+                  AND a.attnum > 0 AND NOT a.attisdropped AND d.description IS NULL
+                """
+            )
+        ).scalar_one()
+        indexes = {
+            row[0]
+            for row in connection.execute(
+                text(
+                    "SELECT indexname FROM pg_indexes WHERE schemaname LIKE 'vaaet_%'"
+                )
+            )
+        }
+        raw_total_validated = connection.execute(
+            text(
+                "SELECT convalidated FROM pg_constraint "
+                "WHERE conname='ck_raw_total_matches_types'"
+            )
+        ).scalar_one()
+    assert revision == "20260806_0002"
+    assert undocumented == 0
+    assert "idx_raw_clip_time" not in indexes
+    assert "idx_features_clip_time" not in indexes
+    assert "idx_validations_prediction_time_id" in indexes
+    assert raw_total_validated is False
+
+
+def test_new_raw_rows_require_consistent_vehicle_total(engine) -> None:
+    run_id = "00000000-0000-0000-0000-000000000099"
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                "INSERT INTO vaaet_ops.pipeline_runs "
+                "(id, workflow, status, completed_at, application_version) "
+                "VALUES (:id, 'collection', 'succeeded', CURRENT_TIMESTAMP, 'test') "
+                "ON CONFLICT (id) DO NOTHING"
+            ),
+            {"id": run_id},
+        )
+    with pytest.raises(IntegrityError):
+        with engine.begin() as connection:
+            connection.execute(
+                text(
+                    """
+                    INSERT INTO vaaet_raw.traffic_data
+                      (pipeline_run_id, clip_id, record_time, avg_speed, count_car,
+                       count_truck, count_bus, count_motorcycle, count_bicycle,
+                       total_vehicles)
+                    VALUES
+                      (:run_id, 'invalid-total', '2026-08-06T12:00:00Z', 10,
+                       1, 0, 0, 0, 0, 2)
+                    """
+                ),
+                {"run_id": run_id},
+            )
 
 
 def test_reinference_preserves_append_only_human_validation(engine) -> None:

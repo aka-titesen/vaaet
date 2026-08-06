@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from vaaet.data.datasets import RAW_TELEMETRY_V2_COLUMNS
+from vaaet.data.datasets import CANONICAL_RAW_TELEMETRY_COLUMNS
 from vaaet.exceptions import VideoOpenError
 from vaaet.logging import get_logger
 from vaaet.settings import STATE_LABELS
@@ -383,7 +383,7 @@ def analyze_video(
         processed_duration_seconds - complete_minutes * 60.0,
         0.0,
     )
-    telemetry = pd.DataFrame.from_records(records, columns=RAW_TELEMETRY_V2_COLUMNS)
+    telemetry = pd.DataFrame.from_records(records, columns=CANONICAL_RAW_TELEMETRY_COLUMNS)
     classifications = (
         pd.DataFrame.from_records(
             classification_records,

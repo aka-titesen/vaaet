@@ -13,6 +13,31 @@ Todos los cambios relevantes del proyecto VAAET se documentan en este archivo, s
 
 ---
 
+## [4.2.0] - 2026-08-06
+
+### Añadido
+
+- Schema `vaaet_ops` y registro redactado de ejecuciones collection, inference,
+  training y review, con fallback JSON cuando PostgreSQL no está disponible.
+- Migración incremental `20260806_0002`, comentarios de catálogo, auditor
+  read-only y ADR-0016.
+
+### Cambiado
+
+- Los contratos Python usan nombres semánticos para columnas base, calidad,
+  metadata y esquema raw canónico; las versiones permanecen en los datos.
+- Consultas y vistas activas usan proyecciones explícitas, los UUID de ejecución
+  tienen integridad referencial y los roles escriben operaciones mediante
+  funciones autorizadas.
+- Se eliminaron índices redundantes y se reforzaron etiquetas de estados,
+  totales vehiculares y cadenas HITL append-only.
+
+### Seguridad
+
+- La base exclusiva revoca creación pública y aplica default privileges cerrados.
+- La continuidad exige cifrado en reposo, 30 días de retención, RPO de 24 horas
+  y restauraciones trimestrales verificadas.
+
 ## [4.1.0] - 2026-08-04
 
 ### Añadido

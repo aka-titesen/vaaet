@@ -5,7 +5,7 @@ from __future__ import annotations
 import pandas as pd
 
 from vaaet.data.datasets import (
-    RAW_TELEMETRY_V2_COLUMNS,
+    CANONICAL_RAW_TELEMETRY_COLUMNS,
     build_group_ids,
     group_aware_train_test_split,
     merge_raw_telemetry_csv,
@@ -50,7 +50,7 @@ def test_merge_empty_raw_telemetry_does_not_create_csv(tmp_path) -> None:
     merged = merge_raw_telemetry_csv(pd.DataFrame(), destination)
 
     assert merged.empty
-    assert tuple(merged.columns) == RAW_TELEMETRY_V2_COLUMNS
+    assert tuple(merged.columns) == CANONICAL_RAW_TELEMETRY_COLUMNS
     assert not destination.exists()
 
 

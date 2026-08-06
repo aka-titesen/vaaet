@@ -1,4 +1,4 @@
-# Linaje de datos — VAAET ML 4.1.0
+# Linaje de datos — VAAET ML 4.2.0
 
 ## Flujo operacional
 
@@ -20,6 +20,10 @@ flowchart LR
 Cada ejecución de adquisición o inferencia genera un `pipeline_run_id`. Los
 timestamps se persisten como `TIMESTAMPTZ` UTC; valores históricos sin zona se
 interpretan como `America/Argentina/Buenos_Aires` durante la migración.
+
+Desde 4.2.0 el UUID referencia `vaaet_ops.pipeline_runs`, que registra workflow,
+estado, commit, contratos y conteos sin secretos. Cuando PostgreSQL es opcional,
+el mismo contrato se conserva como JSON bajo `data/processed/pipeline-runs/`.
 
 ## Adquisición
 

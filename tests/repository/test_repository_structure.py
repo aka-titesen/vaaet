@@ -15,6 +15,7 @@ ACTIVE_NOTEBOOKS = [
 ]
 ALLOWED_SCRIPT_FILES = {
     "README.md",
+    "audit-postgres-database.py",
     "convert-postgres-backup.py",
     "evaluate-telemetry-exports.py",
     "export-training-dataset.py",
@@ -87,6 +88,7 @@ def test_active_sources_do_not_use_legacy_paths_or_import_hacks() -> None:
         REPO_ROOT / "docs/architecture/decisions/0013-on-demand-data-collection-workflow.md",
         REPO_ROOT / "docs/architecture/decisions/0014-hierarchical-traffic-state-and-incident-policy.md",
         REPO_ROOT / "docs/architecture/decisions/0015-postgresql-namespaces-security-and-hitl.md",
+        REPO_ROOT / "docs/architecture/decisions/0016-postgresql-hardening-and-pipeline-runs.md",
     ]
     for path in active_files:
         content = path.read_text(encoding="utf-8")
@@ -160,3 +162,17 @@ def test_notebook_extras_match_workflows() -> None:
     for notebook in ACTIVE_NOTEBOOKS:
         code = _concatenate_code_cells(notebook)
         assert f"[{expected[notebook.name]}]" in code
+
+
+def test_active_code_uses_semantic_telemetry_contract_names() -> None:
+    active_python = [*REPO_ROOT.joinpath("src").rglob("*.py"), *REPO_ROOT.joinpath("tests").rglob("*.py")]
+    forbidden = ("RAW_TELEMETRY_" + "V2_COLUMNS", "MODERN_" + "TELEMETRY_COLUMNS")
+    for path in active_python:
+        content = path.read_text(encoding="utf-8")
+        for name in forbidden:
+            assert name not in content, f"{path.relative_to(REPO_ROOT)} contains {name}"
+
+
+def test_active_database_queries_do_not_select_star() -> None:
+    for path in REPO_ROOT.joinpath("src", "vaaet", "data").glob("*.py"):
+        assert "SELECT *" not in path.read_text(encoding="utf-8").upper()

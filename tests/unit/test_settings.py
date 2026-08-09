@@ -14,6 +14,12 @@ class TestConstants:
         assert RANDOM_SEED == 42
         assert isinstance(RANDOM_SEED, int)
 
+    def test_temporal_contract(self) -> None:
+        from vaaet.settings import CANONICAL_TIMEZONE, TRAFFIC_LOCAL_TIMEZONE
+
+        assert CANONICAL_TIMEZONE == "UTC"
+        assert TRAFFIC_LOCAL_TIMEZONE == "America/Argentina/Buenos_Aires"
+
     def test_state_labels_immutable(self) -> None:
         from vaaet.settings import STATE_LABELS
 

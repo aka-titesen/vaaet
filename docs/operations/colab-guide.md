@@ -77,6 +77,12 @@ las fuentes son `PostgresSource`. La celda siguiente declara objetos en
 `RAW_SOURCES` y `FEEDBACK_SOURCES`; al cargar CSV, backup o ZIP se debe habilitar
 el tipo correspondiente de forma explícita.
 
+Todo `record_time` se normaliza a UTC. Los backups y CSV legacy sin zona se
+interpretan como `America/Argentina/Buenos_Aires`; por eso su rango UTC puede
+desplazarse tres horas respecto del texto original. Las features horarias siguen
+representando la hora argentina. Después de la aumentación, entrenamiento muestra
+`Canonical timestamp timezone: UTC` antes de auditar el dataset.
+
 Descargá los outputs antes de cerrar la sesión. El backup canónico usa el formato de archivo `1.16`, que requiere PostgreSQL 17 o posterior. Cuando debe procesarlo, el notebook de entrenamiento configura de forma visible el repositorio APT oficial PGDG, instala únicamente `postgresql-client-17` y ejecuta directamente `/usr/lib/postgresql/17/bin/pg_restore`. La clave, URL, codename y arquitectura del repositorio se declaran explícitamente en la celda; no se instala el servidor PostgreSQL. El importador selecciona entradas exactas del catálogo del archivo, por lo que admite tanto `public.traffic_data` legacy como `vaaet_raw.traffic_data` moderno sin restaurar DDL ni conectarse a una base viva.
 
 Cada workflow registra un `pipeline_run_id`. Con PostgreSQL usa el schema

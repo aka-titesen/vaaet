@@ -22,6 +22,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
+from vaaet.data.timestamps import normalize_timestamp, normalize_timestamp_series
 from vaaet.settings import (
     DATA_ORIGIN_COL,
     LABELING_THRESHOLDS,
@@ -40,8 +41,8 @@ __all__ = [
 SYNTHETIC_ID_OFFSET: int = 50_001
 """First ``id`` assigned to synthetic records (avoids collision with real IDs 1–2 114)."""
 
-_SYNTHETIC_TIME_START = pd.Timestamp("2025-04-21 06:00:00")
-"""Anchor timestamp for synthetic records (1 week before real data)."""
+_SYNTHETIC_TIME_START = normalize_timestamp(pd.Timestamp("2025-04-21 06:00:00"))
+"""UTC instant for 06:00 bridge-local time, one week before real data."""
 
 
 def _with_provenance(
@@ -237,8 +238,12 @@ def augment_with_synthetic(
     seed: int = RANDOM_SEED,
 ) -> pd.DataFrame:
     """Append synthetic Accident and Congestion sequences to real telemetry."""
+    canonical_real = df_raw.copy()
+    canonical_real["record_time"] = normalize_timestamp_series(
+        canonical_real["record_time"]
+    )
     tagged_real = _with_provenance(
-        df_raw,
+        canonical_real,
         data_origin="real",
         synthetic_scenario="observed",
     )
@@ -270,4 +275,5 @@ def augment_with_synthetic(
         ],
         ignore_index=True,
     )
+    result["record_time"] = normalize_timestamp_series(result["record_time"])
     return result

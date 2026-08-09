@@ -129,6 +129,27 @@ class TestEngineerFeatures:
         with np.testing.assert_raises_regex(ValueError, "Duplicate"):
             engineer_features(duplicate)
 
+    def test_rejects_equivalent_local_and_utc_duplicate_instants(
+        self, raw_telemetry_df: pd.DataFrame
+    ) -> None:
+        frame = raw_telemetry_df.iloc[:2].copy()
+        frame["clip_id"] = "same-clip"
+        frame["record_time"] = pd.Series(
+            ["2025-05-01 08:00:00", "2025-05-01 11:00:00Z"],
+            index=frame.index,
+            dtype=object,
+        )
+        with np.testing.assert_raises_regex(ValueError, "Duplicate"):
+            engineer_features(frame)
+
+    def test_hour_feature_uses_bridge_local_time(self, raw_telemetry_df: pd.DataFrame) -> None:
+        frame = raw_telemetry_df.loc[raw_telemetry_df["clip_id"].eq("clip_0")].copy()
+        frame["record_time"] = pd.date_range(
+            "2025-05-01 13:00:00Z", periods=len(frame), freq="1min"
+        )
+        result = engineer_features(frame)
+        assert result["hour_of_day"].eq(10).all()
+
     def test_rejects_non_monotonic_clip(self, raw_telemetry_df: pd.DataFrame) -> None:
         frame = raw_telemetry_df.copy()
         first_clip = frame.index[frame["clip_id"].eq("clip_0")]

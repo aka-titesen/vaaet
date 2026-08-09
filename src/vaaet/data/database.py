@@ -23,6 +23,7 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.exc import OperationalError, ProgrammingError
 from sqlalchemy.pool import QueuePool
 
+from vaaet.data.timestamps import normalize_timestamp_series
 from vaaet.exceptions import (
     ArtifactNotFoundError,
     ArtifactValidationError,
@@ -123,7 +124,7 @@ class DatabaseSettings:
 
     @property
     def application(self) -> str:
-        return self.application_name or f"vaaet-{self.profile.value}-4.2.1"
+        return self.application_name or f"vaaet-{self.profile.value}-4.2.2"
 
 
 @dataclass(frozen=True)
@@ -689,7 +690,7 @@ def parse_sql_dump(sql_path: str | Path) -> pd.DataFrame:
         raise ValueError("No COPY block for a recognized traffic_data table was found.")
     for column in raw.columns:
         if column == "record_time":
-            raw[column] = pd.to_datetime(raw[column], errors="coerce", utc=False)
+            raw[column] = normalize_timestamp_series(raw[column])
         elif column not in {"clip_id", "telemetry_schema_version", "pipeline_run_id"}:
             converted = pd.to_numeric(raw[column], errors="coerce")
             if raw[column].isna().equals(converted.isna()):

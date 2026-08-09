@@ -613,6 +613,7 @@ class TestParseSqlDump:
 
         df = parse_sql_dump(sample_sql)
         assert pd.api.types.is_datetime64_any_dtype(df["record_time"])
+        assert df.iloc[0]["record_time"] == pd.Timestamp("2024-01-15 11:00:00Z")
 
     def test_speed_values(self, sample_sql: Path) -> None:
         from vaaet.data.database import parse_sql_dump

@@ -12,6 +12,7 @@ from typing import Literal, Mapping
 
 import pandas as pd
 
+from vaaet.data.timestamps import normalize_timestamp
 from vaaet.settings import (
     DATA_ORIGINS,
     MODEL_STATE_LABELS,
@@ -33,10 +34,7 @@ __all__ = [
 
 
 def _coerce_timestamp(value: object, field_name: str) -> pd.Timestamp:
-    ts = pd.Timestamp(value)
-    if pd.isna(ts):
-        raise ValueError(f"{field_name} must be a valid timestamp")
-    return ts
+    return normalize_timestamp(value, field_name=field_name)
 
 
 def _validate_non_negative_int(value: int, field_name: str) -> None:

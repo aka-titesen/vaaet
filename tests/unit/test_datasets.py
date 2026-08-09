@@ -44,6 +44,19 @@ def test_merge_raw_telemetry_csv_is_cumulative_and_deduplicated(tmp_path) -> Non
     assert destination.is_file()
 
 
+def test_merge_deduplicates_equivalent_local_and_utc_timestamps(tmp_path) -> None:
+    destination = tmp_path / "traffic_data_raw.csv"
+    local = pd.DataFrame([_raw_row("2025-05-01 08:01:00", speed=12.0)])
+    utc = pd.DataFrame([_raw_row("2025-05-01 11:01:00Z", speed=18.0)])
+
+    merge_raw_telemetry_csv(local, destination)
+    merged = merge_raw_telemetry_csv(utc, destination)
+
+    assert len(merged) == 1
+    assert merged.iloc[0]["avg_speed"] == 18.0
+    assert merged.iloc[0]["record_time"] == pd.Timestamp("2025-05-01 11:01:00Z")
+
+
 def test_merge_empty_raw_telemetry_does_not_create_csv(tmp_path) -> None:
     destination = tmp_path / "traffic_data_raw.csv"
 

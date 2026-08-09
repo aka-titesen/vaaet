@@ -7,7 +7,13 @@ from dataclasses import dataclass
 import pandas as pd
 
 from vaaet.data.datasets import TELEMETRY_QUALITY_COLUMNS, build_group_ids
-from vaaet.settings import FEATURE_COLS, TELEMETRY_SCHEMA_VERSION
+from vaaet.data.timestamps import normalize_timestamp_series
+from vaaet.settings import (
+    CANONICAL_TIMEZONE,
+    FEATURE_COLS,
+    TELEMETRY_SCHEMA_VERSION,
+    TRAFFIC_LOCAL_TIMEZONE,
+)
 
 __all__ = ["DatasetAudit", "audit_training_dataset", "validate_training_partitions"]
 
@@ -42,7 +48,9 @@ def audit_training_dataset(
     if df.empty:
         raise ValueError("Dataset contract failed; no records were loaded.")
 
-    timestamps = pd.to_datetime(df["record_time"], errors="raise")
+    df = df.copy()
+    df["record_time"] = normalize_timestamp_series(df["record_time"])
+    timestamps = df["record_time"]
     if df.duplicated(["clip_id", "record_time"]).any():
         raise ValueError("Dataset contract failed; duplicate clip/time records found.")
     counts = df[[
@@ -132,6 +140,8 @@ def audit_training_dataset(
         "clips": int(groups.nunique()),
         "time_start": timestamps.min().isoformat(),
         "time_end": timestamps.max().isoformat(),
+        "timezone": CANONICAL_TIMEZONE,
+        "traffic_local_timezone": TRAFFIC_LOCAL_TIMEZONE,
         "records_by_origin": origins.value_counts(dropna=False).to_dict(),
         "records_by_schema": schema.fillna("traffic-telemetry-v1").value_counts().to_dict(),
         "modern_columns_present": modern_present,

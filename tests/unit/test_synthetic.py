@@ -5,6 +5,9 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
+from vaaet.data.timestamps import normalize_timestamp_series, traffic_local_hour
+from vaaet.evaluation.dataset_validation import audit_training_dataset
+from vaaet.features.engineering import engineer_features
 from vaaet.features.synthetic import (
     SYNTHETIC_ID_OFFSET,
     augment_with_synthetic,
@@ -133,10 +136,38 @@ class TestAugmentWithSynthetic:
         augmented = augment_with_synthetic(
             raw, n_accident_seq=1, n_congestion_seq=1, records_per_seq=5
         )
+        expected = raw.copy()
+        expected["record_time"] = normalize_timestamp_series(expected["record_time"])
         pd.testing.assert_frame_equal(
-            augmented.iloc[: len(raw)][raw.columns].reset_index(drop=True),
-            raw,
+            augmented.iloc[: len(raw)][raw.columns].reset_index(drop=True), expected
         )
+
+    def test_mixed_real_and_synthetic_timestamps_are_canonical_utc(self) -> None:
+        raw = _tiny_raw_df()
+        raw["record_time"] = normalize_timestamp_series(raw["record_time"])
+        augmented = augment_with_synthetic(
+            raw, n_accident_seq=1, n_congestion_seq=1, records_per_seq=5
+        )
+        assert str(augmented["record_time"].dtype) == "datetime64[ns, UTC]"
+        synthetic = augmented.loc[augmented[DATA_ORIGIN_COL].eq("synthetic")]
+        assert traffic_local_hour(synthetic["record_time"]).iloc[0] == 6
+
+    def test_observed_2068_plus_200_regression_reaches_audit_and_engineering(self) -> None:
+        raw = _tiny_raw_df(n=2068)
+        raw["clip_id"] = "legacy-bridge-episode"
+        raw["record_time"] = normalize_timestamp_series(raw["record_time"])
+        augmented = augment_with_synthetic(
+            raw,
+            n_accident_seq=10,
+            n_congestion_seq=10,
+            records_per_seq=10,
+        )
+        audit = audit_training_dataset(augmented, require_production_eligible=False)
+        engineered = engineer_features(augmented)
+        assert len(augmented) == 2268
+        assert audit.report["records"] == 2268
+        assert audit.report["timezone"] == "UTC"
+        assert not engineered.empty
 
     def test_real_rows_are_tagged(self) -> None:
         raw = _tiny_raw_df()

@@ -14,6 +14,11 @@ from types import MappingProxyType
 
 RANDOM_SEED: int = 42
 
+# Temporal contract
+
+CANONICAL_TIMEZONE: str = "UTC"
+TRAFFIC_LOCAL_TIMEZONE: str = "America/Argentina/Buenos_Aires"
+
 
 # Dataset provenance
 

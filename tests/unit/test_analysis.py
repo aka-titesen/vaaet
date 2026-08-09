@@ -6,8 +6,10 @@ from pathlib import Path
 
 import cv2
 import numpy as np
+import pandas as pd
 
 from vaaet.data.datasets import CANONICAL_RAW_TELEMETRY_COLUMNS
+from vaaet.features.engineering import engineer_features
 from vaaet.vision import analysis
 from vaaet.vision.analysis import TrafficStatePrediction, analyze_video
 from vaaet.vision.detector import Detection
@@ -126,3 +128,9 @@ def test_analyze_video_discards_only_the_partial_tail(tmp_path, monkeypatch) -> 
     assert result.complete_minutes == 2
     assert result.processed_duration_seconds == 125.0
     assert result.discarded_partial_seconds == 5.0
+    assert str(result.telemetry["record_time"].dtype) == "datetime64[ns, UTC]"
+    assert result.telemetry.iloc[0]["record_time"] == pd.Timestamp(
+        "2025-05-01 11:01:00Z"
+    )
+    engineered = engineer_features(result.telemetry)
+    assert engineered.iloc[0]["hour_of_day"] == 8

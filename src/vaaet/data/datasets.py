@@ -8,6 +8,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from vaaet.data.timestamps import normalize_timestamp_series
 from vaaet.settings import RANDOM_SEED
 
 __all__ = [
@@ -66,15 +67,13 @@ def build_group_ids(
             if time_col not in df.columns:
                 return groups.mask(groups.eq(""), row_fallback)
 
-            timestamps = pd.to_datetime(df[time_col], errors="coerce")
+            timestamps = normalize_timestamp_series(df[time_col], field_name=time_col)
             fallback = timestamps.dt.floor(fallback_window).astype(str)
-            fallback = fallback.where(~timestamps.isna(), row_fallback)
             return groups.mask(groups.eq(""), "window_" + fallback)
 
     if time_col in df.columns:
-        timestamps = pd.to_datetime(df[time_col], errors="coerce")
+        timestamps = normalize_timestamp_series(df[time_col], field_name=time_col)
         fallback = timestamps.dt.floor(fallback_window).astype(str)
-        fallback = fallback.where(~timestamps.isna(), row_fallback)
         return pd.Series("window_" + fallback, index=df.index, dtype="object")
 
     return row_fallback
@@ -209,7 +208,7 @@ def grouped_temporal_train_validation_test_split(
         raise ValueError("At least one real group is required for validation and test.")
 
     real_groups = groups.loc[real.index]
-    timestamps = pd.to_datetime(real[time_col], errors="raise")
+    timestamps = normalize_timestamp_series(real[time_col], field_name=time_col)
     group_times = timestamps.groupby(real_groups).max().sort_values()
     if len(group_times) < 3:
         raise ValueError("At least three real clips/groups are required for three-way splitting.")
@@ -332,7 +331,7 @@ def merge_raw_telemetry_csv(
         frames.insert(0, existing)
 
     merged = pd.concat(frames, ignore_index=True)
-    merged["record_time"] = pd.to_datetime(merged["record_time"], errors="raise")
+    merged["record_time"] = normalize_timestamp_series(merged["record_time"])
     merged = (
         merged.drop_duplicates(subset=["clip_id", "record_time"], keep="last")
         .sort_values(["record_time", "clip_id"])

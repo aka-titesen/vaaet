@@ -21,6 +21,8 @@ def test_v2_dataset_is_audited_as_eligible(raw_telemetry_df: pd.DataFrame) -> No
     audit = audit_training_dataset(raw_telemetry_df)
     assert audit.production_eligible is True
     assert audit.report["telemetry_v2_coverage"] == 1.0
+    assert audit.report["timezone"] == "UTC"
+    assert audit.report["traffic_local_timezone"] == "America/Argentina/Buenos_Aires"
 
 
 def test_legacy_dataset_is_not_silently_approved(raw_telemetry_df: pd.DataFrame) -> None:

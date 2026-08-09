@@ -177,6 +177,8 @@ def test_training_augmentation_handles_raw_and_feedback_inputs() -> None:
     assert guard in code
     assert code.index(guard) < code.index("_n_before = len(df_raw)")
     assert "Feedback-only run: synthetic raw augmentation skipped" in code
+    assert "from vaaet.data.timestamps import normalize_timestamp_series" in code
+    assert "Canonical timestamp timezone" in code
 
 
 def test_training_documents_actual_synthetic_record_count() -> None:

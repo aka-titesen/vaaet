@@ -23,6 +23,10 @@ from vaaet.data.database import (
     parse_sql_dump_tables,
     restore_backup_to_sql,
 )
+from vaaet.data.timestamps import (
+    count_naive_timestamps,
+    normalize_timestamp_series,
+)
 from vaaet.settings import FEATURE_COLS
 
 DATASET_PACKAGE_CONTRACT = "vaaet-training-dataset-v1"
@@ -147,9 +151,9 @@ def create_dataset_package(
                 "columns": list(frame.columns),
             }
             if "record_time" in frame:
-                timestamps = pd.to_datetime(frame["record_time"], utc=True, errors="raise")
-                if timestamps.isna().any():
-                    raise ValueError(f"Dataset component {key} contains missing record_time values.")
+                timestamps = normalize_timestamp_series(
+                    frame["record_time"], field_name=f"{key}.record_time"
+                )
                 files[key]["record_time_min"] = timestamps.min().isoformat()
                 files[key]["record_time_max"] = timestamps.max().isoformat()
         manifest = {
@@ -315,6 +319,18 @@ def _load_raw(source: TrainingSource) -> pd.DataFrame:
         raise ValueError(
             f"Explicit raw source {type(source).__name__}{suffix} contains zero telemetry rows."
         )
+    temporal_provenance = dict(frame.attrs.get("vaaet_provenance", {}))
+    naive_count = count_naive_timestamps(frame["record_time"])
+    frame = frame.copy()
+    frame["record_time"] = normalize_timestamp_series(frame["record_time"])
+    temporal_provenance.update(
+        {
+            "timestamp_timezone": "UTC",
+            "naive_timezone_assumption": "America/Argentina/Buenos_Aires",
+            "naive_timestamps_localized": naive_count,
+        }
+    )
+    frame.attrs["vaaet_provenance"] = temporal_provenance
     return frame
 
 
@@ -351,7 +367,7 @@ def _deduplicate_raw(frames: Sequence[pd.DataFrame]) -> pd.DataFrame:
     required = RAW_REQUIRED_COLUMNS
     if missing := required - set(combined.columns):
         raise ValueError(f"Raw sources are missing fields: {sorted(missing)}")
-    combined["record_time"] = pd.to_datetime(combined["record_time"], utc=True)
+    combined["record_time"] = normalize_timestamp_series(combined["record_time"])
     comparison = [column for column in combined.columns if column not in {"id", "pipeline_run_id"}]
     for _, group in combined.groupby(["clip_id", "record_time"], dropna=False):
         if len(group[comparison].drop_duplicates()) > 1:
@@ -379,7 +395,7 @@ def _deduplicate_feedback(frames: Sequence[pd.DataFrame]) -> tuple[pd.DataFrame,
         versions = set(combined["feature_schema_version"].dropna().astype(str))
         if versions and versions != {FEATURE_SCHEMA_VERSION}:
             raise ValueError(f"Incompatible feature schema versions: {sorted(versions)}")
-    combined["record_time"] = pd.to_datetime(combined["record_time"], utc=True)
+    combined["record_time"] = normalize_timestamp_series(combined["record_time"])
     combined["traffic_state"] = pd.to_numeric(combined["traffic_state"], errors="raise").astype(int)
     for _, group in combined.groupby(["clip_id", "record_time"], dropna=False):
         if group["traffic_state"].nunique() > 1 or len(
@@ -417,7 +433,7 @@ def compose_supervised_dataset(
     columns = list(dict.fromkeys(column for frame in frames for column in frame.columns))
     aligned = [frame.reindex(columns=columns) for frame in frames]
     combined = pd.concat(aligned, ignore_index=True)
-    combined["record_time"] = pd.to_datetime(combined["record_time"], utc=True)
+    combined["record_time"] = normalize_timestamp_series(combined["record_time"])
     return (
         combined.sort_values("is_human_validated")
         .drop_duplicates(["clip_id", "record_time"], keep="last")

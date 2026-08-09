@@ -115,6 +115,35 @@ def test_combines_raw_and_human_feedback(tmp_path: Path) -> None:
     assert set(result.provenance["kind"]) == {"raw", "validated_feedback"}
 
 
+def test_legacy_raw_csv_is_localized_and_reports_temporal_assumption(tmp_path: Path) -> None:
+    raw_path = tmp_path / "legacy.csv"
+    pd.DataFrame(
+        [
+            {
+                "clip_id": "legacy-clip",
+                "record_time": "2025-04-28 10:00:00",
+                "avg_speed": 50,
+                "count_car": 1,
+                "count_truck": 0,
+                "count_bus": 0,
+                "count_motorcycle": 0,
+                "count_bicycle": 0,
+                "total_vehicles": 1,
+            }
+        ]
+    ).to_csv(raw_path, index=False)
+
+    result = load_training_inputs(
+        TrainingIngestionPlan(raw_sources=(RawCsvSource(raw_path),))
+    )
+
+    assert result.raw.iloc[0]["record_time"] == pd.Timestamp("2025-04-28 13:00:00Z")
+    source = result.provenance.iloc[0]
+    assert source["timestamp_timezone"] == "UTC"
+    assert source["naive_timezone_assumption"] == "America/Argentina/Buenos_Aires"
+    assert source["naive_timestamps_localized"] == 1
+
+
 def test_accident_is_reserved_for_incident_evaluation(tmp_path: Path) -> None:
     package = _package_tables(tmp_path / "accident.zip", state=3)
     result = load_training_inputs(

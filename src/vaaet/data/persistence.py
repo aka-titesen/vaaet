@@ -14,6 +14,7 @@ from sqlalchemy.exc import ProgrammingError
 from vaaet.artifacts import FEATURE_SCHEMA_VERSION
 from vaaet.data.database import DatabaseSettings, get_engine
 from vaaet.data.pipeline_runs import PipelineRunMetadata, PipelineWorkflow, pipeline_run
+from vaaet.data.timestamps import normalize_timestamp
 from vaaet.logging import get_logger
 from vaaet.settings import MODEL_VERSION, STATE_LABELS, TELEMETRY_SCHEMA_VERSION
 
@@ -34,10 +35,7 @@ class PersistResult:
 def _utc_timestamp(value: object) -> object:
     if value is None or pd.isna(value):
         return None
-    timestamp = pd.Timestamp(value)
-    if timestamp.tzinfo is None:
-        timestamp = timestamp.tz_localize("America/Argentina/Buenos_Aires")
-    return timestamp.tz_convert("UTC").to_pydatetime()
+    return normalize_timestamp(value).to_pydatetime()
 
 
 def _nullable_int(value: object) -> int | None:

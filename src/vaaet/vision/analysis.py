@@ -4,12 +4,13 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pandas as pd
 
 from vaaet.data.datasets import CANONICAL_RAW_TELEMETRY_COLUMNS
+from vaaet.data.timestamps import normalize_timestamp
 from vaaet.exceptions import VideoOpenError
 from vaaet.logging import get_logger
 from vaaet.settings import STATE_LABELS
@@ -272,11 +273,13 @@ def analyze_video(
     clip_id = source.stem
     captured_at = extract_recording_start(str(source))
     if captured_at is None:
-        captured_at = datetime.now().astimezone().replace(tzinfo=None)
+        captured_at = datetime.now(timezone.utc)
         logger.warning(
             "Filename does not encode capture time; using processing time for %s",
             source.name,
         )
+    else:
+        captured_at = normalize_timestamp(captured_at).to_pydatetime()
 
     accumulator = MinuteTelemetryAccumulator(clip_id=clip_id)
     records: list[dict[str, object]] = []

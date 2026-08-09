@@ -1,4 +1,4 @@
-# Linaje de datos — VAAET ML 4.2.1
+# Linaje de datos — VAAET ML 4.2.2
 
 ## Flujo operacional
 
@@ -20,6 +20,10 @@ flowchart LR
 Cada ejecución de adquisición o inferencia genera un `pipeline_run_id`. Los
 timestamps se persisten como `TIMESTAMPTZ` UTC; valores históricos sin zona se
 interpretan como `America/Argentina/Buenos_Aires` durante la migración.
+El mismo contrato se aplica en memoria, CSV, backups, paquetes y sintéticos:
+`record_time` siempre es timezone-aware en UTC. La hora argentina se recupera
+únicamente para las features circadianas y la presentación, sin alterar el
+instante persistido.
 
 Desde 4.2.0 el UUID referencia `vaaet_ops.pipeline_runs`, que registra workflow,
 estado, commit, contratos y conteos sin secretos. Cuando PostgreSQL es opcional,

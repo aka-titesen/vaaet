@@ -13,6 +13,22 @@ Todos los cambios relevantes del proyecto VAAET se documentan en este archivo, s
 
 ---
 
+## [4.2.2] - 2026-08-09
+
+### Corregido
+
+- `record_time` se normaliza como UTC timezone-aware en adquisición, ingestión,
+  sintéticos, auditoría, ingeniería, CSV, contratos y persistencia.
+- Los timestamps legacy sin zona se interpretan como hora de Buenos Aires; las
+  features `hour_of_day` y `weather_condition` conservan esa semántica local.
+- La combinación observada de 2.068 filas reales UTC y 200 sintéticas deja de
+  producir timestamps mixtos y completa auditoría e ingeniería de features.
+
+### Pruebas
+
+- Se cubren equivalencia local/UTC, deduplicación por instante, cruce entre
+  entrenamiento e inferencia y la regresión completa de 2.268 registros.
+
 ## [4.2.1] - 2026-08-09
 
 ### Corregido

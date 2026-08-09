@@ -4,7 +4,7 @@
 
 | Campo | Valor |
 |---|---|
-| Proyecto | VAAET ML 4.2.1 |
+| Proyecto | VAAET ML 4.2.2 |
 | Modelo vigente | `mlp-v2.0` |
 | Estado inicial | Experimental / shadow-only hasta cumplir gates |
 | Runtime | TensorFlow/Keras, Python 3.10–3.12, Google Colab |
@@ -30,7 +30,7 @@ Las salidas aprendidas son `Normal`, `Reduced` y `Congested`. El estado público
 
 ## Features
 
-Se conserva el orden contractual de 19 features: velocidad y volumen; conteos de cinco tipos; proporción de pesados; deltas, transición, varianza y persistencia por segmento continuo de cada clip; calidad de velocidad, near-zero y stationary sobre tracks únicos; hora y proxy nocturno. La semántica temporal corresponde a `traffic-features-v2`.
+Se conserva el orden contractual de 19 features: velocidad y volumen; conteos de cinco tipos; proporción de pesados; deltas, transición, varianza y persistencia por segmento continuo de cada clip; calidad de velocidad, near-zero y stationary sobre tracks únicos; hora y proxy nocturno. `record_time` se transporta en UTC, mientras `hour_of_day` y `weather_condition` se derivan en `America/Argentina/Buenos_Aires`. La semántica temporal corresponde a `traffic-features-v2`.
 
 Los registros `traffic-telemetry-v1` no contienen evidencia moderna de calidad. Esos valores permanecen desconocidos y sólo permiten reproducir un baseline experimental; nunca se interpretan como calidad perfecta.
 
@@ -69,4 +69,4 @@ La promoción manual exige telemetría v2 suficiente, holdout humano, retrospect
 | `mlp-v1.1` | Baseline de 19 features y cuatro salidas |
 | `mlp-v2.0` | Tres salidas estables, contrato v2 y política jerárquica humana para Accident |
 
-Última revisión: 2026-08-04. Véanse [ADR-0014](../architecture/decisions/0014-hierarchical-traffic-state-and-incident-policy.md) y [ADR-0015](../architecture/decisions/0015-postgresql-namespaces-security-and-hitl.md).
+Última revisión: 2026-08-09. Véanse [ADR-0014](../architecture/decisions/0014-hierarchical-traffic-state-and-incident-policy.md) y [ADR-0015](../architecture/decisions/0015-postgresql-namespaces-security-and-hitl.md).

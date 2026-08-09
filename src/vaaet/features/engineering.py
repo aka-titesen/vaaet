@@ -11,6 +11,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
+from vaaet.data.timestamps import normalize_timestamp_series, traffic_local_hour
 from vaaet.settings import FEATURE_COLS, FEATURE_MAX_GAP_MINUTES, LABELING_THRESHOLDS
 
 __all__ = [
@@ -44,7 +45,7 @@ def _validate_and_order(df: pd.DataFrame) -> pd.DataFrame:
     out = df.copy()
     if out["clip_id"].isna().any() or out["clip_id"].astype(str).str.strip().eq("").any():
         raise ValueError("clip_id must be present for every telemetry record.")
-    out["record_time"] = pd.to_datetime(out["record_time"], errors="raise", utc=False)
+    out["record_time"] = normalize_timestamp_series(out["record_time"])
     if out.duplicated(["clip_id", "record_time"]).any():
         raise ValueError("Duplicate (clip_id, record_time) telemetry records are not allowed.")
 
@@ -143,7 +144,7 @@ def engineer_features(df: pd.DataFrame) -> pd.DataFrame:
         observed_tracks,
     )
 
-    out["hour_of_day"] = out["record_time"].dt.hour
+    out["hour_of_day"] = traffic_local_hour(out["record_time"])
     out["weather_condition"] = (~out["hour_of_day"].between(6, 18)).astype(int)
 
     # Delta-based features are undefined for the first record. Preserve the

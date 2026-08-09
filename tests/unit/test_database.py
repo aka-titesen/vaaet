@@ -319,6 +319,163 @@ class TestRestoreBackupToSql:
             with pytest.raises(RuntimeError, match=r"version mismatch .*binary="):
                 restore_backup_to_sql(backup)
 
+    def test_selects_exact_schema_qualified_table_via_toc(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from unittest.mock import MagicMock
+
+        from vaaet.data.database import restore_backup_to_sql
+
+        backup = tmp_path / "legacy.backup"
+        backup.write_bytes(b"PGDMP")
+        pg_restore = tmp_path / "pg_restore-17"
+        pg_restore.write_text("binary", encoding="utf-8")
+        output = tmp_path / "legacy.sql"
+        commands: list[list[str]] = []
+        selected_toc = ""
+
+        monkeypatch.setattr("vaaet.data.database.os.access", lambda *_: True)
+
+        def fake_run(command, **_kwargs):
+            nonlocal selected_toc
+            commands.append(command)
+            if "--version" in command:
+                return MagicMock(
+                    returncode=0, stdout="pg_restore (PostgreSQL) 17.10", stderr=""
+                )
+            if "-l" in command:
+                return MagicMock(
+                    returncode=0,
+                    stdout="321; 0 987 TABLE DATA public traffic_data postgres\n",
+                    stderr="",
+                )
+            toc_path = Path(command[command.index("--use-list") + 1])
+            selected_toc = toc_path.read_text(encoding="utf-8")
+            output.write_text(
+                "COPY public.traffic_data (clip_id, record_time) FROM stdin;\n"
+                "clip-a\t2026-08-09 12:00:00\n\\.\n",
+                encoding="utf-8",
+            )
+            return MagicMock(returncode=0, stdout="", stderr="")
+
+        monkeypatch.setattr("vaaet.data.database.subprocess.run", fake_run)
+
+        result = restore_backup_to_sql(
+            backup,
+            output_path=output,
+            pg_restore_path=pg_restore,
+            tables=("public.traffic_data",),
+        )
+
+        restore_command = commands[-1]
+        assert result == output
+        assert "--use-list" in restore_command
+        assert "--table" not in restore_command
+        assert "public.traffic_data" not in restore_command
+        assert selected_toc == "321; 0 987 TABLE DATA public traffic_data postgres\n"
+
+    def test_rejects_nonzero_restore_and_removes_partial_output(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from unittest.mock import MagicMock
+
+        from vaaet.data.database import restore_backup_to_sql
+
+        backup = tmp_path / "legacy.backup"
+        backup.write_bytes(b"PGDMP")
+        pg_restore = tmp_path / "pg_restore-17"
+        pg_restore.write_text("binary", encoding="utf-8")
+        output = tmp_path / "partial.sql"
+        monkeypatch.setattr("vaaet.data.database.os.access", lambda *_: True)
+
+        def fake_run(command, **_kwargs):
+            if "--version" in command:
+                return MagicMock(
+                    returncode=0, stdout="pg_restore (PostgreSQL) 17.10", stderr=""
+                )
+            output.write_text("-- partial", encoding="utf-8")
+            return MagicMock(returncode=1, stdout="", stderr="selection failed")
+
+        monkeypatch.setattr("vaaet.data.database.subprocess.run", fake_run)
+
+        with pytest.raises(RuntimeError, match="exit 1"):
+            restore_backup_to_sql(
+                backup, output_path=output, pg_restore_path=pg_restore
+            )
+        assert not output.exists()
+
+    def test_rejects_requested_table_missing_from_catalog(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from unittest.mock import MagicMock
+
+        from vaaet.data.database import restore_backup_to_sql
+
+        backup = tmp_path / "other.backup"
+        backup.write_bytes(b"PGDMP")
+        pg_restore = tmp_path / "pg_restore-17"
+        pg_restore.write_text("binary", encoding="utf-8")
+        monkeypatch.setattr("vaaet.data.database.os.access", lambda *_: True)
+
+        def fake_run(command, **_kwargs):
+            if "--version" in command:
+                return MagicMock(
+                    returncode=0, stdout="pg_restore (PostgreSQL) 17.10", stderr=""
+                )
+            return MagicMock(
+                returncode=0,
+                stdout="7; 0 8 TABLE DATA public unrelated postgres\n",
+                stderr="",
+            )
+
+        monkeypatch.setattr("vaaet.data.database.subprocess.run", fake_run)
+
+        with pytest.raises(ValueError, match="did not match requested TABLE DATA"):
+            restore_backup_to_sql(
+                backup,
+                pg_restore_path=pg_restore,
+                tables=("public.traffic_data",),
+            )
+
+    def test_rejects_successful_output_without_requested_copy(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from unittest.mock import MagicMock
+
+        from vaaet.data.database import restore_backup_to_sql
+
+        backup = tmp_path / "legacy.backup"
+        backup.write_bytes(b"PGDMP")
+        pg_restore = tmp_path / "pg_restore-17"
+        pg_restore.write_text("binary", encoding="utf-8")
+        output = tmp_path / "invalid.sql"
+        monkeypatch.setattr("vaaet.data.database.os.access", lambda *_: True)
+
+        def fake_run(command, **_kwargs):
+            if "--version" in command:
+                return MagicMock(
+                    returncode=0, stdout="pg_restore (PostgreSQL) 17.10", stderr=""
+                )
+            if "-l" in command:
+                return MagicMock(
+                    returncode=0,
+                    stdout="321; 0 987 TABLE DATA public traffic_data postgres\n",
+                    stderr="",
+                )
+            output.write_text("-- no COPY data", encoding="utf-8")
+            return MagicMock(returncode=0, stdout="", stderr="")
+
+        monkeypatch.setattr("vaaet.data.database.subprocess.run", fake_run)
+
+        with pytest.raises(ValueError, match="no COPY block"):
+            restore_backup_to_sql(
+                backup,
+                output_path=output,
+                pg_restore_path=pg_restore,
+                tables=("public.traffic_data",),
+            )
+        assert not output.exists()
+
 
 def test_backup_catalog_recognizes_modern_and_legacy_tables(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -508,3 +665,21 @@ class TestParseSqlDump:
         assert frame.iloc[0]["near_zero_motion_count"] == 3
         assert frame.iloc[0]["speed_measurement_quality"] == pytest.approx(0.8)
         assert frame.iloc[0]["telemetry_schema_version"] == "traffic-telemetry-v2"
+
+    def test_preserves_empty_copy_schema(self, tmp_path: Path) -> None:
+        from vaaet.data.database import parse_sql_dump_tables
+
+        sql_file = tmp_path / "empty-table.sql"
+        sql_file.write_text(
+            "COPY public.traffic_data (clip_id, record_time, total_vehicles) FROM stdin;\n"
+            "\\.\n",
+            encoding="utf-8",
+        )
+        frames = parse_sql_dump_tables(sql_file)
+        assert "public.traffic_data" in frames
+        assert frames["public.traffic_data"].empty
+        assert list(frames["public.traffic_data"].columns) == [
+            "clip_id",
+            "record_time",
+            "total_vehicles",
+        ]

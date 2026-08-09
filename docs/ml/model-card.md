@@ -4,7 +4,7 @@
 
 | Campo | Valor |
 |---|---|
-| Proyecto | VAAET ML 4.2.0 |
+| Proyecto | VAAET ML 4.2.1 |
 | Modelo vigente | `mlp-v2.0` |
 | Estado inicial | Experimental / shadow-only hasta cumplir gates |
 | Runtime | TensorFlow/Keras, Python 3.10–3.12, Google Colab |

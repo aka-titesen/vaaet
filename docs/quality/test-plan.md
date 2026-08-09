@@ -8,7 +8,7 @@ Complementa SRS.md (requisitos) y SAD.md (arquitectura). -->
 | Campo | Detalles |
 |---|---|
 | **Nombre del Proyecto** | VAAET — Video Advanced Analysis of Traffic |
-| **Versión** | 4.2.0 |
+| **Versión** | 4.2.1 |
 | **Estado** | Aprobado |
 | **Responsable Técnico** | Facundo Nicolás González |
 | **Responsable de QA** | Facundo Nicolás González |

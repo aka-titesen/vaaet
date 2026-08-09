@@ -126,6 +126,14 @@ jobs:
     env:
       VAAET_DATABASE_ADMIN_URL: postgresql+psycopg2://postgres:postgres@localhost:5432/vaaet
       VAAET_EXPECT_LEGACY_FIXTURE: "1"
+      VAAET_LEGACY_BACKUP_PATH: /tmp/vaaet-legacy.backup
+      VAAET_MODERN_BACKUP_PATH: /tmp/vaaet-modern.backup
+      VAAET_PG_RESTORE_PATH: /usr/lib/postgresql/17/bin/pg_restore
+      PGHOST: localhost
+      PGPORT: "5432"
+      PGDATABASE: vaaet
+      PGUSER: postgres
+      PGPASSWORD: postgres
     steps:
       - uses: actions/checkout@v4
 
@@ -136,11 +144,25 @@ jobs:
       - name: Instalar dependencias de base de datos
         run: pip install -e ".[database,dev]"
 
+      - name: Instalar cliente PostgreSQL 17
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq curl ca-certificates
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl --fail --silent --show-error --retry 3 --output /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          . /etc/os-release
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt ${VERSION_CODENAME}-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list >/dev/null
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client-17
+          /usr/lib/postgresql/17/bin/pg_restore --version
+
       - name: Aplicar migración y roles
         run: |
           python -c "import os, pathlib, psycopg2; c=psycopg2.connect(os.environ['VAAET_DATABASE_ADMIN_URL'].replace('postgresql+psycopg2://','postgresql://')); c.autocommit=True; c.cursor().execute(pathlib.Path('tests/fixtures/postgres-legacy.sql').read_text()); c.close()"
+          /usr/lib/postgresql/17/bin/pg_dump --format=custom --data-only --table=public.traffic_data --file="$VAAET_LEGACY_BACKUP_PATH"
           alembic upgrade head
           python -c "import os, pathlib, psycopg2; c=psycopg2.connect(os.environ['VAAET_DATABASE_ADMIN_URL'].replace('postgresql+psycopg2://','postgresql://')); c.autocommit=True; c.cursor().execute(pathlib.Path('migrations/provision-roles.sql').read_text()); c.close()"
+          /usr/lib/postgresql/17/bin/pg_dump --format=custom --data-only --table=vaaet_raw.traffic_data --file="$VAAET_MODERN_BACKUP_PATH"
 
       - name: Probar schema, constraints y mínimo privilegio
         run: pytest tests/integration -v --tb=short -m postgres

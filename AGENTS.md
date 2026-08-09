@@ -5,10 +5,10 @@
 | Campo | Detalle |
 |---|---|
 | Proyecto | VAAET ML — Video Advanced Analysis of Traffic |
-| Versión | 4.2.0 |
+| Versión | 4.2.1 |
 | Runtime objetivo | Python 3.10–3.12; Google Colab |
 | Responsable | Facundo Nicolás González |
-| Última revisión | 2026-08-06 |
+| Última revisión | 2026-08-09 |
 
 ## Mandato
 

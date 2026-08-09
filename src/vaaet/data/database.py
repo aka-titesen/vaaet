@@ -39,6 +39,26 @@ PREDICTION_TABLE = "vaaet_ml.traffic_predictions"
 VALIDATION_TABLE = "vaaet_feedback.human_validations"
 EFFECTIVE_LABELS_VIEW = "vaaet_feedback.effective_human_labels"
 
+_RECOGNIZED_BACKUP_TABLES = {
+    RAW_TABLE,
+    FEATURE_TABLE,
+    PREDICTION_TABLE,
+    VALIDATION_TABLE,
+    "public.traffic_data",
+    "public.telemetry_raw",
+    "public.traffic_classifications",
+}
+_TOC_TABLE_DATA_PATTERN = re.compile(
+    r"^\s*(?P<dump_id>\d+);\s+\d+\s+\d+\s+TABLE DATA\s+"
+    r"(?P<schema>\S+)\s+(?P<table>\S+)\s+.+$",
+    re.IGNORECASE,
+)
+_COPY_PATTERN = re.compile(
+    r"COPY\s+(?:(?P<schema>[\w\"]+)\.)?(?P<table>[\w\"]+)\s*"
+    r"\((?P<columns>[^)]+)\)\s+FROM\s+stdin;",
+    re.IGNORECASE,
+)
+
 
 class DatabaseProfile(str, Enum):
     """Least-privilege database identity used by a workflow."""
@@ -103,7 +123,7 @@ class DatabaseSettings:
 
     @property
     def application(self) -> str:
-        return self.application_name or f"vaaet-{self.profile.value}-4.2.0"
+        return self.application_name or f"vaaet-{self.profile.value}-4.2.1"
 
 
 @dataclass(frozen=True)
@@ -118,6 +138,14 @@ class DatabaseHealth:
     current_role: str
     ssl_enabled: bool
     available_schemas: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class _BackupCatalogEntry:
+    """Exact TABLE DATA entry retained from a pg_restore table of contents."""
+
+    qualified_name: str
+    toc_line: str
 
 
 def _colab_secret(name: str) -> str | None:
@@ -474,6 +502,43 @@ def _resolve_pg_restore(pg_restore_path: str | Path | None) -> Path:
     return resolved
 
 
+def _pg_restore_version(binary: Path) -> str:
+    result = subprocess.run(
+        [str(binary), "--version"], capture_output=True, text=True, check=False
+    )
+    version = result.stdout.strip()
+    if result.returncode != 0 or not version:
+        diagnostic = result.stderr.strip() or "no version output"
+        raise ArtifactValidationError(
+            f"Cannot execute PostgreSQL backup reader {binary}: {diagnostic}"
+        )
+    return version
+
+
+def get_pg_restore_version(pg_restore_path: str | Path | None = None) -> str:
+    """Return a validated, display-safe pg_restore version string."""
+    return _pg_restore_version(_resolve_pg_restore(pg_restore_path))
+
+
+def _read_backup_catalog(backup: Path, binary: Path) -> tuple[_BackupCatalogEntry, ...]:
+    result = subprocess.run(
+        [str(binary), "-l", str(backup)], capture_output=True, text=True, check=False
+    )
+    if result.returncode != 0:
+        raise ArtifactValidationError(
+            f"Cannot inspect PostgreSQL backup with {binary}: {result.stderr.strip()}"
+        )
+    entries: list[_BackupCatalogEntry] = []
+    for line in result.stdout.splitlines():
+        match = _TOC_TABLE_DATA_PATTERN.match(line)
+        if not match:
+            continue
+        schema = match.group("schema").strip(chr(34))
+        table = match.group("table").strip(chr(34))
+        entries.append(_BackupCatalogEntry(f"{schema}.{table}", line.strip()))
+    return tuple(entries)
+
+
 def inspect_backup_catalog(
     backup_path: str | Path,
     *,
@@ -483,28 +548,12 @@ def inspect_backup_catalog(
     if not backup.is_file():
         raise ArtifactNotFoundError(f"Backup file not found: {backup}")
     binary = _resolve_pg_restore(pg_restore_path)
-    result = subprocess.run(
-        [str(binary), "-l", str(backup)], capture_output=True, text=True, check=False
-    )
-    if result.returncode:
-        raise ArtifactValidationError(
-            f"Cannot inspect PostgreSQL backup with {binary}: {result.stderr.strip()}"
-        )
-    recognized: set[str] = set()
-    for schema, table in re.findall(
-        r"TABLE DATA\s+(\S+)\s+(\S+)", result.stdout, flags=re.IGNORECASE
-    ):
-        normalized = f"{schema.strip(chr(34))}.{table.strip(chr(34))}"
-        if normalized in {
-            RAW_TABLE,
-            FEATURE_TABLE,
-            PREDICTION_TABLE,
-            VALIDATION_TABLE,
-            "public.traffic_data",
-            "public.telemetry_raw",
-            "public.traffic_classifications",
-        }:
-            recognized.add(normalized)
+    entries = _read_backup_catalog(backup, binary)
+    recognized = {
+        entry.qualified_name
+        for entry in entries
+        if entry.qualified_name in _RECOGNIZED_BACKUP_TABLES
+    }
     return tuple(sorted(recognized))
 
 
@@ -518,10 +567,9 @@ def restore_backup_to_sql(
     if not backup.is_file():
         raise ArtifactNotFoundError(f"Backup file not found: {backup}")
     binary = _resolve_pg_restore(pg_restore_path)
-    version = subprocess.run(
-        [str(binary), "--version"], capture_output=True, text=True, check=False
-    ).stdout.strip()
+    version = _pg_restore_version(binary)
     destination = Path(output_path) if output_path else backup.with_suffix(".sql")
+    destination.unlink(missing_ok=True)
     command = [
         str(binary),
         "--data-only",
@@ -529,27 +577,70 @@ def restore_backup_to_sql(
         "--no-acl",
         "--no-comments",
     ]
-    for table_name in tables or ():
-        command.extend(["--table", table_name])
+    requested_tables = tuple(dict.fromkeys(tables or ()))
+    toc_path: Path | None = None
+    if requested_tables:
+        entries = _read_backup_catalog(backup, binary)
+        by_name = {entry.qualified_name: entry for entry in entries}
+        missing = [table_name for table_name in requested_tables if table_name not in by_name]
+        if missing:
+            available = sorted(
+                entry.qualified_name
+                for entry in entries
+                if entry.qualified_name in _RECOGNIZED_BACKUP_TABLES
+            )
+            raise ArtifactValidationError(
+                "PostgreSQL backup selection did not match requested TABLE DATA entries: "
+                f"missing={missing}, recognized={available}"
+            )
+        with tempfile.NamedTemporaryFile(
+            mode="w", encoding="utf-8", suffix=".toc", delete=False
+        ) as handle:
+            handle.write("\n".join(by_name[name].toc_line for name in requested_tables))
+            handle.write("\n")
+            toc_path = Path(handle.name)
+        command.extend(["--use-list", str(toc_path)])
     command.extend(["-f", str(destination), str(backup)])
-    result = subprocess.run(command, capture_output=True, text=True, check=False)
+    try:
+        result = subprocess.run(command, capture_output=True, text=True, check=False)
+    except OSError:
+        destination.unlink(missing_ok=True)
+        raise
+    finally:
+        if toc_path is not None:
+            toc_path.unlink(missing_ok=True)
     stderr = result.stderr.strip()
     if any(value in stderr.lower() for value in ("unsupported version", "unsupported archive")):
+        destination.unlink(missing_ok=True)
         raise RuntimeError(
             f"pg_restore version mismatch ({version}, binary={binary}).\nstderr: {stderr}"
         )
-    if result.returncode not in (0, 1):
-        raise RuntimeError(f"pg_restore failed (exit {result.returncode}):\n{stderr}")
+    if result.returncode != 0:
+        destination.unlink(missing_ok=True)
+        raise RuntimeError(
+            f"pg_restore failed (exit {result.returncode}, reader={version}, "
+            f"tables={list(requested_tables)}):\n{stderr or 'no diagnostic output'}"
+        )
     if not destination.is_file() or destination.stat().st_size == 0:
+        destination.unlink(missing_ok=True)
         raise RuntimeError(f"pg_restore produced an empty or missing file: {destination}")
+    if requested_tables:
+        extracted_tables: set[str] = set()
+        with destination.open(encoding="utf-8", errors="replace") as handle:
+            for line in handle:
+                match = _COPY_PATTERN.match(line.strip())
+                if match:
+                    schema = (match.group("schema") or "public").strip(chr(34))
+                    table = match.group("table").strip(chr(34))
+                    extracted_tables.add(f"{schema}.{table}")
+        missing_copy = [name for name in requested_tables if name not in extracted_tables]
+        if missing_copy:
+            destination.unlink(missing_ok=True)
+            raise ArtifactValidationError(
+                "PostgreSQL backup extraction produced no COPY block for requested tables: "
+                f"{missing_copy} (reader={version})"
+            )
     return destination
-
-
-_COPY_PATTERN = re.compile(
-    r"COPY\s+(?:(?P<schema>[\w\"]+)\.)?(?P<table>[\w\"]+)\s*"
-    r"\((?P<columns>[^)]+)\)\s+FROM\s+stdin;",
-    re.IGNORECASE,
-)
 
 
 def parse_sql_dump_tables(sql_path: str | Path) -> dict[str, pd.DataFrame]:
@@ -574,14 +665,17 @@ def parse_sql_dump_tables(sql_path: str | Path) -> dict[str, pd.DataFrame]:
             if lines[index]:
                 rows.append(lines[index])
             index += 1
+        qualified_name = f"{schema}.{table_name}"
         if rows:
-            frames[f"{schema}.{table_name}"] = pd.read_csv(
+            frames[qualified_name] = pd.read_csv(
                 io.StringIO("\n".join(rows)),
                 sep="\t",
                 header=None,
                 names=columns,
                 na_values=["\\N"],
             )
+        else:
+            frames[qualified_name] = pd.DataFrame(columns=columns)
         index += 1
     return frames
 
@@ -626,6 +720,7 @@ __all__ = [
     "DatabaseSettings",
     "database_engine",
     "execute_with_retry",
+    "get_pg_restore_version",
     "get_engine",
     "get_optional_database_settings",
     "inspect_backup_catalog",

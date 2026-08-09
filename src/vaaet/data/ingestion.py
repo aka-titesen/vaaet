@@ -16,6 +16,7 @@ import pandas as pd
 from vaaet.artifacts import FEATURE_SCHEMA_VERSION
 from vaaet.data.database import (
     DatabaseSettings,
+    get_pg_restore_version,
     inspect_backup_catalog,
     load_human_ground_truth,
     load_telemetry,
@@ -256,6 +257,7 @@ def _frames_from_backup(
         raise ValueError(
             f"PostgreSQL backup does not contain requested components: {sorted(components)}"
         )
+    reader_version = get_pg_restore_version(source.pg_restore_path)
     sql_path = restore_backup_to_sql(
         source.path,
         pg_restore_path=source.pg_restore_path,
@@ -269,7 +271,13 @@ def _frames_from_backup(
     for key, names in aliases.items():
         for name in names:
             if name in tables:
-                result[key] = tables[name]
+                frame = tables[name]
+                frame.attrs["vaaet_provenance"] = {
+                    "archive_table": name,
+                    "backup_layout": "legacy" if name.startswith("public.") else "modern",
+                    "reader_version": reader_version,
+                }
+                result[key] = frame
                 break
     if "validations" not in result and "predictions" in result:
         legacy = result["predictions"]
@@ -282,20 +290,32 @@ def _frames_from_backup(
                 )
                 validated["reviewed_at"] = validated.get("validated_at", validated["classified_at"])
                 validated["reviewer_id"] = "legacy-import"
+                validated.attrs["vaaet_provenance"] = legacy.attrs.get(
+                    "vaaet_provenance", {}
+                )
                 result["validations"] = validated
     return result
 
 
 def _load_raw(source: TrainingSource) -> pd.DataFrame:
     if isinstance(source, PostgresSource):
-        return load_telemetry(settings=source.settings)
-    if isinstance(source, RawCsvSource):
-        return pd.read_csv(source.path)
-    if isinstance(source, DatasetPackageSource):
-        return load_dataset_package(source.path).get("raw", pd.DataFrame())
-    if isinstance(source, PostgresBackupSource):
-        return _frames_from_backup(source, components={"raw"}).get("raw", pd.DataFrame())
-    raise TypeError(f"Unsupported raw source: {type(source)!r}")
+        frame = load_telemetry(settings=source.settings)
+    elif isinstance(source, RawCsvSource):
+        frame = pd.read_csv(source.path)
+    elif isinstance(source, DatasetPackageSource):
+        frame = load_dataset_package(source.path).get("raw", pd.DataFrame())
+    elif isinstance(source, PostgresBackupSource):
+        frame = _frames_from_backup(source, components={"raw"}).get("raw", pd.DataFrame())
+    else:
+        raise TypeError(f"Unsupported raw source: {type(source)!r}")
+    if frame.empty:
+        details = frame.attrs.get("vaaet_provenance", {})
+        archive_table = details.get("archive_table")
+        suffix = f" ({archive_table})" if archive_table else ""
+        raise ValueError(
+            f"Explicit raw source {type(source).__name__}{suffix} contains zero telemetry rows."
+        )
+    return frame
 
 
 def _load_feedback(source: TrainingSource) -> pd.DataFrame:
@@ -304,11 +324,20 @@ def _load_feedback(source: TrainingSource) -> pd.DataFrame:
     if isinstance(source, DatasetPackageSource):
         return _latest_validated_feedback(load_dataset_package(source.path))
     if isinstance(source, PostgresBackupSource):
-        return _latest_validated_feedback(
-            _frames_from_backup(
-                source, components={"features", "predictions", "validations"}
-            )
+        frames = _frames_from_backup(
+            source, components={"features", "predictions", "validations"}
         )
+        frame = _latest_validated_feedback(frames)
+        source_details = next(
+            (
+                item.attrs.get("vaaet_provenance", {})
+                for item in frames.values()
+                if item.attrs.get("vaaet_provenance")
+            ),
+            {},
+        )
+        frame.attrs["vaaet_provenance"] = source_details
+        return frame
     if isinstance(source, RawCsvSource):
         raise ValueError("RawCsvSource cannot be used as a feedback source.")
     raise TypeError(f"Unsupported feedback source: {type(source)!r}")
@@ -404,15 +433,23 @@ def load_training_inputs(plan: TrainingIngestionPlan) -> TrainingDataset:
     for index, source in enumerate(plan.raw_sources):
         frame = _load_raw(source)
         raw_frames.append(frame)
-        provenance.append(
-            {"kind": "raw", "source_index": index, "source_type": type(source).__name__, "rows": len(frame)}
-        )
+        provenance.append({
+            "kind": "raw",
+            "source_index": index,
+            "source_type": type(source).__name__,
+            "rows": len(frame),
+            **frame.attrs.get("vaaet_provenance", {}),
+        })
     for index, source in enumerate(plan.feedback_sources):
         frame = _load_feedback(source)
         feedback_frames.append(frame)
-        provenance.append(
-            {"kind": "validated_feedback", "source_index": index, "source_type": type(source).__name__, "rows": len(frame)}
-        )
+        provenance.append({
+            "kind": "validated_feedback",
+            "source_index": index,
+            "source_type": type(source).__name__,
+            "rows": len(frame),
+            **frame.attrs.get("vaaet_provenance", {}),
+        })
     raw = _deduplicate_raw(raw_frames)
     feedback, incidents = _deduplicate_feedback(feedback_frames)
     if raw.empty and feedback.empty and incidents.empty:

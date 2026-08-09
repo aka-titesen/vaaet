@@ -12,6 +12,7 @@ import pytest
 
 from vaaet.artifacts import FEATURE_SCHEMA_VERSION
 from vaaet.data.ingestion import (
+    RAW_REQUIRED_COLUMNS,
     DatasetPackageSource,
     FeedbackPolicy,
     PostgresBackupSource,
@@ -214,6 +215,10 @@ def test_raw_backup_extracts_only_requested_raw_table(tmp_path: Path) -> None:
     )
     with (
         patch("vaaet.data.ingestion.inspect_backup_catalog", return_value=catalog),
+        patch(
+            "vaaet.data.ingestion.get_pg_restore_version",
+            return_value="pg_restore (PostgreSQL) 17.10",
+        ),
         patch("vaaet.data.ingestion.restore_backup_to_sql", return_value=restored) as restore,
         patch(
             "vaaet.data.ingestion.parse_sql_dump_tables",
@@ -225,3 +230,78 @@ def test_raw_backup_extracts_only_requested_raw_table(tmp_path: Path) -> None:
         )
     assert len(result.raw) == 1
     assert restore.call_args.kwargs["tables"] == ("vaaet_raw.traffic_data",)
+    assert result.provenance.iloc[0]["archive_table"] == "vaaet_raw.traffic_data"
+    assert result.provenance.iloc[0]["backup_layout"] == "modern"
+    assert result.provenance.iloc[0]["reader_version"] == "pg_restore (PostgreSQL) 17.10"
+
+
+def test_legacy_raw_backup_reports_table_and_preserves_columns(tmp_path: Path) -> None:
+    backup = tmp_path / "legacy.backup"
+    backup.write_bytes(b"PGDMP")
+    restored = tmp_path / "legacy.sql"
+    restored.write_text("restored", encoding="utf-8")
+    raw = pd.DataFrame(
+        [
+            {
+                "id": 1,
+                "clip_id": "legacy-clip",
+                "record_time": "2025-04-21T12:00:00Z",
+                "avg_speed": 45.5,
+                "count_car": 10,
+                "count_truck": 2,
+                "count_bus": 1,
+                "count_motorcycle": 3,
+                "count_bicycle": 0,
+                "total_vehicles": 16,
+            }
+        ]
+    )
+    with (
+        patch(
+            "vaaet.data.ingestion.inspect_backup_catalog",
+            return_value=("public.traffic_data",),
+        ),
+        patch(
+            "vaaet.data.ingestion.get_pg_restore_version",
+            return_value="pg_restore (PostgreSQL) 17.10",
+        ),
+        patch("vaaet.data.ingestion.restore_backup_to_sql", return_value=restored),
+        patch(
+            "vaaet.data.ingestion.parse_sql_dump_tables",
+            return_value={"public.traffic_data": raw},
+        ),
+    ):
+        result = load_training_inputs(
+            TrainingIngestionPlan(raw_sources=(PostgresBackupSource(backup),))
+        )
+
+    assert list(result.raw.columns) == list(raw.columns)
+    assert result.provenance.iloc[0]["archive_table"] == "public.traffic_data"
+    assert result.provenance.iloc[0]["backup_layout"] == "legacy"
+
+
+def test_explicit_empty_raw_backup_fails_with_specific_table(tmp_path: Path) -> None:
+    backup = tmp_path / "empty.backup"
+    backup.write_bytes(b"PGDMP")
+    restored = tmp_path / "empty.sql"
+    restored.write_text("restored", encoding="utf-8")
+    empty_raw = pd.DataFrame(columns=sorted(RAW_REQUIRED_COLUMNS))
+    with (
+        patch(
+            "vaaet.data.ingestion.inspect_backup_catalog",
+            return_value=("public.traffic_data",),
+        ),
+        patch(
+            "vaaet.data.ingestion.get_pg_restore_version",
+            return_value="pg_restore (PostgreSQL) 17.10",
+        ),
+        patch("vaaet.data.ingestion.restore_backup_to_sql", return_value=restored),
+        patch(
+            "vaaet.data.ingestion.parse_sql_dump_tables",
+            return_value={"public.traffic_data": empty_raw},
+        ),
+    ):
+        with pytest.raises(ValueError, match=r"public\.traffic_data.*zero telemetry rows"):
+            load_training_inputs(
+                TrainingIngestionPlan(raw_sources=(PostgresBackupSource(backup),))
+            )

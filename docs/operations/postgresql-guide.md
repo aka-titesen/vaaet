@@ -1,4 +1,4 @@
-# Operación PostgreSQL — VAAET ML 4.2.0
+# Operación PostgreSQL — VAAET ML 4.2.1
 
 Esta guía aplica a PostgreSQL 14+ en AWS RDS, Neon, Supabase o un servidor
 propio. El endpoint debe ser accesible desde Colab; VPN y túneles quedan fuera de
@@ -52,8 +52,10 @@ pg_dump --format=custom --no-owner --no-acl \
 pg_restore -l vaaet-db-v2.backup
 ```
 
-El notebook usa cliente 17, inspecciona el catálogo y extrae únicamente tablas
-reconocidas con `--data-only --no-owner --no-acl`. Nunca restaura DDL o roles del
+El notebook usa cliente 17, inspecciona el catálogo y extrae las entradas
+`TABLE DATA` exactas mediante una lista TOC controlada y
+`--data-only --no-owner --no-acl`. No pasa nombres `schema.table` a `--table`,
+porque `pg_restore` no admite esa calificación. Nunca restaura DDL o roles del
 archivo sobre la base viva. Probá restauraciones administrativas en una base
 aislada antes de depender del backup.
 

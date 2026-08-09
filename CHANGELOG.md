@@ -13,6 +13,23 @@ Todos los cambios relevantes del proyecto VAAET se documentan en este archivo, s
 
 ---
 
+## [4.2.1] - 2026-08-09
+
+### Corregido
+
+- La extracción de backups custom usa entradas exactas `TABLE DATA` del catálogo
+  de `pg_restore`, preservando compatibilidad con `public.traffic_data` y
+  `vaaet_raw.traffic_data` sin pasar nombres calificados a `--table`.
+- Una restauración con retorno no exitoso, tabla ausente, tabla raw vacía o SQL
+  sin el bloque `COPY` solicitado se detiene con un diagnóstico específico.
+- La procedencia de entrenamiento informa tabla legacy/moderna, versión del
+  lector y filas importadas.
+
+### Pruebas
+
+- CI genera backups custom legacy y modernos con PostgreSQL 17 y verifica su
+  ingestión real de extremo a extremo.
+
 ## [4.2.0] - 2026-08-06
 
 ### Añadido

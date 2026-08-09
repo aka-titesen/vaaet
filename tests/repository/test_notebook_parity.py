@@ -164,6 +164,9 @@ def test_training_prepares_postgres_backup_reader_in_colab() -> None:
     assert "PostgresBackupSource(BACKUP_PATH" in code
     assert "Path(PG_RESTORE_PATH) if PG_RESTORE_PATH else None" in code
     assert "Backup reader ready" in code
+    assert "Detected backup table" in code
+    assert "archive_table" in code
+    assert "reader_version" in code
     assert "!apt-get" not in code
     assert "shell=True" not in code
 

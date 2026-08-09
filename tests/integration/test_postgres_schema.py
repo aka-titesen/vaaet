@@ -3,12 +3,18 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 
 import pandas as pd
 import pytest
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import IntegrityError
 
+from vaaet.data.ingestion import (
+    PostgresBackupSource,
+    TrainingIngestionPlan,
+    load_training_inputs,
+)
 from vaaet.data.persistence import persist_classified_telemetry
 from vaaet.data.review import HumanValidation, persist_human_validation
 
@@ -25,6 +31,38 @@ def engine():
         yield active
     finally:
         active.dispose()
+
+
+@pytest.mark.parametrize(
+    ("path_variable", "expected_table", "expected_layout"),
+    [
+        ("VAAET_LEGACY_BACKUP_PATH", "public.traffic_data", "legacy"),
+        ("VAAET_MODERN_BACKUP_PATH", "vaaet_raw.traffic_data", "modern"),
+    ],
+)
+def test_real_pg17_custom_backups_are_ingested_exactly(
+    path_variable: str, expected_table: str, expected_layout: str
+) -> None:
+    backup_value = os.getenv(path_variable)
+    pg_restore_value = os.getenv("VAAET_PG_RESTORE_PATH")
+    if not backup_value or not pg_restore_value:
+        pytest.skip("PostgreSQL 17 backup fixtures are not configured")
+
+    result = load_training_inputs(
+        TrainingIngestionPlan(
+            raw_sources=(
+                PostgresBackupSource(Path(backup_value), Path(pg_restore_value)),
+            )
+        )
+    )
+
+    assert len(result.raw) >= 1
+    assert "legacy-clip" in set(result.raw["clip_id"])
+    assert result.provenance.iloc[0]["archive_table"] == expected_table
+    assert result.provenance.iloc[0]["backup_layout"] == expected_layout
+    assert str(result.provenance.iloc[0]["reader_version"]).startswith(
+        "pg_restore (PostgreSQL) 17"
+    )
 
 
 def test_migrated_schemas_tables_and_views_exist(engine) -> None:

@@ -8,7 +8,7 @@ Complementa SRS.md (requisitos) y SAD.md (arquitectura). -->
 | Campo | Detalles |
 |---|---|
 | **Nombre del Proyecto** | VAAET — Video Advanced Analysis of Traffic |
-| **Versión** | 4.3.0 |
+| **Versión** | 4.4.0 |
 | **Estado** | Aprobado |
 | **Responsable Técnico** | Facundo Nicolás González |
 | **Responsable de QA** | Facundo Nicolás González |
@@ -62,6 +62,7 @@ Verifican el funcionamiento aislado de cada módulo en `src/`.
 | `tests/unit/test_synthetic.py` | `src/vaaet/features/synthetic.py` | Generación de datos sintéticos |
 | `tests/unit/test_video.py` | `src/vaaet/vision/video.py` | Utilidades de video I/O |
 | `tests/unit/test_reporting.py` | `src/vaaet/evaluation/reporting.py` | Reportes y visualizaciones |
+| `tests/unit/test_human_holdout.py` | `src/vaaet/training/holdout.py` | Snapshot, checksums, versiones, idempotencia y leakage |
 | `tests/repository/test_notebook_parity.py` | Notebooks ↔ paquete | Paridad de código |
 | `tests/repository/test_repository_structure.py` | Repositorio | Higiene, rutas y enlaces |
 

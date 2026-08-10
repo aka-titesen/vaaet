@@ -25,6 +25,13 @@ checksums SHA-256.
 - `input_policy`: `legacy-v1-bootstrap` o `canonical-v2`.
 - `deployment_stage`: `pilot`, `candidate` o `production`.
 
+Desde VAAET 4.4.0, un modelo que declara `data_provenance.human_holdout=true`
+debe incluir también `human_holdout`: contrato `vaaet-human-holdout-v1`, UUID del
+snapshot, generación, fingerprint SHA-256 y filas de validation/test. Un modelo
+sin benchmark congelado utiliza `null`. El descriptor no incorpora el dataset;
+sólo permite auditar con qué fotografía humana se midió el candidato y rechazar
+comparaciones automáticas entre fingerprints distintos.
+
 Un bundle semilla siempre es `pilot` y `production_eligible=false`. La política
 legacy neutraliza las tres evidencias de calidad desconocidas tanto durante el
 entrenamiento como durante la inferencia, evitando una divergencia train/serve.
@@ -56,3 +63,4 @@ La infraestructura de publicación y descarga para la Web App queda fuera de
 este repositorio. Véase [ADR-0012](../architecture/decisions/0012-ml-web-boundary-and-artifact-contract.md).
 La semántica jerárquica está gobernada por [ADR-0014](../architecture/decisions/0014-hierarchical-traffic-state-and-incident-policy.md).
 El ciclo semilla/HITL está gobernado por [ADR-0017](../architecture/decisions/0017-seed-bootstrap-and-hitl-retraining.md).
+El benchmark humano congelado está gobernado por [ADR-0018](../architecture/decisions/0018-versioned-frozen-human-holdouts.md).

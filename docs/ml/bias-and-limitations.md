@@ -145,7 +145,10 @@ Las etiquetas de entrenamiento NO son ground truth humano. Se generan con reglas
 Desde 4.3.0 el bootstrap queda identificado como `weak-proxy` y `pilot`; sus
 métricas sólo miden fidelidad a las reglas. En cada reentrenamiento HITL la
 memoria proxy disminuye por clase y llega a cero con soporte humano suficiente.
-Un holdout humano congelado nunca forma parte de esa memoria.
+Desde 4.4.0 el holdout humano se materializa como snapshot versionado; sus clips
+nunca forman parte de esa memoria ni de train. Una nueva generación cambia el
+benchmark, por lo que sus métricas no se comparan automáticamente con la
+generación anterior.
 
 ### 6.2 Desequilibrio de Clases y Datos Sintéticos
 

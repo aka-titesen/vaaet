@@ -59,6 +59,7 @@ database/sqlite/
 data/processed/*.csv
 data/processed/*.zip
 data/processed/pipeline-runs/
+data/processed/holdouts/
 
 # DVC
 .dvc/cache

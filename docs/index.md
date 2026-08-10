@@ -1,10 +1,11 @@
-# Documentación de VAAET ML 4.3.0
+# Documentación de VAAET ML 4.4.0
 
 ## Puntos de entrada
 
 - [Arquitectura de software](architecture/software-architecture.md)
 - [Contrato del bundle](ml/model-artifact-contract.md)
 - [ADR de inicio semilla y HITL](architecture/decisions/0017-seed-bootstrap-and-hitl-retraining.md)
+- [ADR de holdout humano congelado](architecture/decisions/0018-versioned-frozen-human-holdouts.md)
 - [Model card y gates de promoción](ml/model-card.md)
 - [Protocolo de anotación humana](ml/human-annotation-protocol.md)
 - [Guía de usuario](operations/user-guide.md)

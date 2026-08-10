@@ -1,4 +1,4 @@
-# Linaje de datos — VAAET ML 4.3.0
+# Linaje de datos — VAAET ML 4.4.0
 
 ## Flujo operacional
 
@@ -16,6 +16,8 @@ flowchart LR
     SP --> T["HITL retraining"]
     F --> T
     H --> T
+    H --> HO["Frozen human holdout"]
+    HO --> T
     T --> B["Bundle v2 candidate"]
 ```
 
@@ -65,3 +67,10 @@ proxy decrece por clase al crecer el soporte humano y desaparece en los umbrales
 documentados por ADR-0017. Conflictos
 entre validaciones efectivas detienen el entrenamiento. Sintéticos sólo aparecen
 en train y siempre permanecen identificados.
+
+Con `HUMAN_HOLDOUT_FROZEN=True`, validation y test se materializan como
+`vaaet-human-holdout-v1` bajo Google Drive. El snapshot conserva las features y
+etiquetas exactas, mientras `current.json` selecciona la generación activa. Sus
+grupos se excluyen de train; actualizar el benchmark crea una nueva generación
+sin sobrescribir la anterior. PostgreSQL continúa siendo la autoridad del
+feedback y el ZIP sólo representa la fotografía reproducible de evaluación.

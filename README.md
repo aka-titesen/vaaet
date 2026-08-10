@@ -1,4 +1,4 @@
-# VAAET ML 4.3.0
+# VAAET ML 4.4.0
 
 PostgreSQL se organiza en `vaaet_raw`, `vaaet_ml`, `vaaet_feedback` y
 `vaaet_ops`. Este último registra el ciclo de cada workflow sin almacenar
@@ -12,6 +12,7 @@ VAAET ML es el repositorio de machine learning para analizar el tránsito del Pu
 video -> collection -> vaaet_raw.traffic_data
 raw -> seed bootstrap -> processed seed -> pilot bundle
 processed seed + validated feedback -> HITL retraining -> candidate bundle
+validated feedback -> frozen validation/test holdout -> repeatable evaluation
 video + bundle -> inference -> vaaet_ml.telemetry_features + traffic_predictions
 predictions -> explicit HITL review -> vaaet_feedback.human_validations
 ```
@@ -43,6 +44,12 @@ pero no acredita calidad real de producción: carece de telemetría v2 completa,
 holdout humano y accidentes reales. Los reentrenamientos HITL consumen features
 ya calculadas y sustituyen progresivamente la memoria proxy por etiquetas
 humanas; cada artefacto sigue siendo candidato hasta cumplir los gates.
+
+En HITL, `HUMAN_HOLDOUT_FROZEN=True` crea o reutiliza validation y test humanos
+versionados bajo Google Drive. Los nuevos registros no alteran ese benchmark;
+una actualización explícita genera otra fotografía y conserva la anterior. El
+fingerprint del holdout queda registrado en el manifiesto del modelo, conforme
+a [ADR-0018](docs/architecture/decisions/0018-versioned-frozen-human-holdouts.md).
 
 La futura Web App pertenece a otro repositorio y consumirá únicamente bundles validados. La [documentación](docs/index.md) y la [guía de Colab](docs/operations/colab-guide.md) describen el flujo completo.
 

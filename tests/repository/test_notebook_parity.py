@@ -150,6 +150,14 @@ def test_training_uses_shared_feature_contracts() -> None:
     assert "TrainingMode.HITL_RETRAINING" in code
     assert "SeedDatasetPackageSource" in code
     assert "HUMAN_HOLDOUT_FROZEN = False" in code
+    assert "HumanHoldoutAction.REUSE_OR_CREATE" in code
+    assert "HumanHoldoutAction.CREATE_NEW_VERSION" in code
+    assert "HUMAN_HOLDOUT_UPDATE_REASON" in code
+    assert "resolve_human_holdout(" in code
+    assert "frozen_holdout=human_holdout_snapshot" in code
+    assert "human_holdout_snapshot.descriptor" in code
+    assert "/content/drive/MyDrive/vaaet-ml/data/holdouts" in code
+    assert "no ephemeral fallback is allowed" in code
     assert "compose_supervised_dataset(" in code
     assert 'feedback_policy=FeedbackPolicy.VALIDATED_ONLY' in code
     assert "USE_HUMAN_VALIDATED_FEEDBACK" not in code

@@ -4,7 +4,7 @@
 
 | Campo | Valor |
 |---|---|
-| Proyecto | VAAET ML 4.3.0 |
+| Proyecto | VAAET ML 4.4.0 |
 | Modelo vigente | `mlp-v2.1` |
 | Estado inicial | Pilot weak-supervision hasta cumplir gates humanos |
 | Runtime | TensorFlow/Keras, Python 3.10–3.12, Google Colab |
@@ -62,9 +62,12 @@ Los objetivos iniciales son F1-macro ≥0,88; precision/recall de Normal ≥0,93
 Sin al menos 100 minutos Congested validados de 20 episodios reales, esa clase es experimental. Sin accidentes reales no se publica recall de Accident. Para candidatos se reportan falsos por hora; el objetivo preliminar es menos de uno cada 100 horas y unas 300 horas negativas sin falsos para evidencia aproximada al 95%.
 
 La promoción manual exige telemetría v2 suficiente, holdout humano, retrospective replay, shadow mode prospectivo y revisión de falsos positivos. El manifiesto conserva `production_eligible` y `promotion_blockers`.
-El notebook no considera congelado un test sólo porque sus filas sean humanas:
-`HUMAN_HOLDOUT_FROZEN` debe habilitarse conscientemente para un paquete inmutable
-que no participó en ninguna decisión de modelado.
+El notebook no considera congelado un test sólo porque sus filas sean humanas.
+Desde 4.4.0, `HUMAN_HOLDOUT_FROZEN=True` resuelve un snapshot contractual con
+validation y test exactos, checksums y fingerprint. Todos sus clips se excluyen
+de train y cada actualización produce una generación nueva. El manifiesto del
+modelo registra ese fingerprint; candidatos evaluados con benchmarks diferentes
+no son comparables automáticamente.
 
 ## Limitaciones
 
@@ -83,4 +86,4 @@ que no participó en ninguna decisión de modelado.
 | `mlp-v2.0` | Tres salidas estables, contrato v2 y política jerárquica humana para Accident |
 | `mlp-v2.1` | Modos seed/HITL, política legacy paritaria y selección conservadora de balanceo |
 
-Última revisión: 2026-08-09. Véanse [ADR-0014](../architecture/decisions/0014-hierarchical-traffic-state-and-incident-policy.md), [ADR-0015](../architecture/decisions/0015-postgresql-namespaces-security-and-hitl.md) y [ADR-0017](../architecture/decisions/0017-seed-bootstrap-and-hitl-retraining.md).
+Última revisión: 2026-08-10. Véanse [ADR-0014](../architecture/decisions/0014-hierarchical-traffic-state-and-incident-policy.md), [ADR-0015](../architecture/decisions/0015-postgresql-namespaces-security-and-hitl.md), [ADR-0017](../architecture/decisions/0017-seed-bootstrap-and-hitl-retraining.md) y [ADR-0018](../architecture/decisions/0018-versioned-frozen-human-holdouts.md).

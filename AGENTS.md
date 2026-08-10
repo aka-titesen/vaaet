@@ -5,10 +5,10 @@
 | Campo | Detalle |
 |---|---|
 | Proyecto | VAAET ML — Video Advanced Analysis of Traffic |
-| Versión | 4.3.0 |
+| Versión | 4.4.0 |
 | Runtime objetivo | Python 3.10–3.12; Google Colab |
 | Responsable | Facundo Nicolás González |
-| Última revisión | 2026-08-09 |
+| Última revisión | 2026-08-10 |
 
 ## Mandato
 
@@ -24,7 +24,7 @@ src/vaaet/                  lógica compartida instalable
 tests/                      pruebas unitarias, contractuales y de repositorio
 ```
 
-La Web App futura vive en otro repositorio y sólo consume el bundle v2 definido por `docs/ml/model-artifact-contract.md`. El MLP aprende tres estados estables; Accident es un estado público exclusivamente humano conforme a ADR-0014. ADR-0015 gobierna namespaces, ingestión y feedback; ADR-0016 gobierna hardening y registro de ejecuciones; ADR-0017 gobierna inicio semilla y reentrenamiento HITL.
+La Web App futura vive en otro repositorio y sólo consume el bundle v2 definido por `docs/ml/model-artifact-contract.md`. El MLP aprende tres estados estables; Accident es un estado público exclusivamente humano conforme a ADR-0014. ADR-0015 gobierna namespaces, ingestión y feedback; ADR-0016 gobierna hardening y registro de ejecuciones; ADR-0017 gobierna inicio semilla y reentrenamiento HITL; ADR-0018 gobierna holdouts humanos congelados.
 
 ## Gobernanza
 
@@ -57,4 +57,4 @@ La lógica de negocio vive en `src/vaaet/`. Los notebooks importan `vaaet.*` des
 
 GPU, Drive, PostgreSQL, descarga de YOLO y DVC remoto se validan manualmente en Colab.
 
-No agregar, quitar ni reordenar las 19 `FEATURE_COLS`; no cambiar los cuatro estados públicos ni el esquema PostgreSQL sin autorización y un ADR. ADR-0012 gobierna el límite multi-repo, ADR-0013 el workflow de adquisición, ADR-0014 la arquitectura jerárquica, ADR-0015 los namespaces/HITL, ADR-0016 el hardening y linaje operacional, y ADR-0017 los modos semilla/HITL.
+No agregar, quitar ni reordenar las 19 `FEATURE_COLS`; no cambiar los cuatro estados públicos ni el esquema PostgreSQL sin autorización y un ADR. ADR-0012 gobierna el límite multi-repo, ADR-0013 el workflow de adquisición, ADR-0014 la arquitectura jerárquica, ADR-0015 los namespaces/HITL, ADR-0016 el hardening y linaje operacional, ADR-0017 los modos semilla/HITL y ADR-0018 el benchmark humano versionado.

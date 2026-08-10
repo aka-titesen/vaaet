@@ -13,6 +13,25 @@ Todos los cambios relevantes del proyecto VAAET se documentan en este archivo, s
 
 ---
 
+## [4.4.0] - 2026-08-10
+
+### Añadido
+
+- Contrato portable `vaaet-human-holdout-v1` para congelar validation y test
+  humanos con checksums, fingerprint y soporte por clase.
+- Almacenamiento versionado en Google Drive mediante `current.json`, creación
+  inicial, reutilización exacta y actualizaciones explícitas e idempotentes.
+- Descriptor del benchmark en el manifiesto del modelo y comparación restringida
+  a candidatos evaluados con el mismo fingerprint.
+- ADR-0018 para gobernar el benchmark humano congelado.
+
+### Seguridad y calidad
+
+- Los clips reservados se excluyen completamente de train y nunca se sustituyen
+  por una partición efímera cuando Drive falla.
+- Accident, weak labels y datos sintéticos quedan fuera del holdout humano.
+- Las correcciones contradictorias exigen una nueva generación auditable.
+
 ## [4.3.0] - 2026-08-09
 
 ### Añadido

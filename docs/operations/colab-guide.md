@@ -83,10 +83,32 @@ ejecutar `pg_restore` ni ingeniería. `ENABLE_DATA_UPLOAD=False` evita abrir el
 selector cuando todas las fuentes son PostgreSQL. Cada tipo se habilita de forma
 explícita: nunca se adivina por columnas.
 
-`HUMAN_HOLDOUT_FROZEN` permanece `False` por defecto. Sólo puede cambiarse a
-`True` cuando validation/test provienen de un paquete humano inmutable y
-versionado que no se utilizó para ajustar reglas, umbrales o balanceo. Tener
-filas humanas no basta por sí solo para aprobar producción.
+`HUMAN_HOLDOUT_FROZEN` permanece `False` por defecto porque el Inicio Semilla no
+tiene ground truth humano. En `TrainingMode.HITL_RETRAINING`, configurá:
+
+```python
+HUMAN_HOLDOUT_FROZEN = True
+HUMAN_HOLDOUT_ACTION = HumanHoldoutAction.REUSE_OR_CREATE
+HUMAN_HOLDOUT_UPDATE_REASON = None
+```
+
+La primera ejecución crea validation y test bajo
+`MyDrive/vaaet-ml/data/holdouts/`; las posteriores cargan exactamente el ZIP
+señalado por `current.json`. Los registros humanos nuevos quedan disponibles
+para train y no alteran el benchmark automáticamente. Deben existir al menos
+tres clips o grupos por cada estado estable para congelarlo.
+
+Para incorporar nuevas revisiones al benchmark, usá una vez:
+
+```python
+HUMAN_HOLDOUT_ACTION = HumanHoldoutAction.CREATE_NEW_VERSION
+HUMAN_HOLDOUT_UPDATE_REASON = "Incorporación de clips revisados de agosto de 2026"
+```
+
+Esto crea una nueva generación sin sobrescribir la anterior. La operación es
+idempotente con la misma fotografía de datos. Después de resolverla, el runtime
+vuelve a `REUSE_OR_CREATE`. Un fallo al montar Drive detiene el entrenamiento:
+no se sustituye el benchmark por un split aleatorio.
 
 Todo `record_time` se normaliza a UTC. Los backups y CSV legacy sin zona se
 interpretan como `America/Argentina/Buenos_Aires`; por eso su rango UTC puede

@@ -7,6 +7,7 @@ import importlib.metadata
 import json
 import re
 import subprocess
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Mapping
@@ -105,6 +106,7 @@ def create_manifest(
     data_provenance: Mapping[str, Any],
     training_lifecycle: Mapping[str, Any],
     decision_policy: Mapping[str, Any] | None = None,
+    human_holdout: Mapping[str, Any] | None = None,
 ) -> Path:
     """Create the serving manifest after a successful training export."""
     directory = Path(bundle_dir).resolve()
@@ -146,6 +148,7 @@ def create_manifest(
         "metrics": dict(metrics),
         "data_provenance": dict(data_provenance),
         "training_lifecycle": lifecycle,
+        "human_holdout": dict(human_holdout) if human_holdout is not None else None,
     }
     output = directory / MANIFEST_FILE
     output.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
@@ -291,6 +294,44 @@ def validate_manifest(bundle_dir: str | Path) -> dict[str, Any]:
     for name in ("human_holdout", "production_eligible"):
         if type(provenance[name]) is not bool:
             raise ArtifactValidationError(f"Manifest data_provenance.{name} must be boolean.")
+    holdout = manifest.get("human_holdout")
+    if provenance["human_holdout"]:
+        if not isinstance(holdout, dict):
+            raise ArtifactValidationError(
+                "A frozen human holdout requires its versioned snapshot descriptor."
+            )
+        required_holdout = {
+            "contract",
+            "snapshot_id",
+            "generation",
+            "fingerprint",
+            "validation_rows",
+            "test_rows",
+        }
+        if missing_holdout := sorted(required_holdout - holdout.keys()):
+            raise ArtifactValidationError(
+                f"Missing human holdout descriptor fields: {', '.join(missing_holdout)}"
+            )
+        if holdout["contract"] != "vaaet-human-holdout-v1":
+            raise ArtifactValidationError("Unsupported human holdout contract.")
+        try:
+            uuid.UUID(str(holdout["snapshot_id"]))
+        except ValueError as exc:
+            raise ArtifactValidationError("Human holdout snapshot_id must be a UUID.") from exc
+        if type(holdout["generation"]) is not int or holdout["generation"] < 1:
+            raise ArtifactValidationError("Human holdout generation must be positive.")
+        fingerprint = holdout["fingerprint"]
+        if not isinstance(fingerprint, str) or not _SHA256_PATTERN.fullmatch(fingerprint):
+            raise ArtifactValidationError("Human holdout fingerprint must be SHA-256.")
+        for count_field in ("validation_rows", "test_rows"):
+            if type(holdout[count_field]) is not int or holdout[count_field] < 1:
+                raise ArtifactValidationError(
+                    f"Human holdout {count_field} must be a positive integer."
+                )
+    elif holdout is not None:
+        raise ArtifactValidationError(
+            "A model without a frozen benchmark must not declare a human holdout descriptor."
+        )
     if not isinstance(provenance["promotion_blockers"], list) or not all(
         isinstance(item, str) for item in provenance["promotion_blockers"]
     ):

@@ -31,6 +31,14 @@ def valid_bundle(tmp_path: Path) -> Path:
             ModelInputPolicy.CANONICAL_V2,
             production_eligible=True,
         ),
+        human_holdout={
+            "contract": "vaaet-human-holdout-v1",
+            "snapshot_id": "12345678-1234-5678-1234-567812345678",
+            "generation": 1,
+            "fingerprint": "a" * 64,
+            "validation_rows": 12,
+            "test_rows": 15,
+        },
     )
     return tmp_path
 
@@ -209,4 +217,20 @@ def test_rejects_hitl_bundle_marked_as_pilot(valid_bundle: Path) -> None:
 def test_rejects_changed_bundle_file(valid_bundle: Path) -> None:
     (valid_bundle / REQUIRED_FILES[0]).write_bytes(b"changed")
     with pytest.raises(ArtifactValidationError, match="Checksum"):
+        validate_manifest(valid_bundle)
+
+
+def test_rejects_frozen_holdout_without_snapshot_descriptor(valid_bundle: Path) -> None:
+    payload = _manifest(valid_bundle)
+    payload["human_holdout"] = None
+    _write_manifest(valid_bundle, payload)
+    with pytest.raises(ArtifactValidationError, match="snapshot descriptor"):
+        validate_manifest(valid_bundle)
+
+
+def test_rejects_invalid_holdout_fingerprint(valid_bundle: Path) -> None:
+    payload = _manifest(valid_bundle)
+    payload["human_holdout"]["fingerprint"] = "invalid"
+    _write_manifest(valid_bundle, payload)
+    with pytest.raises(ArtifactValidationError, match="fingerprint"):
         validate_manifest(valid_bundle)

@@ -8,7 +8,7 @@ Complementa BIAS_AND_LIMITATIONS.md y FEASIBILITY.md. -->
 | Campo | Detalles |
 |---|---|
 | **Nombre del Proyecto** | VAAET — Video Advanced Analysis of Traffic |
-| **Versión** | 4.3.0 |
+| **Versión** | 4.4.0 |
 | **Responsable Técnico** | Facundo Nicolás González |
 | **Última Revisión** | 2026-07-23 |
 
@@ -28,6 +28,7 @@ Complementa BIAS_AND_LIMITATIONS.md y FEASIBILITY.md. -->
 | R-008 | **Incompatibilidad de versiones** de dependencias (TF, YOLO) | Técnico | Media | Moderado | 🟡 Alto | `pyproject.toml` con versiones mínimas; CI en múltiples versiones de Python | Pin de versiones exactas en `requirements-lock.txt` |
 | R-009 | **Exposición accidental de credenciales** de BD | Seguridad | Baja | Crítico | 🔴 Crítico | Variables de entorno exclusivamente; `.env` en `.gitignore`; nunca imprimir en outputs | Rotar credenciales inmediatamente; auditar historial de git |
 | R-010 | **Pérdida de artefactos de modelo** entre sesiones de Colab | Operativo | Media | Serio | 🟡 Alto | Exportación del bundle completo a Google Drive | Re-ejecutar entrenamiento para regenerar artefactos |
+| R-011 | **Contaminación o deriva del holdout humano** | ML/Datos | Baja | Serio | 🟡 Alto | Snapshots inmutables, grupos excluidos de train, checksums y fingerprint | Detener promoción y crear una generación nueva con motivo auditable |
 
 ---
 
@@ -37,7 +38,7 @@ Complementa BIAS_AND_LIMITATIONS.md y FEASIBILITY.md. -->
               Bajo        Moderado      Serio        Crítico
 Alta     │  ────────  │  R-004,R-007 │  R-001,R-005 │  ─────────  │
 Media    │  ────────  │  R-002,R-008 │  R-010       │  ─────────  │
-Baja     │  R-003     │  R-006       │  ─────────   │  R-009      │
+Baja     │  R-003     │  R-006       │  R-011       │  R-009      │
 ```
 
 ---

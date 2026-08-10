@@ -1,4 +1,4 @@
-# ERD vigente — VAAET ML 4.3.0
+# ERD vigente — VAAET ML 4.4.0
 
 El diagrama y diccionario canónicos están en el
 [modelo PostgreSQL `vaaet-db-v2`](../data-model.md). La separación vigente es

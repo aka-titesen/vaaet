@@ -133,6 +133,14 @@ def test_dataset_package_roundtrip_and_checksum(tmp_path: Path) -> None:
         load_dataset_package(damaged)
 
 
+def test_dataset_package_never_overwrites_silently(tmp_path: Path) -> None:
+    package = _package_tables(tmp_path / "immutable.zip")
+    original = package.read_bytes()
+    with pytest.raises(FileExistsError, match="already exists"):
+        _package_tables(package)
+    assert package.read_bytes() == original
+
+
 def test_combines_raw_and_human_feedback(tmp_path: Path) -> None:
     raw_path = tmp_path / "raw.csv"
     pd.DataFrame(

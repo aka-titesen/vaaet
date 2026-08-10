@@ -1,4 +1,4 @@
-# VAAET ML 4.4.0
+# VAAET ML 4.5.0
 
 PostgreSQL se organiza en `vaaet_raw`, `vaaet_ml`, `vaaet_feedback` y
 `vaaet_ops`. Este último registra el ciclo de cada workflow sin almacenar
@@ -10,8 +10,9 @@ VAAET ML es el repositorio de machine learning para analizar el tránsito del Pu
 
 ```text
 video -> collection -> vaaet_raw.traffic_data
-raw -> seed bootstrap -> processed seed -> pilot bundle
-processed seed + validated feedback -> HITL retraining -> candidate bundle
+raw -> seed bootstrap -> immutable seed snapshot -> pilot bundle
+inference review -> immutable HITL session package -> active catalog
+seed snapshot + active HITL catalog -> input lock -> HITL retraining -> candidate bundle
 validated feedback -> frozen validation/test holdout -> repeatable evaluation
 video + bundle -> inference -> vaaet_ml.telemetry_features + traffic_predictions
 predictions -> explicit HITL review -> vaaet_feedback.human_validations
@@ -36,7 +37,7 @@ Cada notebook tiene una sola celda de preparación: clona o actualiza `https://g
 
 ## Contrato del modelo
 
-El bundle v2 contiene `traffic_classifier.keras`, `feature_scaler.joblib`, `label_mapping.joblib` y `model-manifest.json`. El MLP aprende `Normal`, `Reduced` y `Congested`; una sospecha de incidente conserva `Congested` y sólo una confirmación humana validada puede publicar `Accident`. El manifiesto fija las 19 features, calibración, política temporal, modo de entrenamiento, política de entrada, etapa de despliegue, elegibilidad, procedencia y checksums. Consultá el [contrato de artefactos](docs/ml/model-artifact-contract.md), [ADR-0014](docs/architecture/decisions/0014-hierarchical-traffic-state-and-incident-policy.md) y [ADR-0017](docs/architecture/decisions/0017-seed-bootstrap-and-hitl-retraining.md).
+El bundle v2 contiene `traffic_classifier.keras`, `feature_scaler.joblib`, `label_mapping.joblib` y `model-manifest.json`. El MLP aprende `Normal`, `Reduced` y `Congested`; una sospecha de incidente conserva `Congested` y sólo una confirmación humana validada puede publicar `Accident`. El manifiesto fija las 19 features, calibración, política temporal, modo de entrenamiento, política de entrada, etapa de despliegue, elegibilidad, procedencia, checksums y descriptor del input lock. Consultá el [contrato de artefactos](docs/ml/model-artifact-contract.md), [ADR-0014](docs/architecture/decisions/0014-hierarchical-traffic-state-and-incident-policy.md), [ADR-0017](docs/architecture/decisions/0017-seed-bootstrap-and-hitl-retraining.md) y [ADR-0019](docs/architecture/decisions/0019-immutable-seed-and-hitl-datasets.md).
 
 Los aproximadamente 2.068 registros históricos permiten crear un bundle
 `pilot` mediante weak supervision. Ese resultado reproduce reglas preliminares,
@@ -68,10 +69,13 @@ psql 'postgresql://admin:...@host:5432/vaaet' -f migrations/provision-roles.sql
 ```
 
 El entrenamiento declara `TrainingMode.SEED_BOOTSTRAP` o
-`TrainingMode.HITL_RETRAINING` mediante `TrainingIngestionPlan`: puede combinar
-PostgreSQL, backups, CSV raw, el paquete semilla procesado y
-`vaaet-training-dataset-v1.zip`. Sólo
-`human_validations` efectivas ingresan como etiquetas; predicciones sin revisar
-nunca se convierten en ground truth. Consultá [ADR-0015](docs/architecture/decisions/0015-postgresql-namespaces-security-and-hitl.md) y [ADR-0016](docs/architecture/decisions/0016-postgresql-hardening-and-pipeline-runs.md).
+`TrainingMode.HITL_RETRAINING` mediante `TrainingIngestionPlan`. La semilla se
+guarda como snapshot inmutable y cada sesión de revisión produce un paquete HITL
+catalogado. Sólo `human_validations` efectivas ingresan como etiquetas;
+predicciones sin revisar nunca se convierten en ground truth. Cada entrenamiento
+escribe un `vaaet-training-input-lock-v1` con los fingerprints exactos utilizados.
+Consultá [ADR-0015](docs/architecture/decisions/0015-postgresql-namespaces-security-and-hitl.md),
+[ADR-0016](docs/architecture/decisions/0016-postgresql-hardening-and-pipeline-runs.md) y
+[ADR-0019](docs/architecture/decisions/0019-immutable-seed-and-hitl-datasets.md).
 El provisionamiento, backup, rotación y recuperación están en la
 [guía PostgreSQL](docs/operations/postgresql-guide.md).

@@ -124,7 +124,7 @@ class DatabaseSettings:
 
     @property
     def application(self) -> str:
-        return self.application_name or f"vaaet-{self.profile.value}-4.4.0"
+        return self.application_name or f"vaaet-{self.profile.value}-4.5.0"
 
 
 @dataclass(frozen=True)

@@ -13,6 +13,34 @@ Todos los cambios relevantes del proyecto VAAET se documentan en este archivo, s
 
 ---
 
+## [4.5.0] - 2026-08-10
+
+### Añadido
+
+- Store inmutable `vaaet-seed-bootstrap-v1` con generaciones, fingerprint y
+  pointer atómico `current.json`.
+- Catálogo `vaaet-dataset-catalog-v1` y un paquete portable por sesión HITL,
+  tanto con PostgreSQL como sin él.
+- Resolución global de correcciones append-only mediante UUID y exclusión
+  contractual de predicciones no revisadas.
+- `vaaet-training-input-lock-v1` por entrenamiento y descriptor dentro de
+  `model-manifest.json`.
+- ADR-0019 para gobernar datasets portables inmutables y locks de entrada.
+
+### Cambiado
+
+- Entrenamiento consume el snapshot semilla vigente y todos los paquetes HITL
+  activos del catálogo, en lugar de rutas ZIP mutables.
+- Inferencia acumula las decisiones de revisión y ofrece una finalización
+  explícita, idempotente y sincronizable con Google Drive.
+
+### Seguridad y calidad
+
+- Escrituras atómicas de pointers y catálogo, validación de rutas relativas,
+  checksums SHA-256 y cuarentena catalogable.
+- Ciclos, ramas, referencias inválidas y conflictos de etiquetas o features
+  detienen la ingestión antes de entrenar.
+
 ## [4.4.0] - 2026-08-10
 
 ### Añadido

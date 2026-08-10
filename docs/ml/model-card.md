@@ -4,7 +4,7 @@
 
 | Campo | Valor |
 |---|---|
-| Proyecto | VAAET ML 4.4.0 |
+| Proyecto | VAAET ML 4.5.0 |
 | Modelo vigente | `mlp-v2.1` |
 | Estado inicial | Pilot weak-supervision hasta cumplir gates humanos |
 | Runtime | TensorFlow/Keras, Python 3.10–3.12, Google Colab |
@@ -69,6 +69,13 @@ de train y cada actualización produce una generación nueva. El manifiesto del
 modelo registra ese fingerprint; candidatos evaluados con benchmarks diferentes
 no son comparables automáticamente.
 
+Desde 4.5.0, cada candidato registra además un
+`vaaet-training-input-lock-v1`. El lock fija el snapshot semilla, revisión del
+catálogo HITL, paquetes y fingerprints exactos, resolución de duplicados y
+correcciones, y holdout utilizado. Repetir un entrenamiento con el mismo lock
+reproduce la selección de datos, aunque los pesos dependan también de las semillas
+y del runtime declarado.
+
 ## Limitaciones
 
 - Datos históricos de un único puente, período y configuración de cámara.
@@ -86,4 +93,4 @@ no son comparables automáticamente.
 | `mlp-v2.0` | Tres salidas estables, contrato v2 y política jerárquica humana para Accident |
 | `mlp-v2.1` | Modos seed/HITL, política legacy paritaria y selección conservadora de balanceo |
 
-Última revisión: 2026-08-10. Véanse [ADR-0014](../architecture/decisions/0014-hierarchical-traffic-state-and-incident-policy.md), [ADR-0015](../architecture/decisions/0015-postgresql-namespaces-security-and-hitl.md), [ADR-0017](../architecture/decisions/0017-seed-bootstrap-and-hitl-retraining.md) y [ADR-0018](../architecture/decisions/0018-versioned-frozen-human-holdouts.md).
+Última revisión: 2026-08-10. Véanse [ADR-0014](../architecture/decisions/0014-hierarchical-traffic-state-and-incident-policy.md), [ADR-0015](../architecture/decisions/0015-postgresql-namespaces-security-and-hitl.md), [ADR-0017](../architecture/decisions/0017-seed-bootstrap-and-hitl-retraining.md), [ADR-0018](../architecture/decisions/0018-versioned-frozen-human-holdouts.md) y [ADR-0019](../architecture/decisions/0019-immutable-seed-and-hitl-datasets.md).

@@ -107,6 +107,7 @@ def create_manifest(
     training_lifecycle: Mapping[str, Any],
     decision_policy: Mapping[str, Any] | None = None,
     human_holdout: Mapping[str, Any] | None = None,
+    training_input_lock: Mapping[str, Any] | None = None,
 ) -> Path:
     """Create the serving manifest after a successful training export."""
     directory = Path(bundle_dir).resolve()
@@ -149,6 +150,9 @@ def create_manifest(
         "data_provenance": dict(data_provenance),
         "training_lifecycle": lifecycle,
         "human_holdout": dict(human_holdout) if human_holdout is not None else None,
+        "training_input_lock": (
+            dict(training_input_lock) if training_input_lock is not None else None
+        ),
     }
     output = directory / MANIFEST_FILE
     output.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
@@ -332,6 +336,25 @@ def validate_manifest(bundle_dir: str | Path) -> dict[str, Any]:
         raise ArtifactValidationError(
             "A model without a frozen benchmark must not declare a human holdout descriptor."
         )
+    input_lock = manifest.get("training_input_lock")
+    if input_lock is not None:
+        if not isinstance(input_lock, dict):
+            raise ArtifactValidationError("training_input_lock must be an object or null.")
+        required_lock = {"contract", "lock_id", "fingerprint"}
+        if missing_lock := sorted(required_lock - input_lock.keys()):
+            raise ArtifactValidationError(
+                f"Missing training input lock fields: {', '.join(missing_lock)}"
+            )
+        if input_lock["contract"] != "vaaet-training-input-lock-v1":
+            raise ArtifactValidationError("Unsupported training input lock contract.")
+        try:
+            uuid.UUID(str(input_lock["lock_id"]))
+        except ValueError as exc:
+            raise ArtifactValidationError("Training input lock ID must be a UUID.") from exc
+        if not isinstance(input_lock["fingerprint"], str) or not _SHA256_PATTERN.fullmatch(
+            input_lock["fingerprint"]
+        ):
+            raise ArtifactValidationError("Training input lock fingerprint must be SHA-256.")
     if not isinstance(provenance["promotion_blockers"], list) or not all(
         isinstance(item, str) for item in provenance["promotion_blockers"]
     ):

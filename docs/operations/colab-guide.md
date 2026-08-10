@@ -70,18 +70,28 @@ de varios minutos para comprobar transiciones, persistencia e histéresis.
 
 La revisión HITL es una celda explícita posterior al clip, no un pop-up durante
 inferencia. `priority` muestra incidentes candidatos, baja confianza, abstenciones
-y transiciones; `all` permite revisar cada minuto. Sin conexión de review, la
-sesión exporta `vaaet-training-dataset-v1.zip`, que luego puede declararse como
-`DatasetPackageSource` en entrenamiento. Sólo validaciones humanas ingresan como
-etiquetas; Accident se reserva para evaluar el detector.
+y transiciones; `all` permite revisar cada minuto. Al ejecutar
+`finalize_current_review()` se genera siempre un paquete inmutable de la sesión,
+se sincroniza bajo `MyDrive/vaaet-ml/data/hitl-reviews/YYYY/MM/DD/` y se registra
+en `catalog.json`, exista o no PostgreSQL. Si Drive falla, el ZIP queda como
+`pending-sync` local y no se incorpora al catálogo. Sólo validaciones humanas
+ingresan como etiquetas; Accident se reserva para evaluar el detector.
 
 En entrenamiento, seleccioná explícitamente `TrainingMode.SEED_BOOTSTRAP` o
 `TrainingMode.HITL_RETRAINING`. El primer modo declara `RAW_SOURCES`, calcula las
-features una vez y crea `vaaet-seed-bootstrap-v1.zip`. El segundo declara ese
-paquete en `SEED_SOURCES` y las correcciones en `FEEDBACK_SOURCES`; no vuelve a
-ejecutar `pg_restore` ni ingeniería. `ENABLE_DATA_UPLOAD=False` evita abrir el
-selector cuando todas las fuentes son PostgreSQL. Cada tipo se habilita de forma
-explícita: nunca se adivina por columnas.
+features una vez y resuelve la semilla mediante `VersionedSeedStore`. La primera
+ejecución crea generación `0001`; repetir los mismos datos reutiliza el mismo
+fingerprint y cambiar contenido exige `CREATE_NEW_VERSION` con motivo. El segundo
+modo lee el snapshot señalado por `current.json` y todos los paquetes `active`
+del catálogo HITL mediante `HitlCatalogSource`; no vuelve a ejecutar `pg_restore`
+ni ingeniería. Cada tipo se habilita de forma explícita: nunca se adivina por
+columnas.
+
+Al terminar el entrenamiento se guarda
+`MyDrive/vaaet-ml/training-runs/<run-id>/training-input-lock.json`. El lock enumera
+el snapshot semilla, revisión del catálogo, IDs y fingerprints de paquetes HITL,
+holdout humano y filas finales. El manifiesto del modelo incluye su descriptor;
+dos ejecuciones sólo son reproducibles si seleccionan los mismos fingerprints.
 
 `HUMAN_HOLDOUT_FROZEN` permanece `False` por defecto porque el Inicio Semilla no
 tiene ground truth humano. En `TrainingMode.HITL_RETRAINING`, configurá:

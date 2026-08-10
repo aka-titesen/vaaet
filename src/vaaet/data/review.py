@@ -12,6 +12,7 @@ from sqlalchemy import text
 from sqlalchemy.engine import Engine
 
 from vaaet.data.database import DatabaseSettings, get_engine
+from vaaet.data.dataset_artifacts import finalize_review_session
 from vaaet.data.ingestion import create_dataset_package
 from vaaet.data.pipeline_runs import PipelineRunMetadata, PipelineWorkflow, pipeline_run
 from vaaet.settings import STATE_LABELS
@@ -286,6 +287,7 @@ __all__ = [
     "HumanValidation",
     "build_review_widget",
     "export_offline_review_package",
+    "finalize_review_session",
     "load_review_queue",
     "persist_human_validation",
     "select_review_queue",

@@ -1,4 +1,4 @@
-# Linaje de datos — VAAET ML 4.4.0
+# Linaje de datos — VAAET ML 4.5.0
 
 ## Flujo operacional
 
@@ -11,14 +11,17 @@ flowchart LR
     I --> P[("vaaet_ml.traffic_predictions")]
     P --> Q["Explicit HITL review"]
     Q --> H[("vaaet_feedback.human_validations")]
+    Q --> HP["Immutable HITL session package"]
+    HP --> HC["Active HITL catalog"]
     R --> S["Seed bootstrap"]
-    S --> SP["Processed seed package"]
+    S --> SP["Immutable seed snapshot"]
     SP --> T["HITL retraining"]
-    F --> T
+    HC --> T
     H --> T
     H --> HO["Frozen human holdout"]
     HO --> T
-    T --> B["Bundle v2 candidate"]
+    T --> L["Training input lock"]
+    L --> B["Bundle v2 candidate"]
 ```
 
 Cada ejecución de adquisición o inferencia genera un `pipeline_run_id`. Los
@@ -48,7 +51,9 @@ patentes ni identidades.
 `review` agrega validaciones sin modificar predicciones. El modo `all` conserva la
 validación previa como `supersedes_validation_id` al corregir. Accident requiere nota y
 revisión explícita del contexto. Sin base disponible se exporta
-`vaaet-training-dataset-v1.zip`.
+un paquete inmutable `vaaet-training-dataset-v1.zip` por sesión. El paquete se
+registra en `vaaet-dataset-catalog-v1`; los registros omitidos permanecen como no
+supervisados y nunca son targets.
 
 ## Entrenamiento
 
@@ -74,3 +79,13 @@ etiquetas exactas, mientras `current.json` selecciona la generación activa. Sus
 grupos se excluyen de train; actualizar el benchmark crea una nueva generación
 sin sobrescribir la anterior. PostgreSQL continúa siendo la autoridad del
 feedback y el ZIP sólo representa la fotografía reproducible de evaluación.
+
+## Artefactos de dataset e input lock
+
+La semilla procesada vive bajo `data/seed-bootstrap/snapshots/` en Drive y
+`current.json` apunta a una generación inmutable. Las sesiones HITL viven bajo
+`data/hitl-reviews/YYYY/MM/DD/` y `catalog.json` selecciona paquetes `active`.
+Antes de exportar el bundle, entrenamiento escribe `vaaet-training-input-lock-v1`
+con el snapshot semilla, revisión exacta del catálogo, fingerprints de cada ZIP y
+holdout utilizado. El lock aporta linaje reproducible; no contiene pesos ni
+reemplaza PostgreSQL.

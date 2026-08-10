@@ -32,6 +32,12 @@ sin benchmark congelado utiliza `null`. El descriptor no incorpora el dataset;
 sólo permite auditar con qué fotografía humana se midió el candidato y rechazar
 comparaciones automáticas entre fingerprints distintos.
 
+Desde VAAET 4.5.0, `training_input_lock` puede incorporar el descriptor
+`vaaet-training-input-lock-v1`: UUID del lock y fingerprint SHA-256 de la selección
+exacta de semilla, catálogo HITL y holdout. El JSON completo permanece en
+`MyDrive/vaaet-ml/training-runs/<run-id>/`; el bundle conserva sólo su descriptor
+y continúa teniendo cuatro archivos.
+
 Un bundle semilla siempre es `pilot` y `production_eligible=false`. La política
 legacy neutraliza las tres evidencias de calidad desconocidas tanto durante el
 entrenamiento como durante la inferencia, evitando una divergencia train/serve.
@@ -64,3 +70,4 @@ este repositorio. Véase [ADR-0012](../architecture/decisions/0012-ml-web-bounda
 La semántica jerárquica está gobernada por [ADR-0014](../architecture/decisions/0014-hierarchical-traffic-state-and-incident-policy.md).
 El ciclo semilla/HITL está gobernado por [ADR-0017](../architecture/decisions/0017-seed-bootstrap-and-hitl-retraining.md).
 El benchmark humano congelado está gobernado por [ADR-0018](../architecture/decisions/0018-versioned-frozen-human-holdouts.md).
+La gestión inmutable de datasets está gobernada por [ADR-0019](../architecture/decisions/0019-immutable-seed-and-hitl-datasets.md).

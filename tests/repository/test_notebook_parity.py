@@ -159,6 +159,14 @@ def test_training_uses_shared_feature_contracts() -> None:
     assert "/content/drive/MyDrive/vaaet-ml/data/holdouts" in code
     assert "no ephemeral fallback is allowed" in code
     assert "compose_supervised_dataset(" in code
+    assert "VersionedSeedStore" in code
+    assert "DatasetArtifactAction.REUSE_OR_CREATE" in code
+    assert "DatasetArtifactAction.CREATE_NEW_VERSION" in code
+    assert "HitlCatalogSource(HITL_CATALOG_PATH, CatalogSelection.ALL_ACTIVE)" in code
+    assert "create_training_input_lock(" in code
+    assert "training_input_lock=training_input_lock.descriptor" in code
+    assert "data/processed/vaaet-seed-bootstrap-v1.zip" not in code
+    assert "data/raw/vaaet-training-dataset-v1.zip" not in code
     assert 'feedback_policy=FeedbackPolicy.VALIDATED_ONLY' in code
     assert "USE_HUMAN_VALIDATED_FEEDBACK" not in code
     assert "persist_traffic_analysis" not in code
@@ -178,12 +186,22 @@ def test_training_prepares_postgres_backup_reader_in_colab() -> None:
     assert "Path(PG_RESTORE_PATH) if PG_RESTORE_PATH else None" in code
     assert "Backup reader ready" in code
     assert "for fname in uploaded" in code
-    assert "Processed seed package restored from Drive" in code
+    assert "Immutable dataset root" in code
     assert "Detected backup table" in code
     assert "archive_table" in code
     assert "reader_version" in code
     assert "!apt-get" not in code
     assert "shell=True" not in code
+
+
+def test_inference_finalizes_immutable_hitl_review_sessions() -> None:
+    code = _code(NOTEBOOKS["inference"])
+    assert "finalize_review_session" in code
+    assert "def finalize_current_review" in code
+    assert "REVIEW_VALIDATIONS.append" in code
+    assert "/content/drive/MyDrive/vaaet-ml/data/hitl-reviews" in code
+    assert "result.sync_status" in code
+    assert "export_completed_offline_review" not in code
 
 
 def test_training_augmentation_handles_raw_and_feedback_inputs() -> None:
@@ -231,7 +249,7 @@ def test_inference_uses_shared_analysis_and_validates_bundle() -> None:
     assert "from sqlalchemy import text as sa_text" not in code
     assert "load_review_queue" in code
     assert "build_review_widget" in code
-    assert "export_completed_offline_review" in code
+    assert "finalize_current_review" in code
     assert "DatabaseProfile.REVIEW" in code
     assert "ENABLE_HUMAN_REVIEW = False" in code
     assert "PERSIST_TO_DATABASE = False" in code

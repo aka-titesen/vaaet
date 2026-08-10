@@ -39,6 +39,11 @@ def valid_bundle(tmp_path: Path) -> Path:
             "validation_rows": 12,
             "test_rows": 15,
         },
+        training_input_lock={
+            "contract": "vaaet-training-input-lock-v1",
+            "lock_id": "87654321-4321-8765-4321-876543218765",
+            "fingerprint": "b" * 64,
+        },
     )
     return tmp_path
 
@@ -62,6 +67,15 @@ def test_valid_bundle(valid_bundle: Path) -> None:
     assert manifest["decision_policy"]["automatic_accident_state_allowed"] is False
     assert manifest["training_lifecycle"]["deployment_stage"] == "production"
     assert manifest["training_lifecycle"]["input_policy"] == "canonical-v2"
+    assert manifest["training_input_lock"]["fingerprint"] == "b" * 64
+
+
+def test_rejects_invalid_training_input_lock(valid_bundle: Path) -> None:
+    payload = _manifest(valid_bundle)
+    payload["training_input_lock"]["fingerprint"] = "invalid"
+    _write_manifest(valid_bundle, payload)
+    with pytest.raises(ArtifactValidationError, match="input lock fingerprint"):
+        validate_manifest(valid_bundle)
 
 
 @pytest.mark.parametrize("delta", [-1, 1])

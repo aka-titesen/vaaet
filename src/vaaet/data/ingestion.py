@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import tempfile
+import warnings
 import zipfile
 from dataclasses import dataclass
 from enum import Enum
@@ -23,6 +24,7 @@ from vaaet.data.database import (
     parse_sql_dump_tables,
     restore_backup_to_sql,
 )
+from vaaet.data.dataset_artifacts import HitlCatalogSource, load_hitl_catalog_feedback
 from vaaet.data.timestamps import (
     count_naive_timestamps,
     normalize_timestamp_series,
@@ -31,6 +33,7 @@ from vaaet.settings import FEATURE_COLS
 from vaaet.training.lifecycle import TrainingMode
 
 DATASET_PACKAGE_CONTRACT = "vaaet-training-dataset-v1"
+SEED_DATASET_PACKAGE_CONTRACT = "vaaet-seed-bootstrap-v1"
 PACKAGE_FILES = {
     "raw": "raw-telemetry.csv",
     "features": "telemetry-features.csv",
@@ -88,6 +91,7 @@ TrainingSource = (
     | RawCsvSource
     | DatasetPackageSource
     | SeedDatasetPackageSource
+    | HitlCatalogSource
 )
 
 
@@ -142,9 +146,17 @@ def create_dataset_package(
     predictions: pd.DataFrame | None = None,
     validations: pd.DataFrame | None = None,
     provenance: dict[str, object] | None = None,
+    contract_version: str = DATASET_PACKAGE_CONTRACT,
+    package_metadata: dict[str, object] | None = None,
+    overwrite: bool = False,
+    include_empty_components: tuple[str, ...] = (),
 ) -> Path:
     """Create a checksum-protected portable dataset package."""
     output = Path(output_path)
+    if output.exists() and not overwrite:
+        raise FileExistsError(f"Dataset package already exists: {output}")
+    if contract_version not in {DATASET_PACKAGE_CONTRACT, SEED_DATASET_PACKAGE_CONTRACT}:
+        raise ValueError(f"Unsupported dataset package contract: {contract_version}")
     output.parent.mkdir(parents=True, exist_ok=True)
     frames = {
         "raw": raw,
@@ -152,13 +164,18 @@ def create_dataset_package(
         "predictions": predictions,
         "validations": validations,
     }
+    unknown_empty_components = set(include_empty_components) - set(frames)
+    if unknown_empty_components:
+        raise ValueError(
+            f"Unknown empty dataset package components: {sorted(unknown_empty_components)}"
+        )
     if not any(frame is not None and not frame.empty for frame in frames.values()):
         raise ValueError("A dataset package must contain at least one non-empty table.")
     with tempfile.TemporaryDirectory(prefix="vaaet-dataset-") as temp_dir:
         root = Path(temp_dir)
         files: dict[str, dict[str, object]] = {}
         for key, frame in frames.items():
-            if frame is None or frame.empty:
+            if frame is None or (frame.empty and key not in include_empty_components):
                 continue
             filename = PACKAGE_FILES[key]
             path = root / filename
@@ -176,11 +193,12 @@ def create_dataset_package(
                 files[key]["record_time_min"] = timestamps.min().isoformat()
                 files[key]["record_time_max"] = timestamps.max().isoformat()
         manifest = {
-            "contract_version": DATASET_PACKAGE_CONTRACT,
+            "contract_version": contract_version,
             "timezone": "UTC",
             "feature_schema_version": FEATURE_SCHEMA_VERSION,
             "files": files,
             "provenance": provenance or {},
+            "package_metadata": package_metadata or {},
         }
         (root / "dataset-manifest.json").write_text(
             json.dumps(manifest, indent=2, sort_keys=True), encoding="utf-8"
@@ -193,7 +211,11 @@ def create_dataset_package(
     return output
 
 
-def load_dataset_package(path: str | Path) -> dict[str, pd.DataFrame]:
+def load_dataset_package(
+    path: str | Path,
+    *,
+    accepted_contracts: tuple[str, ...] = (DATASET_PACKAGE_CONTRACT,),
+) -> dict[str, pd.DataFrame]:
     package = Path(path)
     if not package.is_file():
         raise FileNotFoundError(f"Dataset package not found: {package}")
@@ -205,7 +227,8 @@ def load_dataset_package(path: str | Path) -> dict[str, pd.DataFrame]:
         if not manifest_path.is_file():
             raise ValueError("Dataset package is missing dataset-manifest.json.")
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-        if manifest.get("contract_version") != DATASET_PACKAGE_CONTRACT:
+        contract_version = manifest.get("contract_version")
+        if contract_version not in accepted_contracts:
             raise ValueError("Unsupported dataset package contract version.")
         frames: dict[str, pd.DataFrame] = {}
         for key, metadata in manifest.get("files", {}).items():
@@ -223,12 +246,17 @@ def load_dataset_package(path: str | Path) -> dict[str, pd.DataFrame]:
             if list(frame.columns) != metadata.get("columns"):
                 raise ValueError(f"Column contract mismatch for dataset component {key}.")
             frame.attrs["vaaet_package_provenance"] = manifest.get("provenance", {})
+            frame.attrs["vaaet_package_metadata"] = manifest.get("package_metadata", {})
+            frame.attrs["vaaet_package_contract"] = contract_version
             frames[key] = frame
         return frames
 
 
 def _load_seed_features(source: SeedDatasetPackageSource) -> pd.DataFrame:
-    frames = load_dataset_package(source.path)
+    frames = load_dataset_package(
+        source.path,
+        accepted_contracts=(SEED_DATASET_PACKAGE_CONTRACT, DATASET_PACKAGE_CONTRACT),
+    )
     frame = frames.get("features", pd.DataFrame())
     if frame.empty:
         raise ValueError("Explicit seed package contains zero processed feature rows.")
@@ -247,11 +275,19 @@ def _load_seed_features(source: SeedDatasetPackageSource) -> pd.DataFrame:
         if versions and versions != {FEATURE_SCHEMA_VERSION}:
             raise ValueError(f"Incompatible seed feature schema versions: {sorted(versions)}")
     package_provenance = frame.attrs.get("vaaet_package_provenance", {})
+    package_contract = frame.attrs.get("vaaet_package_contract")
     if package_provenance.get("training_mode") != TrainingMode.SEED_BOOTSTRAP.value or (
         package_provenance.get("supervision") != "weak-proxy"
     ):
         raise ValueError(
             "Seed package provenance must declare seed-bootstrap weak-proxy supervision."
+        )
+    if package_contract == DATASET_PACKAGE_CONTRACT:
+        warnings.warn(
+            "Legacy seed package uses vaaet-training-dataset-v1; register it in the "
+            "versioned seed store to migrate to vaaet-seed-bootstrap-v1.",
+            DeprecationWarning,
+            stacklevel=2,
         )
     frame = frame.copy()
     frame["record_time"] = normalize_timestamp_series(frame["record_time"])
@@ -369,6 +405,8 @@ def _load_raw(source: TrainingSource) -> pd.DataFrame:
         frame = _frames_from_backup(source, components={"raw"}).get("raw", pd.DataFrame())
     elif isinstance(source, SeedDatasetPackageSource):
         raise ValueError("SeedDatasetPackageSource must be declared in seed_sources.")
+    elif isinstance(source, HitlCatalogSource):
+        raise ValueError("HitlCatalogSource cannot be used as a raw source.")
     else:
         raise TypeError(f"Unsupported raw source: {type(source)!r}")
     if frame.empty:
@@ -417,6 +455,10 @@ def _load_feedback(source: TrainingSource) -> pd.DataFrame:
         raise ValueError("RawCsvSource cannot be used as a feedback source.")
     if isinstance(source, SeedDatasetPackageSource):
         raise ValueError("SeedDatasetPackageSource cannot be used as a feedback source.")
+    if isinstance(source, HitlCatalogSource):
+        frame, descriptor = load_hitl_catalog_feedback(source)
+        frame.attrs["vaaet_provenance"] = descriptor
+        return frame
     raise TypeError(f"Unsupported feedback source: {type(source)!r}")
 
 
@@ -562,8 +604,10 @@ def load_training_inputs(plan: TrainingIngestionPlan) -> TrainingDataset:
 
 __all__ = [
     "DATASET_PACKAGE_CONTRACT",
+    "SEED_DATASET_PACKAGE_CONTRACT",
     "DatasetPackageSource",
     "FeedbackPolicy",
+    "HitlCatalogSource",
     "PostgresBackupSource",
     "PostgresSource",
     "RawCsvSource",

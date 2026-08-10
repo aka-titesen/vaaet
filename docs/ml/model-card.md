@@ -4,9 +4,9 @@
 
 | Campo | Valor |
 |---|---|
-| Proyecto | VAAET ML 4.2.2 |
-| Modelo vigente | `mlp-v2.0` |
-| Estado inicial | Experimental / shadow-only hasta cumplir gates |
+| Proyecto | VAAET ML 4.3.0 |
+| Modelo vigente | `mlp-v2.1` |
+| Estado inicial | Pilot weak-supervision hasta cumplir gates humanos |
 | Runtime | TensorFlow/Keras, Python 3.10–3.12, Google Colab |
 | Artefacto | Bundle DVC contrato v2 |
 
@@ -32,7 +32,11 @@ Las salidas aprendidas son `Normal`, `Reduced` y `Congested`. El estado público
 
 Se conserva el orden contractual de 19 features: velocidad y volumen; conteos de cinco tipos; proporción de pesados; deltas, transición, varianza y persistencia por segmento continuo de cada clip; calidad de velocidad, near-zero y stationary sobre tracks únicos; hora y proxy nocturno. `record_time` se transporta en UTC, mientras `hour_of_day` y `weather_condition` se derivan en `America/Argentina/Buenos_Aires`. La semántica temporal corresponde a `traffic-features-v2`.
 
-Los registros `traffic-telemetry-v1` no contienen evidencia moderna de calidad. Esos valores permanecen desconocidos y sólo permiten reproducir un baseline experimental; nunca se interpretan como calidad perfecta.
+Los registros `traffic-telemetry-v1` no contienen evidencia moderna de calidad.
+El modo semilla aplica `input_policy=legacy-v1-bootstrap`: neutraliza
+`speed_measurement_quality`, `near_zero_motion_ratio` y
+`stationary_confirmed_ratio` tanto en train como en serving. No se interpretan
+como calidad perfecta ni se permite que los sintéticos revelen su procedencia.
 
 ## Datos y particiones
 
@@ -40,10 +44,16 @@ Los registros `traffic-telemetry-v1` no contienen evidencia moderna de calidad. 
 - Validation: grupos reales completos del período restante.
 - Train: grupos restantes; es la única partición que admite sintéticos.
 - Scaler, class weights y cualquier balanceo se ajustan sólo con train.
-- El baseline usa class weights limitados y no SMOTE 1:1.
+- El bootstrap compara class weights, oversampling moderado y escenarios
+  sintéticos de congestión sobre validation proxy; prioriza coste y falsos
+  Congested, sin SMOTE 1:1.
 - Escenarios sintéticos de Accident no son targets del MLP ni evidencia de eficacia real.
 
-Las etiquetas de reglas son proxies. Las métricas de producción sólo son válidas sobre un holdout real, humano y agrupado conforme al [protocolo de anotación](human-annotation-protocol.md).
+Las etiquetas de reglas son proxies. El bundle semilla es un piloto y sus
+métricas sólo expresan fidelidad a esa weak supervision. En HITL, la memoria
+proxy decrece hasta cero a 300 etiquetas humanas Normal, 300 Reduced y 100
+Congested. Las métricas de producción sólo son válidas sobre un holdout real,
+humano y agrupado conforme al [protocolo de anotación](human-annotation-protocol.md).
 
 ## Métricas y promoción
 
@@ -52,6 +62,9 @@ Los objetivos iniciales son F1-macro ≥0,88; precision/recall de Normal ≥0,93
 Sin al menos 100 minutos Congested validados de 20 episodios reales, esa clase es experimental. Sin accidentes reales no se publica recall de Accident. Para candidatos se reportan falsos por hora; el objetivo preliminar es menos de uno cada 100 horas y unas 300 horas negativas sin falsos para evidencia aproximada al 95%.
 
 La promoción manual exige telemetría v2 suficiente, holdout humano, retrospective replay, shadow mode prospectivo y revisión de falsos positivos. El manifiesto conserva `production_eligible` y `promotion_blockers`.
+El notebook no considera congelado un test sólo porque sus filas sean humanas:
+`HUMAN_HOLDOUT_FROZEN` debe habilitarse conscientemente para un paquete inmutable
+que no participó en ninguna decisión de modelado.
 
 ## Limitaciones
 
@@ -68,5 +81,6 @@ La promoción manual exige telemetría v2 suficiente, holdout humano, retrospect
 | `mlp-v1.0` | Baseline histórico de 14 features |
 | `mlp-v1.1` | Baseline de 19 features y cuatro salidas |
 | `mlp-v2.0` | Tres salidas estables, contrato v2 y política jerárquica humana para Accident |
+| `mlp-v2.1` | Modos seed/HITL, política legacy paritaria y selección conservadora de balanceo |
 
-Última revisión: 2026-08-09. Véanse [ADR-0014](../architecture/decisions/0014-hierarchical-traffic-state-and-incident-policy.md) y [ADR-0015](../architecture/decisions/0015-postgresql-namespaces-security-and-hitl.md).
+Última revisión: 2026-08-09. Véanse [ADR-0014](../architecture/decisions/0014-hierarchical-traffic-state-and-incident-policy.md), [ADR-0015](../architecture/decisions/0015-postgresql-namespaces-security-and-hitl.md) y [ADR-0017](../architecture/decisions/0017-seed-bootstrap-and-hitl-retraining.md).

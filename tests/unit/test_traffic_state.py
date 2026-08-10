@@ -12,6 +12,7 @@ from vaaet.inference.traffic_state import (
     classify_telemetry_dataframe,
 )
 from vaaet.settings import FEATURE_COLS
+from vaaet.training.lifecycle import ModelInputPolicy
 
 
 class _DummyScaler:
@@ -162,6 +163,27 @@ class TestClassifyTelemetryDataFrame:
 
         with pytest.raises(ValueError, match="Scaler feature count does not match"):
             classify_telemetry_dataframe(df, model, scaler)
+
+    def test_legacy_bundle_neutralizes_missing_quality_features(self) -> None:
+        df = _feature_rows()
+        df.loc[:, "speed_measurement_quality"] = np.nan
+        scaler = _DummyScaler(len(FEATURE_COLS))
+        model = _DummyModel(np.array([0.90, 0.07, 0.03]))
+
+        result = classify_telemetry_dataframe(
+            df,
+            model,
+            scaler,
+            input_policy=ModelInputPolicy.LEGACY_V1_BOOTSTRAP,
+        )
+        assert not result.empty
+        with pytest.raises(ValueError, match="unknown feature values"):
+            classify_telemetry_dataframe(
+                df,
+                model,
+                scaler,
+                input_policy=ModelInputPolicy.CANONICAL_V2,
+            )
 
 
 class TestStableStatePolicy:

@@ -12,3 +12,8 @@ describe en [el protocolo humano](../docs/ml/human-annotation-protocol.md).
 
 Los datos operativos permanecen ignorados por Git. DVC se reserva para el bundle
 de modelo aprobado, no para videos ni backups de bases de datos.
+
+El inicio semilla produce
+`processed/vaaet-seed-bootstrap-v1.zip`: contiene las 19 features, weak labels,
+procedencia y checksums. Puede descargarse o copiarse a Drive para futuros
+reentrenamientos HITL; no se versiona con Git ni obliga a repetir `pg_restore`.

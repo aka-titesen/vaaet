@@ -152,7 +152,7 @@ DATABASE_SCHEMAS: tuple[str, ...] = (
 )
 
 # Model versioning
-MODEL_VERSION: str = "mlp-v2.0"
+MODEL_VERSION: str = "mlp-v2.1"
 TELEMETRY_SCHEMA_VERSION: str = "traffic-telemetry-v2"
 
 

@@ -17,6 +17,7 @@ from vaaet.data.ingestion import (
     FeedbackPolicy,
     PostgresBackupSource,
     RawCsvSource,
+    SeedDatasetPackageSource,
     TrainingIngestionPlan,
     compose_supervised_dataset,
     create_dataset_package,
@@ -24,6 +25,7 @@ from vaaet.data.ingestion import (
     load_training_inputs,
 )
 from vaaet.settings import FEATURE_COLS
+from vaaet.training.lifecycle import TrainingMode
 
 
 def _features(state: int = 1) -> pd.DataFrame:
@@ -61,11 +63,58 @@ def _package_tables(path: Path, state: int = 1) -> Path:
 
 def test_plan_requires_explicit_source() -> None:
     with pytest.raises(ValueError, match="explicit training source"):
-        TrainingIngestionPlan()
+        TrainingIngestionPlan(mode=TrainingMode.SEED_BOOTSTRAP)
 
 
 def test_only_validated_feedback_policy_exists() -> None:
     assert list(FeedbackPolicy) == [FeedbackPolicy.VALIDATED_ONLY]
+
+
+def test_hitl_mode_requires_validated_feedback_source(tmp_path: Path) -> None:
+    seed = create_dataset_package(
+        tmp_path / "seed.zip",
+        features=_features(),
+        provenance={"training_mode": "seed-bootstrap", "supervision": "weak-proxy"},
+    )
+    with pytest.raises(ValueError, match="HITL retraining requires"):
+        TrainingIngestionPlan(
+            mode=TrainingMode.HITL_RETRAINING,
+            seed_sources=(SeedDatasetPackageSource(seed),),
+        )
+
+
+def test_processed_seed_package_is_loaded_without_raw_engineering(tmp_path: Path) -> None:
+    seed_features = _features(state=2)
+    seed_features["is_human_validated"] = False
+    package = create_dataset_package(
+        tmp_path / "vaaet-seed-bootstrap-v1.zip",
+        features=seed_features,
+        provenance={"training_mode": "seed-bootstrap", "supervision": "weak-proxy"},
+    )
+    result = load_training_inputs(
+        TrainingIngestionPlan(
+            mode=TrainingMode.SEED_BOOTSTRAP,
+            seed_sources=(SeedDatasetPackageSource(package),),
+        )
+    )
+    assert result.raw.empty
+    assert len(result.seed_features) == 1
+    assert result.seed_features.iloc[0]["traffic_state"] == 2
+    assert not bool(result.seed_features.iloc[0]["is_human_validated"])
+    assert result.provenance.iloc[0]["kind"] == "processed_seed"
+
+
+def test_seed_package_requires_weak_proxy_provenance(tmp_path: Path) -> None:
+    features = _features()
+    features["is_human_validated"] = False
+    package = create_dataset_package(tmp_path / "seed.zip", features=features)
+    with pytest.raises(ValueError, match="seed-bootstrap weak-proxy"):
+        load_training_inputs(
+            TrainingIngestionPlan(
+                mode=TrainingMode.SEED_BOOTSTRAP,
+                seed_sources=(SeedDatasetPackageSource(package),),
+            )
+        )
 
 
 def test_dataset_package_roundtrip_and_checksum(tmp_path: Path) -> None:
@@ -104,6 +153,7 @@ def test_combines_raw_and_human_feedback(tmp_path: Path) -> None:
     package = _package_tables(tmp_path / "feedback.zip")
     result = load_training_inputs(
         TrainingIngestionPlan(
+            mode=TrainingMode.HITL_RETRAINING,
             raw_sources=(RawCsvSource(raw_path),),
             feedback_sources=(DatasetPackageSource(package),),
         )
@@ -134,7 +184,10 @@ def test_legacy_raw_csv_is_localized_and_reports_temporal_assumption(tmp_path: P
     ).to_csv(raw_path, index=False)
 
     result = load_training_inputs(
-        TrainingIngestionPlan(raw_sources=(RawCsvSource(raw_path),))
+        TrainingIngestionPlan(
+            mode=TrainingMode.SEED_BOOTSTRAP,
+            raw_sources=(RawCsvSource(raw_path),),
+        )
     )
 
     assert result.raw.iloc[0]["record_time"] == pd.Timestamp("2025-04-28 13:00:00Z")
@@ -147,7 +200,10 @@ def test_legacy_raw_csv_is_localized_and_reports_temporal_assumption(tmp_path: P
 def test_accident_is_reserved_for_incident_evaluation(tmp_path: Path) -> None:
     package = _package_tables(tmp_path / "accident.zip", state=3)
     result = load_training_inputs(
-        TrainingIngestionPlan(feedback_sources=(DatasetPackageSource(package),))
+        TrainingIngestionPlan(
+            mode=TrainingMode.HITL_RETRAINING,
+            feedback_sources=(DatasetPackageSource(package),),
+        )
     )
     assert result.validated_feedback.empty
     assert len(result.confirmed_incidents) == 1
@@ -159,6 +215,7 @@ def test_conflicting_human_labels_stop_ingestion(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="Conflicting human labels"):
         load_training_inputs(
             TrainingIngestionPlan(
+                mode=TrainingMode.HITL_RETRAINING,
                 feedback_sources=(DatasetPackageSource(first), DatasetPackageSource(second))
             )
         )
@@ -187,7 +244,10 @@ def test_feedback_rejects_reordered_feature_contract(tmp_path: Path) -> None:
     )
     with pytest.raises(ValueError, match="exact 19-feature order"):
         load_training_inputs(
-            TrainingIngestionPlan(feedback_sources=(DatasetPackageSource(package),))
+            TrainingIngestionPlan(
+                mode=TrainingMode.HITL_RETRAINING,
+                feedback_sources=(DatasetPackageSource(package),),
+            )
         )
 
 
@@ -255,7 +315,10 @@ def test_raw_backup_extracts_only_requested_raw_table(tmp_path: Path) -> None:
         ),
     ):
         result = load_training_inputs(
-            TrainingIngestionPlan(raw_sources=(PostgresBackupSource(backup),))
+            TrainingIngestionPlan(
+                mode=TrainingMode.SEED_BOOTSTRAP,
+                raw_sources=(PostgresBackupSource(backup),),
+            )
         )
     assert len(result.raw) == 1
     assert restore.call_args.kwargs["tables"] == ("vaaet_raw.traffic_data",)
@@ -301,7 +364,10 @@ def test_legacy_raw_backup_reports_table_and_preserves_columns(tmp_path: Path) -
         ),
     ):
         result = load_training_inputs(
-            TrainingIngestionPlan(raw_sources=(PostgresBackupSource(backup),))
+            TrainingIngestionPlan(
+                mode=TrainingMode.SEED_BOOTSTRAP,
+                raw_sources=(PostgresBackupSource(backup),),
+            )
         )
 
     assert list(result.raw.columns) == list(raw.columns)
@@ -332,5 +398,8 @@ def test_explicit_empty_raw_backup_fails_with_specific_table(tmp_path: Path) -> 
     ):
         with pytest.raises(ValueError, match=r"public\.traffic_data.*zero telemetry rows"):
             load_training_inputs(
-                TrainingIngestionPlan(raw_sources=(PostgresBackupSource(backup),))
+                TrainingIngestionPlan(
+                    mode=TrainingMode.SEED_BOOTSTRAP,
+                    raw_sources=(PostgresBackupSource(backup),),
+                )
             )

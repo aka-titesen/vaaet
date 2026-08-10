@@ -22,6 +22,10 @@ from vaaet.settings import (
     STATE_LABELS,
     WORSENING_PERSISTENCE_MINUTES,
 )
+from vaaet.training.lifecycle import (
+    ModelInputPolicy,
+    TrainingMode,
+)
 
 CONTRACT_VERSION = 2
 FEATURE_SCHEMA_VERSION = "traffic-features-v2"
@@ -44,6 +48,7 @@ REQUIRED_FIELDS = {
     "dependencies",
     "metrics",
     "data_provenance",
+    "training_lifecycle",
 }
 REQUIRED_DEPENDENCIES = ("tensorflow", "scikit-learn", "joblib")
 REQUIRED_PROVENANCE_FIELDS = {
@@ -98,6 +103,7 @@ def create_manifest(
     *,
     metrics: Mapping[str, Any],
     data_provenance: Mapping[str, Any],
+    training_lifecycle: Mapping[str, Any],
     decision_policy: Mapping[str, Any] | None = None,
 ) -> Path:
     """Create the serving manifest after a successful training export."""
@@ -120,6 +126,7 @@ def create_manifest(
     }
     if decision_policy:
         policy.update(dict(decision_policy))
+    lifecycle = dict(training_lifecycle)
     manifest = {
         "contract_version": CONTRACT_VERSION,
         "feature_schema_version": FEATURE_SCHEMA_VERSION,
@@ -138,6 +145,7 @@ def create_manifest(
         },
         "metrics": dict(metrics),
         "data_provenance": dict(data_provenance),
+        "training_lifecycle": lifecycle,
     }
     output = directory / MANIFEST_FILE
     output.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
@@ -185,6 +193,45 @@ def validate_manifest(bundle_dir: str | Path) -> dict[str, Any]:
     expected_outputs = {str(key): value for key, value in MODEL_STATE_LABELS.items()}
     if manifest["model_output_mapping"] != expected_outputs:
         raise ArtifactValidationError("Artifact MLP output mapping is incompatible with VAAET.")
+    lifecycle = manifest["training_lifecycle"]
+    if not isinstance(lifecycle, dict):
+        raise ArtifactValidationError("Manifest training_lifecycle must be an object.")
+    lifecycle_fields = {
+        "training_mode",
+        "supervision",
+        "deployment_stage",
+        "input_policy",
+        "production_eligible",
+    }
+    if missing_lifecycle := sorted(lifecycle_fields - lifecycle.keys()):
+        raise ArtifactValidationError(
+            f"Missing training lifecycle fields: {', '.join(missing_lifecycle)}"
+        )
+    try:
+        training_mode = TrainingMode(lifecycle["training_mode"])
+        input_policy = ModelInputPolicy(lifecycle["input_policy"])
+    except (TypeError, ValueError) as exc:
+        raise ArtifactValidationError("Unsupported training lifecycle mode or input policy.") from exc
+    if lifecycle["deployment_stage"] not in {"pilot", "candidate", "production"}:
+        raise ArtifactValidationError("Unsupported bundle deployment stage.")
+    if not isinstance(lifecycle["supervision"], str) or not lifecycle["supervision"]:
+        raise ArtifactValidationError("Training lifecycle supervision must be non-empty.")
+    if type(lifecycle["production_eligible"]) is not bool:
+        raise ArtifactValidationError("Training lifecycle eligibility must be boolean.")
+    if training_mode is TrainingMode.SEED_BOOTSTRAP and (
+        lifecycle["deployment_stage"] != "pilot"
+        or lifecycle["production_eligible"]
+        or lifecycle["supervision"] != "weak-proxy"
+        or input_policy is not ModelInputPolicy.LEGACY_V1_BOOTSTRAP
+    ):
+        raise ArtifactValidationError(
+            "Seed bootstrap bundles must remain legacy-policy weak-proxy pilots."
+        )
+    if training_mode is TrainingMode.HITL_RETRAINING and (
+        lifecycle["deployment_stage"] not in {"candidate", "production"}
+        or lifecycle["supervision"] != "human-validated-with-proxy-memory"
+    ):
+        raise ArtifactValidationError("HITL bundles must be human-validated candidates or production.")
     policy = manifest["decision_policy"]
     if not isinstance(policy, dict):
         raise ArtifactValidationError("Manifest decision_policy must be an object.")
@@ -251,6 +298,10 @@ def validate_manifest(bundle_dir: str | Path) -> dict[str, Any]:
     metric_eligibility = manifest["metrics"].get("production_eligible")
     if type(metric_eligibility) is not bool or metric_eligibility != provenance["production_eligible"]:
         raise ArtifactValidationError("Production eligibility must be explicit and consistent.")
+    if lifecycle["production_eligible"] != metric_eligibility:
+        raise ArtifactValidationError("Training lifecycle eligibility must match bundle metrics.")
+    if lifecycle["deployment_stage"] == "production" and not metric_eligibility:
+        raise ArtifactValidationError("Only eligible bundles may use the production stage.")
 
     for name in REQUIRED_FILES:
         path = directory / name

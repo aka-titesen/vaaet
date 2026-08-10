@@ -25,6 +25,7 @@ from vaaet.settings import (
     STATE_LABELS,
     WORSENING_PERSISTENCE_MINUTES,
 )
+from vaaet.training.lifecycle import ModelInputPolicy, apply_model_input_policy
 
 __all__ = [
     "apply_conservative_accident_gate",
@@ -225,6 +226,7 @@ def classify_telemetry_dataframe(
     feature_cols: list[str] | None = None,
     model_version: str = MODEL_VERSION,
     decision_policy: Mapping[str, Any] | None = None,
+    input_policy: ModelInputPolicy | str = ModelInputPolicy.CANONICAL_V2,
 ) -> pd.DataFrame:
     """Run the three-class MLP and the exact production decision chain."""
     del label_mapping  # Public labels are governed centrally by STATE_LABELS.
@@ -232,14 +234,10 @@ def classify_telemetry_dataframe(
         return df_features.copy()
     active_features = feature_cols or FEATURE_COLS
     _ensure_feature_compatibility(scaler, active_features)
-    missing = df_features[active_features].isna().any()
-    if missing.any():
-        columns = missing[missing].index.tolist()
-        raise ValueError(
-            "Cannot classify telemetry with unknown feature values. "
-            f"Missing/legacy feature columns: {columns}"
-        )
-    X = scaler.transform(df_features[active_features].to_numpy())
+    if active_features != FEATURE_COLS:
+        raise ValueError("Custom feature order is not supported by bundle v2.")
+    model_matrix = apply_model_input_policy(df_features, input_policy)
+    X = scaler.transform(model_matrix.to_numpy())
     policy = dict(decision_policy or {})
     probabilities = _validate_probabilities(model.predict(X, verbose=0), len(df_features))
     probabilities = apply_temperature_scaling(
@@ -277,6 +275,7 @@ def classify_raw_telemetry(
     model_version: str = MODEL_VERSION,
     inference_mode: str = "stable",
     decision_policy: Mapping[str, Any] | None = None,
+    input_policy: ModelInputPolicy | str = ModelInputPolicy.CANONICAL_V2,
 ) -> pd.DataFrame:
     """Engineer complete minute windows and classify them safely."""
     if df_telemetry.empty:
@@ -301,4 +300,5 @@ def classify_raw_telemetry(
         feature_cols=feature_cols,
         model_version=model_version,
         decision_policy=decision_policy,
+        input_policy=input_policy,
     )

@@ -1,4 +1,4 @@
-# VAAET ML 4.2.2
+# VAAET ML 4.3.0
 
 PostgreSQL se organiza en `vaaet_raw`, `vaaet_ml`, `vaaet_feedback` y
 `vaaet_ops`. Este último registra el ciclo de cada workflow sin almacenar
@@ -10,7 +10,8 @@ VAAET ML es el repositorio de machine learning para analizar el tránsito del Pu
 
 ```text
 video -> collection -> vaaet_raw.traffic_data
-raw + validated feedback -> training -> artifacts/traffic-state (bundle DVC)
+raw -> seed bootstrap -> processed seed -> pilot bundle
+processed seed + validated feedback -> HITL retraining -> candidate bundle
 video + bundle -> inference -> vaaet_ml.telemetry_features + traffic_predictions
 predictions -> explicit HITL review -> vaaet_feedback.human_validations
 ```
@@ -34,9 +35,14 @@ Cada notebook tiene una sola celda de preparación: clona o actualiza `https://g
 
 ## Contrato del modelo
 
-El bundle v2 contiene `traffic_classifier.keras`, `feature_scaler.joblib`, `label_mapping.joblib` y `model-manifest.json`. El MLP aprende `Normal`, `Reduced` y `Congested`; una sospecha de incidente conserva `Congested` y sólo una confirmación humana validada puede publicar `Accident`. El manifiesto fija las 19 features, calibración, política temporal, elegibilidad, bloqueos, procedencia y checksums. Consultá el [contrato de artefactos](docs/ml/model-artifact-contract.md) y [ADR-0014](docs/architecture/decisions/0014-hierarchical-traffic-state-and-incident-policy.md).
+El bundle v2 contiene `traffic_classifier.keras`, `feature_scaler.joblib`, `label_mapping.joblib` y `model-manifest.json`. El MLP aprende `Normal`, `Reduced` y `Congested`; una sospecha de incidente conserva `Congested` y sólo una confirmación humana validada puede publicar `Accident`. El manifiesto fija las 19 features, calibración, política temporal, modo de entrenamiento, política de entrada, etapa de despliegue, elegibilidad, procedencia y checksums. Consultá el [contrato de artefactos](docs/ml/model-artifact-contract.md), [ADR-0014](docs/architecture/decisions/0014-hierarchical-traffic-state-and-incident-policy.md) y [ADR-0017](docs/architecture/decisions/0017-seed-bootstrap-and-hitl-retraining.md).
 
-Los aproximadamente 2.068 registros históricos permiten reproducir un baseline, pero no acreditan un modelo de producción: carecen de telemetría v2 completa, holdout humano y accidentes reales. El notebook lo refleja marcando el bundle como `experimental/shadow-only` hasta cumplir los gates.
+Los aproximadamente 2.068 registros históricos permiten crear un bundle
+`pilot` mediante weak supervision. Ese resultado reproduce reglas preliminares,
+pero no acredita calidad real de producción: carece de telemetría v2 completa,
+holdout humano y accidentes reales. Los reentrenamientos HITL consumen features
+ya calculadas y sustituyen progresivamente la memoria proxy por etiquetas
+humanas; cada artefacto sigue siendo candidato hasta cumplir los gates.
 
 La futura Web App pertenece a otro repositorio y consumirá únicamente bundles validados. La [documentación](docs/index.md) y la [guía de Colab](docs/operations/colab-guide.md) describen el flujo completo.
 
@@ -54,8 +60,10 @@ alembic upgrade head
 psql 'postgresql://admin:...@host:5432/vaaet' -f migrations/provision-roles.sql
 ```
 
-El entrenamiento declara sus fuentes mediante `TrainingIngestionPlan`: puede
-combinar PostgreSQL, backups, CSV raw y `vaaet-training-dataset-v1.zip`. Sólo
+El entrenamiento declara `TrainingMode.SEED_BOOTSTRAP` o
+`TrainingMode.HITL_RETRAINING` mediante `TrainingIngestionPlan`: puede combinar
+PostgreSQL, backups, CSV raw, el paquete semilla procesado y
+`vaaet-training-dataset-v1.zip`. Sólo
 `human_validations` efectivas ingresan como etiquetas; predicciones sin revisar
 nunca se convierten en ground truth. Consultá [ADR-0015](docs/architecture/decisions/0015-postgresql-namespaces-security-and-hitl.md) y [ADR-0016](docs/architecture/decisions/0016-postgresql-hardening-and-pipeline-runs.md).
 El provisionamiento, backup, rotación y recuperación están en la

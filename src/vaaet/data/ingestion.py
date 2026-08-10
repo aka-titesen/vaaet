@@ -28,6 +28,7 @@ from vaaet.data.timestamps import (
     normalize_timestamp_series,
 )
 from vaaet.settings import FEATURE_COLS
+from vaaet.training.lifecycle import TrainingMode
 
 DATASET_PACKAGE_CONTRACT = "vaaet-training-dataset-v1"
 PACKAGE_FILES = {
@@ -74,25 +75,43 @@ class DatasetPackageSource:
     path: Path
 
 
-TrainingSource = PostgresSource | PostgresBackupSource | RawCsvSource | DatasetPackageSource
+@dataclass(frozen=True)
+class SeedDatasetPackageSource:
+    """Processed weak-label seed package; never inferred from generic feature files."""
+
+    path: Path
+
+
+TrainingSource = (
+    PostgresSource
+    | PostgresBackupSource
+    | RawCsvSource
+    | DatasetPackageSource
+    | SeedDatasetPackageSource
+)
 
 
 @dataclass(frozen=True)
 class TrainingIngestionPlan:
+    mode: TrainingMode
     raw_sources: tuple[TrainingSource, ...] = ()
+    seed_sources: tuple[SeedDatasetPackageSource, ...] = ()
     feedback_sources: tuple[TrainingSource, ...] = ()
     feedback_policy: FeedbackPolicy = FeedbackPolicy.VALIDATED_ONLY
 
     def __post_init__(self) -> None:
         if self.feedback_policy is not FeedbackPolicy.VALIDATED_ONLY:
             raise ValueError("Only human-validated feedback can be used for supervised training.")
-        if not self.raw_sources and not self.feedback_sources:
+        if not self.raw_sources and not self.seed_sources and not self.feedback_sources:
             raise ValueError("At least one explicit training source is required.")
+        if self.mode is TrainingMode.HITL_RETRAINING and not self.feedback_sources:
+            raise ValueError("HITL retraining requires an explicit validated feedback source.")
 
 
 @dataclass(frozen=True)
 class TrainingDataset:
     raw: pd.DataFrame
+    seed_features: pd.DataFrame
     validated_feedback: pd.DataFrame
     confirmed_incidents: pd.DataFrame
     provenance: pd.DataFrame
@@ -203,8 +222,46 @@ def load_dataset_package(path: str | Path) -> dict[str, pd.DataFrame]:
                 raise ValueError(f"Row count mismatch for dataset component {key}.")
             if list(frame.columns) != metadata.get("columns"):
                 raise ValueError(f"Column contract mismatch for dataset component {key}.")
+            frame.attrs["vaaet_package_provenance"] = manifest.get("provenance", {})
             frames[key] = frame
         return frames
+
+
+def _load_seed_features(source: SeedDatasetPackageSource) -> pd.DataFrame:
+    frames = load_dataset_package(source.path)
+    frame = frames.get("features", pd.DataFrame())
+    if frame.empty:
+        raise ValueError("Explicit seed package contains zero processed feature rows.")
+    required = {"clip_id", "record_time", "traffic_state", *FEATURE_COLS}
+    if missing := required - set(frame.columns):
+        raise ValueError(f"Seed feature package is missing fields: {sorted(missing)}")
+    feature_order = [column for column in frame.columns if column in FEATURE_COLS]
+    if feature_order != list(FEATURE_COLS):
+        raise ValueError("Seed package does not preserve the exact 19-feature order.")
+    if not pd.to_numeric(frame["traffic_state"], errors="raise").isin((0, 1, 2)).all():
+        raise ValueError("Seed package may contain only stable proxy labels 0, 1, and 2.")
+    if "is_human_validated" in frame and frame["is_human_validated"].fillna(False).any():
+        raise ValueError("Seed package cannot contain human-validated rows.")
+    if "feature_schema_version" in frame:
+        versions = set(frame["feature_schema_version"].dropna().astype(str))
+        if versions and versions != {FEATURE_SCHEMA_VERSION}:
+            raise ValueError(f"Incompatible seed feature schema versions: {sorted(versions)}")
+    package_provenance = frame.attrs.get("vaaet_package_provenance", {})
+    if package_provenance.get("training_mode") != TrainingMode.SEED_BOOTSTRAP.value or (
+        package_provenance.get("supervision") != "weak-proxy"
+    ):
+        raise ValueError(
+            "Seed package provenance must declare seed-bootstrap weak-proxy supervision."
+        )
+    frame = frame.copy()
+    frame["record_time"] = normalize_timestamp_series(frame["record_time"])
+    frame["traffic_state"] = pd.to_numeric(frame["traffic_state"], errors="raise").astype(int)
+    frame["is_human_validated"] = False
+    frame.attrs["vaaet_provenance"] = {
+        "package_kind": "processed-seed",
+        **package_provenance,
+    }
+    return frame
 
 
 def _latest_validated_feedback(frames: dict[str, pd.DataFrame]) -> pd.DataFrame:
@@ -310,6 +367,8 @@ def _load_raw(source: TrainingSource) -> pd.DataFrame:
         frame = load_dataset_package(source.path).get("raw", pd.DataFrame())
     elif isinstance(source, PostgresBackupSource):
         frame = _frames_from_backup(source, components={"raw"}).get("raw", pd.DataFrame())
+    elif isinstance(source, SeedDatasetPackageSource):
+        raise ValueError("SeedDatasetPackageSource must be declared in seed_sources.")
     else:
         raise TypeError(f"Unsupported raw source: {type(source)!r}")
     if frame.empty:
@@ -356,6 +415,8 @@ def _load_feedback(source: TrainingSource) -> pd.DataFrame:
         return frame
     if isinstance(source, RawCsvSource):
         raise ValueError("RawCsvSource cannot be used as a feedback source.")
+    if isinstance(source, SeedDatasetPackageSource):
+        raise ValueError("SeedDatasetPackageSource cannot be used as a feedback source.")
     raise TypeError(f"Unsupported feedback source: {type(source)!r}")
 
 
@@ -378,7 +439,9 @@ def _deduplicate_raw(frames: Sequence[pd.DataFrame]) -> pd.DataFrame:
     return combined.drop_duplicates(["clip_id", "record_time"], keep="last").reset_index(drop=True)
 
 
-def _deduplicate_feedback(frames: Sequence[pd.DataFrame]) -> tuple[pd.DataFrame, pd.DataFrame]:
+def _deduplicate_feedback(
+    frames: Sequence[pd.DataFrame], *, require_human_validation: bool = True
+) -> tuple[pd.DataFrame, pd.DataFrame]:
     non_empty = [frame.copy() for frame in frames if not frame.empty]
     if not non_empty:
         return pd.DataFrame(), pd.DataFrame()
@@ -389,7 +452,11 @@ def _deduplicate_feedback(frames: Sequence[pd.DataFrame]) -> tuple[pd.DataFrame,
     feature_order = [column for column in combined.columns if column in FEATURE_COLS]
     if feature_order != list(FEATURE_COLS):
         raise ValueError("Validated feedback does not preserve the exact 19-feature order.")
-    if "is_human_validated" in combined and not combined["is_human_validated"].fillna(False).all():
+    if (
+        require_human_validation
+        and "is_human_validated" in combined
+        and not combined["is_human_validated"].fillna(False).all()
+    ):
         raise ValueError("Feedback sources contain unvalidated predictions.")
     if "feature_schema_version" in combined:
         versions = set(combined["feature_schema_version"].dropna().astype(str))
@@ -405,7 +472,11 @@ def _deduplicate_feedback(frames: Sequence[pd.DataFrame]) -> tuple[pd.DataFrame,
                 f"Conflicting human labels or features for clip={group.iloc[0]['clip_id']} "
                 f"time={group.iloc[0]['record_time']}"
             )
-    combined = combined.drop_duplicates(["clip_id", "record_time"], keep="last")
+    combined = (
+        combined.drop_duplicates(["clip_id", "record_time"], keep="last")
+        .sort_values(["clip_id", "record_time"])
+        .reset_index(drop=True)
+    )
     incidents = combined.loc[combined["traffic_state"].eq(3)].reset_index(drop=True)
     stable = combined.loc[combined["traffic_state"].isin((0, 1, 2))].reset_index(drop=True)
     return stable, incidents
@@ -444,6 +515,7 @@ def compose_supervised_dataset(
 
 def load_training_inputs(plan: TrainingIngestionPlan) -> TrainingDataset:
     raw_frames: list[pd.DataFrame] = []
+    seed_frames: list[pd.DataFrame] = []
     feedback_frames: list[pd.DataFrame] = []
     provenance: list[dict[str, object]] = []
     for index, source in enumerate(plan.raw_sources):
@@ -451,6 +523,16 @@ def load_training_inputs(plan: TrainingIngestionPlan) -> TrainingDataset:
         raw_frames.append(frame)
         provenance.append({
             "kind": "raw",
+            "source_index": index,
+            "source_type": type(source).__name__,
+            "rows": len(frame),
+            **frame.attrs.get("vaaet_provenance", {}),
+        })
+    for index, source in enumerate(plan.seed_sources):
+        frame = _load_seed_features(source)
+        seed_frames.append(frame)
+        provenance.append({
+            "kind": "processed_seed",
             "source_index": index,
             "source_type": type(source).__name__,
             "rows": len(frame),
@@ -467,10 +549,15 @@ def load_training_inputs(plan: TrainingIngestionPlan) -> TrainingDataset:
             **frame.attrs.get("vaaet_provenance", {}),
         })
     raw = _deduplicate_raw(raw_frames)
+    seed, seed_incidents = _deduplicate_feedback(
+        seed_frames, require_human_validation=False
+    )
+    if not seed_incidents.empty:
+        raise ValueError("Processed seed datasets cannot contain Accident targets.")
     feedback, incidents = _deduplicate_feedback(feedback_frames)
-    if raw.empty and feedback.empty and incidents.empty:
+    if raw.empty and seed.empty and feedback.empty and incidents.empty:
         raise ValueError("No usable raw telemetry or validated feedback was loaded.")
-    return TrainingDataset(raw, feedback, incidents, pd.DataFrame(provenance))
+    return TrainingDataset(raw, seed, feedback, incidents, pd.DataFrame(provenance))
 
 
 __all__ = [
@@ -480,6 +567,7 @@ __all__ = [
     "PostgresBackupSource",
     "PostgresSource",
     "RawCsvSource",
+    "SeedDatasetPackageSource",
     "TrainingDataset",
     "TrainingIngestionPlan",
     "compose_supervised_dataset",

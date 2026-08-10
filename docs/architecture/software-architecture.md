@@ -1,4 +1,4 @@
-# Arquitectura de software — VAAET ML 4.2.2
+# Arquitectura de software — VAAET ML 4.3.0
 
 VAAET ML es un pipeline MLOps batch con adquisición bajo demanda, entrenamiento, inferencia y feedback. Colab orquesta ejecuciones manuales; el paquete `vaaet` concentra lógica comprobable y `pyproject.toml` es la única fuente de dependencias.
 
@@ -6,7 +6,9 @@ VAAET ML es un pipeline MLOps batch con adquisición bajo demanda, entrenamiento
 flowchart LR
     V["Video SISE"] --> C["Data collection notebook"]
     C --> R["Raw CSV / vaaet_raw.traffic_data"]
-    R --> T["Training notebook"]
+    R --> S["Seed bootstrap"]
+    S --> D["Processed seed package"]
+    D --> T["HITL retraining"]
     T --> B["Validated four-file bundle"]
     V --> I["Inference notebook"]
     B --> I
@@ -28,8 +30,14 @@ flowchart LR
 | Datos | `src/vaaet/data/` | CSV, PostgreSQL y persistencia idempotente |
 | Contratos | `contracts.py`, `artifacts.py` | Esquemas y bundle portable |
 | Evaluación | `src/vaaet/evaluation/` | Calibración y reporting |
+| Entrenamiento | `src/vaaet/training/` | Modos seed/HITL, memoria proxy y balanceo conservador |
 
 `vaaet.vision.analysis.analyze_video()` es el límite común entre adquisición e inferencia. Sin proveedor de predicción muestra “Telemetry Collection”; con proveedor incorpora estado y confianza. El módulo no importa TensorFlow.
+
+El notebook de entrenamiento expone dos entradas explícitas que convergen antes
+del split: `SEED_BOOTSTRAP` calcula features desde raw y produce un piloto;
+`HITL_RETRAINING` consume el paquete procesado y feedback humano sin recalcular
+features. El mismo `input_policy` del manifiesto se usa en serving.
 
 ## Integraciones
 

@@ -3,6 +3,8 @@ from __future__ import annotations
 import ast
 import json
 import re
+import subprocess
+import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -21,6 +23,19 @@ ALLOWED_SCRIPT_FILES = {
     "export-training-dataset.py",
     "setup-dvc.sh",
 }
+
+
+def test_training_and_ingestion_modules_import_without_cycles() -> None:
+    subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "import vaaet.data.ingestion; import vaaet.training.partitions; "
+            "import vaaet.inference.traffic_state",
+        ],
+        cwd=REPO_ROOT,
+        check=True,
+    )
 
 
 def _concatenate_code_cells(notebook_path: Path) -> str:

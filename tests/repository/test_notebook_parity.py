@@ -136,7 +136,8 @@ def test_training_uses_shared_feature_contracts() -> None:
     assert "from vaaet.data.database import" in code
     assert "def engineer_features(" not in code
     assert "def assign_traffic_state(" not in code
-    assert "grouped_temporal_train_validation_test_split" in code
+    assert "from vaaet.training.partitions import build_training_partitions" in code
+    assert "build_training_partitions(" in code
     assert "validation_data=(X_validation, y_validation)" in code
     assert "validation_split" not in code
     assert "Dense(n_classes, activation=\"softmax\")" in code
@@ -145,6 +146,10 @@ def test_training_uses_shared_feature_contracts() -> None:
     assert "production_eligible" in code
     assert "SMOTE(" not in code
     assert "TrainingIngestionPlan(" in code
+    assert "TrainingMode.SEED_BOOTSTRAP" in code
+    assert "TrainingMode.HITL_RETRAINING" in code
+    assert "SeedDatasetPackageSource" in code
+    assert "HUMAN_HOLDOUT_FROZEN = False" in code
     assert "compose_supervised_dataset(" in code
     assert 'feedback_policy=FeedbackPolicy.VALIDATED_ONLY' in code
     assert "USE_HUMAN_VALIDATED_FEEDBACK" not in code
@@ -154,7 +159,7 @@ def test_training_uses_shared_feature_contracts() -> None:
 def test_training_prepares_postgres_backup_reader_in_colab() -> None:
     code = _code(NOTEBOOKS["training"])
     assert "ENABLE_DATA_UPLOAD = True" in code
-    condition = 'os.path.exists(_backup_dest) and not os.path.exists(_csv_dest)'
+    condition = 'TRAINING_MODE is TrainingMode.SEED_BOOTSTRAP and os.path.exists(_backup_dest) and not os.path.exists(_csv_dest)'
     assert condition in code
     assert 'Path("/usr/lib/postgresql/17/bin/pg_restore")' in code
     assert '["apt-get", "update", "-qq"]' in code
@@ -164,6 +169,8 @@ def test_training_prepares_postgres_backup_reader_in_colab() -> None:
     assert "PostgresBackupSource(BACKUP_PATH" in code
     assert "Path(PG_RESTORE_PATH) if PG_RESTORE_PATH else None" in code
     assert "Backup reader ready" in code
+    assert "for fname in uploaded" in code
+    assert "Processed seed package restored from Drive" in code
     assert "Detected backup table" in code
     assert "archive_table" in code
     assert "reader_version" in code
@@ -176,7 +183,7 @@ def test_training_augmentation_handles_raw_and_feedback_inputs() -> None:
     guard = 'if "df_raw" not in globals() or not isinstance(df_raw, pd.DataFrame):'
     assert guard in code
     assert code.index(guard) < code.index("_n_before = len(df_raw)")
-    assert "Feedback-only run: synthetic raw augmentation skipped" in code
+    assert "Synthetic raw augmentation skipped outside the one-time seed bootstrap" in code
     assert "from vaaet.data.timestamps import normalize_timestamp_series" in code
     assert "Canonical timestamp timezone" in code
 
@@ -185,6 +192,28 @@ def test_training_documents_actual_synthetic_record_count() -> None:
     notebook = NOTEBOOKS["training"].read_text(encoding="utf-8")
     assert "200 records total" in notebook
     assert "100 records total" not in notebook
+
+
+def test_training_compares_conservative_balance_candidates() -> None:
+    code = _code(NOTEBOOKS["training"])
+    assert "build_balance_candidates(" in code
+    assert "BalanceStrategy.CLASS_WEIGHTS" not in code
+    assert "BalanceStrategy.SYNTHETIC_CONGESTION" in code
+    assert "validation_false_congested_rate" in code
+    assert "selection_score" in code
+    assert "SELECTED_BALANCE_STRATEGY" in code
+    assert "expired proxy-memory rows before scaling" in code
+    assert "labels=[0, 1, 2]" in code
+
+
+def test_training_applies_same_legacy_policy_as_inference() -> None:
+    training = _code(NOTEBOOKS["training"])
+    inference = _code(NOTEBOOKS["inference"])
+    assert "ModelInputPolicy.LEGACY_V1_BOOTSTRAP" in training
+    assert "apply_model_input_policy(" in training
+    assert "input_policy=MODEL_INPUT_POLICY" in training
+    assert 'MODEL_INPUT_POLICY = manifest["training_lifecycle"]["input_policy"]' in inference
+    assert "input_policy=MODEL_INPUT_POLICY" in inference
 
 
 def test_inference_uses_shared_analysis_and_validates_bundle() -> None:
@@ -204,6 +233,9 @@ def test_inference_uses_shared_analysis_and_validates_bundle() -> None:
     assert "def generate_annotated_video(" not in code
     assert 'decision_policy=manifest["decision_policy"]' in code
     assert "ALLOW_EXPERIMENTAL_BUNDLE" in code
+    assert "ALLOW_PILOT_BUNDLE" in code
+    assert "DEPLOYMENT_STAGE" in code
+    assert 'model_version=manifest["model_version"]' in code
     assert "retrain_with_feedback" not in code
     assert "model.output_shape[-1]" in code
     assert "dict(label_mapping) != dict(STATE_LABELS)" in code

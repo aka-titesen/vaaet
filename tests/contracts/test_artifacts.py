@@ -7,6 +7,7 @@ import pytest
 
 from vaaet.artifacts import MANIFEST_FILE, REQUIRED_FILES, create_manifest, validate_manifest
 from vaaet.exceptions import ArtifactNotFoundError, ArtifactValidationError
+from vaaet.training.lifecycle import ModelInputPolicy, TrainingMode, build_training_lifecycle
 
 
 @pytest.fixture
@@ -25,6 +26,11 @@ def valid_bundle(tmp_path: Path) -> Path:
             "production_eligible": True,
             "promotion_blockers": [],
         },
+        training_lifecycle=build_training_lifecycle(
+            TrainingMode.HITL_RETRAINING,
+            ModelInputPolicy.CANONICAL_V2,
+            production_eligible=True,
+        ),
     )
     return tmp_path
 
@@ -46,6 +52,8 @@ def test_valid_bundle(valid_bundle: Path) -> None:
         "2": "Congested",
     }
     assert manifest["decision_policy"]["automatic_accident_state_allowed"] is False
+    assert manifest["training_lifecycle"]["deployment_stage"] == "production"
+    assert manifest["training_lifecycle"]["input_policy"] == "canonical-v2"
 
 
 @pytest.mark.parametrize("delta", [-1, 1])
@@ -145,6 +153,56 @@ def test_rejects_inconsistent_production_eligibility(valid_bundle: Path) -> None
     payload["metrics"]["production_eligible"] = False
     _write_manifest(valid_bundle, payload)
     with pytest.raises(ArtifactValidationError, match="eligibility"):
+        validate_manifest(valid_bundle)
+
+
+def test_rejects_seed_bundle_marked_as_production(valid_bundle: Path) -> None:
+    payload = _manifest(valid_bundle)
+    payload["training_lifecycle"].update(
+        {
+            "training_mode": "seed-bootstrap",
+            "supervision": "weak-proxy",
+            "deployment_stage": "production",
+            "input_policy": "legacy-v1-bootstrap",
+            "production_eligible": True,
+        }
+    )
+    _write_manifest(valid_bundle, payload)
+    with pytest.raises(ArtifactValidationError, match="weak-proxy pilots"):
+        validate_manifest(valid_bundle)
+
+
+def test_rejects_unknown_model_input_policy(valid_bundle: Path) -> None:
+    payload = _manifest(valid_bundle)
+    payload["training_lifecycle"]["input_policy"] = "guess-columns"
+    _write_manifest(valid_bundle, payload)
+    with pytest.raises(ArtifactValidationError, match="lifecycle mode or input policy"):
+        validate_manifest(valid_bundle)
+
+
+def test_rejects_seed_bundle_without_legacy_input_policy(valid_bundle: Path) -> None:
+    payload = _manifest(valid_bundle)
+    payload["training_lifecycle"].update(
+        {
+            "training_mode": "seed-bootstrap",
+            "supervision": "weak-proxy",
+            "deployment_stage": "pilot",
+            "input_policy": "canonical-v2",
+            "production_eligible": False,
+        }
+    )
+    payload["metrics"]["production_eligible"] = False
+    payload["data_provenance"]["production_eligible"] = False
+    _write_manifest(valid_bundle, payload)
+    with pytest.raises(ArtifactValidationError, match="legacy-policy"):
+        validate_manifest(valid_bundle)
+
+
+def test_rejects_hitl_bundle_marked_as_pilot(valid_bundle: Path) -> None:
+    payload = _manifest(valid_bundle)
+    payload["training_lifecycle"]["deployment_stage"] = "pilot"
+    _write_manifest(valid_bundle, payload)
+    with pytest.raises(ArtifactValidationError, match="HITL bundles"):
         validate_manifest(valid_bundle)
 
 

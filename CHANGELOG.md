@@ -13,6 +13,32 @@ Todos los cambios relevantes del proyecto VAAET se documentan en este archivo, s
 
 ---
 
+## [4.3.0] - 2026-08-09
+
+### Añadido
+
+- Modos explícitos `SEED_BOOTSTRAP` y `HITL_RETRAINING` sobre un pipeline común.
+- Paquete semilla procesado reutilizable y memoria proxy decreciente por clase.
+- Comparación reproducible de class weights, oversampling moderado y sintéticos
+  de congestión, seleccionada sólo con validation.
+- Lifecycle del bundle con modo, supervisión, política de entrada y etapa
+  `pilot`, `candidate` o `production`.
+- ADR-0017 para gobernar weak-supervision bootstrap y continuous training HITL.
+
+### Cambiado
+
+- El modelo vigente es `mlp-v2.1`; conserva 19 features y tres salidas estables.
+- La política legacy neutraliza de forma idéntica en entrenamiento e inferencia
+  las evidencias de calidad desconocidas.
+- Inferencia identifica y autoriza de forma explícita bundles piloto.
+
+### Seguridad y calidad
+
+- Accident sigue siendo imposible como salida automática y queda reservado a
+  validación humana.
+- Las predicciones sin revisar nunca ingresan como targets y los sintéticos
+  permanecen exclusivamente en train.
+
 ## [4.2.2] - 2026-08-09
 
 ### Corregido

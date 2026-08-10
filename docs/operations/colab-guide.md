@@ -10,7 +10,9 @@ Referencias oficiales: [versiones del runtime de Colab](https://research.google.
 
 1. Ejecutá adquisición sólo cuando necesites ampliar la telemetría inicial.
 2. Ejecutá entrenamiento cuando cambie el dataset y revisá el informe de elegibilidad antes de conservar el bundle.
-3. Ejecutá inferencia con un clip y un bundle v2 validado; los experimentales se rechazan por defecto.
+3. Ejecutá inferencia con un clip y un bundle v2 validado. Un piloto requiere
+   `ALLOW_PILOT_BUNDLE=True`; un candidato no aprobado requiere una autorización
+   experimental independiente.
 
 Cada notebook clona o actualiza el repositorio en `/content/vaaet`, define un único `REPO_ROOT` e instala una vez un wheel local con sus extras. La instalación no es editable en Colab porque el nombre `/content/vaaet` puede interpretarse como un paquete namespace y ocultar `src/vaaet`; después de instalar se limpia el caché de módulos y se valida el origen real del paquete. El desarrollo local sí conserva `pip install -e`.
 
@@ -46,14 +48,15 @@ psql 'postgresql://admin:...@host:5432/vaaet' -f migrations/provision-roles.sql
 
 ## Artefactos y Drive
 
-El entrenamiento genera cuatro archivos bajo `artifacts/traffic-state/` y puede copiarlos juntos a `MyDrive/vaaet-ml/artifacts/traffic-state`. Inferencia intenta, en orden: bundle local, Drive y upload manual. El manifiesto se valida antes de cargar Keras o joblib. Para una evaluación offline consciente puede definirse `ALLOW_EXPERIMENTAL_BUNDLE=True` antes de la carga; nunca debe usarse para una promoción.
+El entrenamiento genera cuatro archivos bajo `artifacts/traffic-state/` y puede copiarlos juntos a `MyDrive/vaaet-ml/artifacts/traffic-state`. Inferencia intenta, en orden: bundle local, Drive y upload manual. El manifiesto se valida antes de cargar Keras o joblib. `ALLOW_PILOT_BUNDLE=True` permite ejecutar conscientemente el bootstrap; `ALLOW_EXPERIMENTAL_BUNDLE=True` queda reservado para candidatos HITL no aprobados. Ninguno promociona el artefacto.
 
 Después de aprobar un modelo, ejecutá localmente `dvc add artifacts/traffic-state` y `dvc push`. Los pesos YOLO se descargan desde Ultralytics en runtime y nunca se versionan.
 
 ## Entradas y salidas
 
 - Adquisición: MP4 → MP4 anotado + `data/raw/traffic_data_raw.csv` + `vaaet_raw.traffic_data` opcional.
-- Entrenamiento: plan explícito de servidor/backup/CSV/paquete → dataset compuesto + bundle.
+- Entrenamiento semilla: raw explícito → 19 features → paquete semilla + bundle piloto.
+- Reentrenamiento HITL: paquete semilla + features validadas → bundle candidato.
 - Inferencia: MP4 + bundle → MP4 anotado + features/predicciones PostgreSQL opcionales.
 
 El clasificador sólo consume minutos completos. Durante una ventana parcial se muestra el último estado estable. `Accident` nunca es automático: una evidencia persistente produce `Congested + accident_rule_triggered`; el código 3 exige feedback humano validado.
@@ -72,10 +75,18 @@ sesión exporta `vaaet-training-dataset-v1.zip`, que luego puede declararse como
 `DatasetPackageSource` en entrenamiento. Sólo validaciones humanas ingresan como
 etiquetas; Accident se reserva para evaluar el detector.
 
-En entrenamiento, `ENABLE_DATA_UPLOAD=False` evita abrir el selector cuando todas
-las fuentes son `PostgresSource`. La celda siguiente declara objetos en
-`RAW_SOURCES` y `FEEDBACK_SOURCES`; al cargar CSV, backup o ZIP se debe habilitar
-el tipo correspondiente de forma explícita.
+En entrenamiento, seleccioná explícitamente `TrainingMode.SEED_BOOTSTRAP` o
+`TrainingMode.HITL_RETRAINING`. El primer modo declara `RAW_SOURCES`, calcula las
+features una vez y crea `vaaet-seed-bootstrap-v1.zip`. El segundo declara ese
+paquete en `SEED_SOURCES` y las correcciones en `FEEDBACK_SOURCES`; no vuelve a
+ejecutar `pg_restore` ni ingeniería. `ENABLE_DATA_UPLOAD=False` evita abrir el
+selector cuando todas las fuentes son PostgreSQL. Cada tipo se habilita de forma
+explícita: nunca se adivina por columnas.
+
+`HUMAN_HOLDOUT_FROZEN` permanece `False` por defecto. Sólo puede cambiarse a
+`True` cuando validation/test provienen de un paquete humano inmutable y
+versionado que no se utilizó para ajustar reglas, umbrales o balanceo. Tener
+filas humanas no basta por sí solo para aprobar producción.
 
 Todo `record_time` se normaliza a UTC. Los backups y CSV legacy sin zona se
 interpretan como `America/Argentina/Buenos_Aires`; por eso su rango UTC puede
@@ -101,7 +112,9 @@ El cliente es una dependencia del sistema operativo y por eso no forma parte de 
 - Entrenar y validar los cuatro archivos del bundle.
 - Cargar el bundle desde local, Drive y upload en inferencia.
 - Confirmar que un bundle incompleto o incompatible se rechaza antes de inferir.
-- Confirmar que un bundle sin telemetría v2/holdout humano queda `experimental/shadow-only`.
+- Confirmar que un bundle semilla queda `pilot`, no elegible para producción, y
+  que inferencia muestra esa condición.
 - Revisar candidatos de incidente sobre hard negatives y acumular horas negativas; no publicar recall de Accident sin casos reales.
 - Completar una cola HITL, persistir con el perfil review y repetir una inferencia para confirmar que la validación sobrevive.
-- Entrenar combinando una fuente raw y una fuente de feedback validado.
+- Reentrenar combinando el paquete semilla y una fuente de feedback validado;
+  comprobar el peso proxy decreciente por clase.

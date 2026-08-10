@@ -1,4 +1,4 @@
-# Linaje de datos — VAAET ML 4.2.2
+# Linaje de datos — VAAET ML 4.3.0
 
 ## Flujo operacional
 
@@ -11,7 +11,9 @@ flowchart LR
     I --> P[("vaaet_ml.traffic_predictions")]
     P --> Q["Explicit HITL review"]
     Q --> H[("vaaet_feedback.human_validations")]
-    R --> T["Training ingestion"]
+    R --> S["Seed bootstrap"]
+    S --> SP["Processed seed package"]
+    SP --> T["HITL retraining"]
     F --> T
     H --> T
     T --> B["Bundle v2 candidate"]
@@ -48,14 +50,18 @@ revisión explícita del contexto. Sin base disponible se exporta
 
 ## Entrenamiento
 
-`TrainingIngestionPlan` declara fuentes raw y feedback. Puede combinar servidor,
-backup, CSV raw y paquete contractual. El tipo nunca se infiere por columnas:
+`TrainingIngestionPlan` declara uno de dos modos. El tipo nunca se infiere por
+columnas:
 
-- raw: auditoría, ingeniería de las 19 features y etiqueta proxy;
-- feedback: contrato de feature schema y última validación humana, sin recalcular;
+- `SEED_BOOTSTRAP`: raw desde servidor, backup o CSV; auditoría, ingeniería de
+  las 19 features, etiqueta proxy y paquete semilla reutilizable;
+- `HITL_RETRAINING`: paquete semilla más feedback con feature schema compatible
+  y última validación humana, sin recalcular features;
 - estados humanos 0–2: candidatos al MLP;
 - estado humano 3: evaluación del detector de incidente, nunca target del MLP.
 
-La etiqueta humana prevalece sobre el proxy para el mismo minuto. Conflictos
+La etiqueta humana prevalece sobre el proxy para el mismo minuto. La memoria
+proxy decrece por clase al crecer el soporte humano y desaparece en los umbrales
+documentados por ADR-0017. Conflictos
 entre validaciones efectivas detienen el entrenamiento. Sintéticos sólo aparecen
 en train y siempre permanecen identificados.

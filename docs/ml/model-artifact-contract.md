@@ -18,16 +18,28 @@ temperatura de calibración, umbrales por clase, margen, histéresis, prohibici�
 confirmación humana obligatoria, elegibilidad, bloqueos de promoción y
 checksums SHA-256.
 
+`training_lifecycle` vuelve explícitos cuatro datos de serving:
+
+- `training_mode`: `seed-bootstrap` o `hitl-retraining`.
+- `supervision`: `weak-proxy` o `human-validated`.
+- `input_policy`: `legacy-v1-bootstrap` o `canonical-v2`.
+- `deployment_stage`: `pilot`, `candidate` o `production`.
+
+Un bundle semilla siempre es `pilot` y `production_eligible=false`. La política
+legacy neutraliza las tres evidencias de calidad desconocidas tanto durante el
+entrenamiento como durante la inferencia, evitando una divergencia train/serve.
+
 Todo consumidor debe ejecutar `vaaet.artifacts.validate_manifest()` después de
 obtener el bundle —sea local, Drive, upload o registry— y antes de cargar Keras
 o joblib. Un campo ausente, JSON inválido, versión no soportada, schema/mapping
 incompatible, archivo faltante o checksum alterado rechaza el bundle con un
 error de dominio explícito.
 
-`production_eligible=false` no invalida la integridad del bundle, pero obliga a
-tratarlo como artefacto experimental/shadow-only. El notebook de inferencia lo
-rechaza por defecto y sólo permite habilitarlo explícitamente para evaluación
-offline.
+`production_eligible=false` no invalida la integridad del bundle. Inferencia
+permite un `pilot` sólo mediante `ALLOW_PILOT_BUNDLE=True`, lo identifica en el
+output y conserva sus decisiones conservadoras. Los candidatos HITL no aprobados
+requieren la autorización experimental separada; ningún flag cambia la metadata
+ni promociona el artefacto.
 
 ## Versionado con DVC
 
@@ -43,3 +55,4 @@ dvc push
 La infraestructura de publicación y descarga para la Web App queda fuera de
 este repositorio. Véase [ADR-0012](../architecture/decisions/0012-ml-web-boundary-and-artifact-contract.md).
 La semántica jerárquica está gobernada por [ADR-0014](../architecture/decisions/0014-hierarchical-traffic-state-and-incident-policy.md).
+El ciclo semilla/HITL está gobernado por [ADR-0017](../architecture/decisions/0017-seed-bootstrap-and-hitl-retraining.md).

@@ -142,6 +142,11 @@ Las etiquetas de entrenamiento NO son ground truth humano. Se generan con reglas
 
 **Mitigación vigente**: HITL append-only en `vaaet_feedback.human_validations` permite refinar etiquetas sin modificar predicciones. Sólo la vista `effective_human_labels` ingresa al entrenamiento supervisado.
 
+Desde 4.3.0 el bootstrap queda identificado como `weak-proxy` y `pilot`; sus
+métricas sólo miden fidelidad a las reglas. En cada reentrenamiento HITL la
+memoria proxy disminuye por clase y llega a cero con soporte humano suficiente.
+Un holdout humano congelado nunca forma parte de esa memoria.
+
 ### 6.2 Desequilibrio de Clases y Datos Sintéticos
 
 El dataset del Puente Belgrano (abril-julio 2025, ~2.000 registros) no contiene accidentes confirmados. Puede producir etiquetas proxy Congested mediante reglas, pero no existe todavía soporte humano suficiente para tratarlas como ground truth.

@@ -17,6 +17,7 @@ from vaaet.data.ingestion import (
 )
 from vaaet.data.persistence import persist_classified_telemetry
 from vaaet.data.review import HumanValidation, persist_human_validation
+from vaaet.training.lifecycle import TrainingMode
 
 ADMIN_URL = os.getenv("VAAET_DATABASE_ADMIN_URL")
 pytestmark = pytest.mark.postgres
@@ -50,6 +51,7 @@ def test_real_pg17_custom_backups_are_ingested_exactly(
 
     result = load_training_inputs(
         TrainingIngestionPlan(
+            mode=TrainingMode.SEED_BOOTSTRAP,
             raw_sources=(
                 PostgresBackupSource(Path(backup_value), Path(pg_restore_value)),
             )

@@ -1,4 +1,4 @@
-# Operación PostgreSQL — VAAET ML 4.2.2
+# Operación PostgreSQL — VAAET ML 4.3.0
 
 Esta guía aplica a PostgreSQL 14+ en AWS RDS, Neon, Supabase o un servidor
 propio. El endpoint debe ser accesible desde Colab; VPN y túneles quedan fuera de

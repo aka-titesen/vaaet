@@ -219,37 +219,40 @@ def load_dataset_package(
     package = Path(path)
     if not package.is_file():
         raise FileNotFoundError(f"Dataset package not found: {package}")
-    with tempfile.TemporaryDirectory(prefix="vaaet-dataset-read-") as temp_dir:
-        root = Path(temp_dir)
-        with zipfile.ZipFile(package) as archive:
-            _safe_extract(archive, root)
-        manifest_path = root / "dataset-manifest.json"
-        if not manifest_path.is_file():
-            raise ValueError("Dataset package is missing dataset-manifest.json.")
-        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-        contract_version = manifest.get("contract_version")
-        if contract_version not in accepted_contracts:
-            raise ValueError("Unsupported dataset package contract version.")
-        frames: dict[str, pd.DataFrame] = {}
-        for key, metadata in manifest.get("files", {}).items():
-            if key not in PACKAGE_FILES or not isinstance(metadata, dict):
-                raise ValueError(f"Unknown dataset package component: {key}")
-            filename = metadata.get("filename")
-            if filename != PACKAGE_FILES[key]:
-                raise ValueError(f"Unexpected filename for package component {key}.")
-            file_path = root / str(filename)
-            if not file_path.is_file() or _sha256(file_path) != metadata.get("sha256"):
-                raise ValueError(f"Checksum mismatch for dataset component {key}.")
-            frame = pd.read_csv(file_path)
-            if len(frame) != int(metadata.get("rows", -1)):
-                raise ValueError(f"Row count mismatch for dataset component {key}.")
-            if list(frame.columns) != metadata.get("columns"):
-                raise ValueError(f"Column contract mismatch for dataset component {key}.")
-            frame.attrs["vaaet_package_provenance"] = manifest.get("provenance", {})
-            frame.attrs["vaaet_package_metadata"] = manifest.get("package_metadata", {})
-            frame.attrs["vaaet_package_contract"] = contract_version
-            frames[key] = frame
-        return frames
+    try:
+        with tempfile.TemporaryDirectory(prefix="vaaet-dataset-read-") as temp_dir:
+            root = Path(temp_dir)
+            with zipfile.ZipFile(package) as archive:
+                _safe_extract(archive, root)
+            manifest_path = root / "dataset-manifest.json"
+            if not manifest_path.is_file():
+                raise ValueError("Dataset package is missing dataset-manifest.json.")
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            contract_version = manifest.get("contract_version")
+            if contract_version not in accepted_contracts:
+                raise ValueError("Unsupported dataset package contract version.")
+            frames: dict[str, pd.DataFrame] = {}
+            for key, metadata in manifest.get("files", {}).items():
+                if key not in PACKAGE_FILES or not isinstance(metadata, dict):
+                    raise ValueError(f"Unknown dataset package component: {key}")
+                filename = metadata.get("filename")
+                if filename != PACKAGE_FILES[key]:
+                    raise ValueError(f"Unexpected filename for package component {key}.")
+                file_path = root / str(filename)
+                if not file_path.is_file() or _sha256(file_path) != metadata.get("sha256"):
+                    raise ValueError(f"Checksum mismatch for dataset component {key}.")
+                frame = pd.read_csv(file_path, float_precision="round_trip")
+                if len(frame) != int(metadata.get("rows", -1)):
+                    raise ValueError(f"Row count mismatch for dataset component {key}.")
+                if list(frame.columns) != metadata.get("columns"):
+                    raise ValueError(f"Column contract mismatch for dataset component {key}.")
+                frame.attrs["vaaet_package_provenance"] = manifest.get("provenance", {})
+                frame.attrs["vaaet_package_metadata"] = manifest.get("package_metadata", {})
+                frame.attrs["vaaet_package_contract"] = contract_version
+                frames[key] = frame
+            return frames
+    except (zipfile.BadZipFile, UnicodeError, json.JSONDecodeError) as exc:
+        raise ValueError(f"Invalid dataset package: {exc}") from exc
 
 
 def _load_seed_features(source: SeedDatasetPackageSource) -> pd.DataFrame:
@@ -398,7 +401,7 @@ def _load_raw(source: TrainingSource) -> pd.DataFrame:
     if isinstance(source, PostgresSource):
         frame = load_telemetry(settings=source.settings)
     elif isinstance(source, RawCsvSource):
-        frame = pd.read_csv(source.path)
+        frame = pd.read_csv(source.path, float_precision="round_trip")
     elif isinstance(source, DatasetPackageSource):
         frame = load_dataset_package(source.path).get("raw", pd.DataFrame())
     elif isinstance(source, PostgresBackupSource):

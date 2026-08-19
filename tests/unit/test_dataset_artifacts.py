@@ -4,6 +4,7 @@ import json
 import uuid
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 import pytest
 
@@ -103,6 +104,67 @@ def test_seed_store_rejects_changed_data_without_reason(tmp_path: Path) -> None:
         )
 
 
+def test_seed_snapshot_preserves_high_precision_floats(tmp_path: Path) -> None:
+    rng = np.random.default_rng(42)
+    row_count = 512
+    frame = pd.DataFrame(
+        {
+            "clip_id": [f"seed-{index // 16}" for index in range(row_count)],
+            "record_time": pd.date_range(
+                "2025-01-01T00:00:00Z",
+                periods=row_count,
+                freq="min",
+            ),
+            "traffic_state": np.arange(row_count) % 3,
+            "feature_schema_version": FEATURE_SCHEMA_VERSION,
+            "data_origin": "real",
+            "synthetic_scenario": "observed",
+        }
+    )
+    for column in FEATURE_COLS:
+        frame[column] = rng.normal(size=row_count)
+
+    store = VersionedSeedStore(tmp_path / "seed")
+    snapshot = store.resolve(frame, SeedArtifactConfig(store.root))
+    expected = frame.sort_values(["clip_id", "record_time"]).reset_index(drop=True)
+
+    for column in FEATURE_COLS:
+        np.testing.assert_array_equal(
+            snapshot.features[column].to_numpy(),
+            expected[column].to_numpy(),
+        )
+    assert store.resolve(frame, SeedArtifactConfig(store.root)).path == snapshot.path
+
+
+def test_seed_store_recovers_valid_snapshot_without_pointer(tmp_path: Path) -> None:
+    frame = _seed_frame()
+    store = VersionedSeedStore(tmp_path / "seed")
+    created = store.resolve(frame, SeedArtifactConfig(store.root))
+    package_bytes = created.path.read_bytes()
+    store.pointer_path.unlink()
+
+    recovered = store.resolve(frame, SeedArtifactConfig(store.root))
+
+    assert recovered.path == created.path
+    assert recovered.path.read_bytes() == package_bytes
+    assert store.load_current().path == created.path
+
+
+def test_seed_store_preserves_corrupt_snapshot_without_pointer(tmp_path: Path) -> None:
+    frame = _seed_frame()
+    store = VersionedSeedStore(tmp_path / "seed")
+    created = store.resolve(frame, SeedArtifactConfig(store.root))
+    store.pointer_path.unlink()
+    corrupt_payload = b"not-a-valid-seed-package"
+    created.path.write_bytes(corrupt_payload)
+
+    with pytest.raises(FileExistsError, match="preserved for manual recovery"):
+        store.resolve(frame, SeedArtifactConfig(store.root))
+
+    assert created.path.read_bytes() == corrupt_payload
+    assert not store.pointer_path.exists()
+
+
 def test_seed_store_imports_explicit_legacy_weak_proxy_package(tmp_path: Path) -> None:
     legacy = create_dataset_package(
         tmp_path / "legacy-seed.zip",
@@ -151,6 +213,38 @@ def test_review_finalization_is_idempotent_and_cataloged(tmp_path: Path) -> None
     catalog = HitlReviewCatalog(tmp_path / "drive" / "hitl-reviews" / "catalog.json")
     assert catalog.load()["revision"] == 1
     assert len(catalog.load()["entries"]) == 1
+
+
+def test_hitl_package_preserves_high_precision_features(tmp_path: Path) -> None:
+    classified = _classified_frame()
+    rng = np.random.default_rng(7)
+    for column in FEATURE_COLS:
+        classified[column] = rng.normal(size=len(classified))
+    decision = HumanValidation(
+        prediction_id=1,
+        validated_state=0,
+        reviewer_id="facundo",
+    )
+    review_root = tmp_path / "drive" / "hitl-reviews"
+    finalize_review_session(
+        classified=classified,
+        validations=[decision],
+        pipeline_run_id=str(uuid.uuid4()),
+        model_version="mlp-v2.1",
+        git_commit="abc",
+        vaaet_version="4.5.1",
+        local_root=tmp_path / "local",
+        canonical_root=review_root,
+    )
+
+    feedback, _ = load_hitl_catalog_feedback(
+        HitlCatalogSource(review_root / "catalog.json")
+    )
+
+    assert len(feedback) == 1
+    expected = classified.iloc[0]
+    for column in FEATURE_COLS:
+        assert feedback.iloc[0][column] == expected[column]
 
 
 def test_legacy_hitl_package_is_imported_explicitly(tmp_path: Path) -> None:

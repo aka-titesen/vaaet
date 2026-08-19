@@ -1,4 +1,4 @@
-# Arquitectura de software — VAAET ML 4.5.0
+# Arquitectura de software — VAAET ML 4.5.1
 
 VAAET ML es un pipeline MLOps batch con adquisición bajo demanda, entrenamiento, inferencia y feedback. Colab orquesta ejecuciones manuales; el paquete `vaaet` concentra lógica comprobable y `pyproject.toml` es la única fuente de dependencias.
 

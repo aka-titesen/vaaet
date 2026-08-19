@@ -302,7 +302,7 @@ def merge_raw_telemetry_csv(
         if not destination.is_file():
             return pd.DataFrame(columns=CANONICAL_RAW_TELEMETRY_COLUMNS)
 
-        existing = pd.read_csv(destination)
+        existing = pd.read_csv(destination, float_precision="round_trip")
         missing_existing = set(BASE_RAW_TELEMETRY_COLUMNS) - set(existing.columns)
         if missing_existing:
             raise ValueError(
@@ -324,7 +324,7 @@ def merge_raw_telemetry_csv(
             incoming[column] = pd.NA
     frames = [incoming]
     if destination.is_file():
-        existing = pd.read_csv(destination)
+        existing = pd.read_csv(destination, float_precision="round_trip")
         for column in (*TELEMETRY_QUALITY_COLUMNS, *TELEMETRY_METADATA_COLUMNS):
             if column not in existing:
                 existing[column] = pd.NA

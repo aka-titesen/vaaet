@@ -124,7 +124,7 @@ class DatabaseSettings:
 
     @property
     def application(self) -> str:
-        return self.application_name or f"vaaet-{self.profile.value}-4.5.0"
+        return self.application_name or f"vaaet-{self.profile.value}-4.5.1"
 
 
 @dataclass(frozen=True)
@@ -674,6 +674,7 @@ def parse_sql_dump_tables(sql_path: str | Path) -> dict[str, pd.DataFrame]:
                 header=None,
                 names=columns,
                 na_values=["\\N"],
+                float_precision="round_trip",
             )
         else:
             frames[qualified_name] = pd.DataFrame(columns=columns)

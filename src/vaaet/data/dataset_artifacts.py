@@ -287,6 +287,23 @@ class VersionedSeedStore:
         self.snapshots = self.root / "snapshots"
         self.pointer_path = self.root / SEED_POINTER_FILE
 
+    def _write_current_pointer(self, snapshot: SeedArtifactSnapshot) -> None:
+        try:
+            relative = snapshot.path.relative_to(self.root.resolve())
+        except ValueError as exc:
+            raise ValueError("Seed snapshot is outside its configured store.") from exc
+        pointer = {
+            "contract": SEED_POINTER_CONTRACT,
+            "snapshot_contract": SEED_ARTIFACT_CONTRACT,
+            "path": PurePosixPath(*relative.parts).as_posix(),
+            **{
+                key: value
+                for key, value in snapshot.descriptor.items()
+                if key != "contract"
+            },
+        }
+        _atomic_json_write(self.pointer_path, pointer)
+
     def load_current(self) -> SeedArtifactSnapshot | None:
         if not self.pointer_path.is_file():
             return None
@@ -407,7 +424,23 @@ class VersionedSeedStore:
         final_path = self.snapshots / filename
         self.snapshots.mkdir(parents=True, exist_ok=True)
         if final_path.exists():
-            raise FileExistsError(f"Seed snapshot already exists without a valid pointer: {final_path}")
+            try:
+                snapshot = self.load_snapshot(final_path)
+            except (OSError, ValueError) as exc:
+                raise FileExistsError(
+                    "Seed snapshot exists without a valid pointer and failed validation; "
+                    f"the file was preserved for manual recovery: {final_path}"
+                ) from exc
+            if (
+                snapshot.manifest["fingerprint"] != fingerprint
+                or int(snapshot.manifest["generation"]) != generation
+            ):
+                raise FileExistsError(
+                    "Seed snapshot path is occupied by an incompatible immutable artifact: "
+                    f"{final_path}"
+                )
+            self._write_current_pointer(snapshot)
+            return snapshot
         temporary = self.snapshots / f".{filename}.{uuid.uuid4().hex}.tmp"
         try:
             create_dataset_package(
@@ -422,19 +455,15 @@ class VersionedSeedStore:
                 package_metadata=metadata,
                 overwrite=False,
             )
+            candidate = self.load_snapshot(temporary)
+            if (
+                candidate.manifest["fingerprint"] != fingerprint
+                or int(candidate.manifest["generation"]) != generation
+            ):
+                raise ValueError("Temporary seed snapshot validation returned different metadata.")
             os.replace(temporary, final_path)
             snapshot = self.load_snapshot(final_path)
-            pointer = {
-                "contract": SEED_POINTER_CONTRACT,
-                "snapshot_contract": SEED_ARTIFACT_CONTRACT,
-                "path": PurePosixPath("snapshots", filename).as_posix(),
-                **{
-                    key: value
-                    for key, value in snapshot.descriptor.items()
-                    if key != "contract"
-                },
-            }
-            _atomic_json_write(self.pointer_path, pointer)
+            self._write_current_pointer(snapshot)
             return snapshot
         finally:
             temporary.unlink(missing_ok=True)

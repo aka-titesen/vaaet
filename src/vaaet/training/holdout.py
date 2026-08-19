@@ -289,7 +289,10 @@ class FileSystemHoldoutStore:
                         raise ValueError(f"Unexpected holdout filename for {partition}.")
                     if metadata.get("sha256") != _sha256_bytes(payload):
                         raise ValueError(f"Checksum mismatch for holdout {partition}.")
-                    frame = pd.read_csv(io.BytesIO(payload))
+                    frame = pd.read_csv(
+                        io.BytesIO(payload),
+                        float_precision="round_trip",
+                    )
                     if list(frame.columns) != list(HOLDOUT_RECORD_COLUMNS):
                         raise ValueError(f"Column contract mismatch for holdout {partition}.")
                     if len(frame) != metadata.get("rows"):

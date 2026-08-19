@@ -13,6 +13,18 @@ Todos los cambios relevantes del proyecto VAAET se documentan en este archivo, s
 
 ---
 
+## [4.5.1] - 2026-08-19
+
+### Corregido
+
+- Preservación exacta de valores `float64` al recargar CSV contractuales mediante
+  el modo `round_trip` de Pandas, evitando falsos cambios de fingerprint.
+- Validación del snapshot semilla temporal antes de publicarlo en el store
+  inmutable.
+- Recuperación idempotente de snapshots válidos que fueron escritos antes de
+  crear `current.json`; los paquetes corruptos se conservan y se rechazan con
+  un diagnóstico explícito.
+
 ## [4.5.0] - 2026-08-10
 
 ### Añadido

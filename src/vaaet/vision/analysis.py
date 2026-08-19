@@ -15,6 +15,12 @@ from vaaet.exceptions import VideoOpenError
 from vaaet.logging import get_logger
 from vaaet.settings import STATE_LABELS
 from vaaet.vision.detector import Detection, YOLODetector, select_model_variant
+from vaaet.vision.hud import (
+    HudConfig,
+    HudSnapshot,
+    draw_track_annotation,
+    render_hud,
+)
 from vaaet.vision.optical_flow import OpticalFlowEstimator
 from vaaet.vision.speed import (
     SmoothedSpeedTracker,
@@ -50,6 +56,7 @@ class TrafficStatePrediction:
     label: str
     confidence: float
     evidence: float | None = None
+    incident_candidate: bool = False
 
     def __post_init__(self) -> None:
         if self.state not in STATE_LABELS:
@@ -83,22 +90,6 @@ _CLASSIFICATION_COLUMNS: tuple[str, ...] = (
 )
 
 
-_TYPE_COLORS: dict[str, tuple[int, int, int]] = {
-    "car": (80, 210, 80),
-    "truck": (40, 150, 255),
-    "bus": (80, 190, 255),
-    "motorcycle": (255, 170, 30),
-    "bicycle": (230, 130, 230),
-}
-
-_STATE_COLORS: dict[int, tuple[int, int, int]] = {
-    0: (80, 210, 80),
-    1: (0, 210, 255),
-    2: (0, 120, 255),
-    3: (50, 50, 230),
-}
-
-
 def _recording_timestamp(
     recording_start: datetime,
     elapsed_seconds: float,
@@ -117,81 +108,42 @@ def _nearest_detection(track: Track, detections: list[Detection]) -> Detection |
     )
 
 
-def _draw_track(
-    frame: object,
-    track: Track,
-    detection: Detection | None,
-    speed: float | None,
-    stationary: bool,
-) -> None:
-    import cv2
-
-    color = _TYPE_COLORS.get(track.vehicle_type, (220, 220, 220))
-    if detection is None:
-        cx, cy = track.centroid
-        bbox = (cx - 30, cy - 20, cx + 30, cy + 20)
-    else:
-        bbox = detection.bbox
-    x1, y1, x2, y2 = bbox
-    cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
-    motion = "stationary" if stationary else (f"{speed:.1f} km/h" if speed is not None else "n/a")
-    label = f"{track.vehicle_type} #{track.track_id} | {motion}"
-    cv2.putText(
-        frame,
-        label,
-        (x1, max(y1 - 8, 18)),
-        cv2.FONT_HERSHEY_SIMPLEX,
-        0.5,
-        color,
-        2,
-        cv2.LINE_AA,
-    )
-
-
-def _draw_status_panel(
-    frame: object,
+def _build_hud_snapshot(
     accumulator: MinuteTelemetryAccumulator,
     prediction: TrafficStatePrediction | None,
     elapsed_seconds: float,
-) -> None:
-    import cv2
-
-    height, width = frame.shape[:2]
-    panel_width = min(520, max(width - 20, 200))
-    cv2.rectangle(frame, (10, 10), (10 + panel_width, 142), (25, 25, 25), -1)
-    cv2.rectangle(frame, (10, 10), (10 + panel_width, 142), (230, 230, 230), 1)
-
-    total = sum(accumulator.cumulative_counts.values()) + sum(
-        accumulator.minute_counts.values()
+    *,
+    inference_enabled: bool,
+) -> HudSnapshot:
+    cumulative_counts = {
+        kind: accumulator.cumulative_counts.get(kind, 0)
+        + accumulator.minute_counts.get(kind, 0)
+        for kind in ("car", "truck", "bus", "motorcycle", "bicycle")
+    }
+    reliable_count = len(accumulator.reliable_speed_track_ids)
+    rejected_count = len(
+        accumulator.rejected_speed_track_ids - accumulator.reliable_speed_track_ids
     )
-    avg_speed = robust_speed_summary(accumulator.minute_speeds)
-    lines = [
-        f"VAAET ML | {elapsed_seconds:,.0f} s",
-        f"Vehicles: {total} | Current speed: {avg_speed:.1f} km/h",
-        "Counts: "
-        + " | ".join(
-            f"{kind}={accumulator.cumulative_counts.get(kind, 0) + accumulator.minute_counts.get(kind, 0)}"
-            for kind in ("car", "truck", "bus", "motorcycle", "bicycle")
+    quality_attempts = reliable_count + rejected_count
+    return HudSnapshot(
+        elapsed_seconds=elapsed_seconds,
+        cumulative_counts=cumulative_counts,
+        average_speed=(
+            robust_speed_summary(accumulator.minute_speeds)
+            if accumulator.minute_speeds
+            else None
         ),
-    ]
-    if prediction is None:
-        lines.append("Mode: Telemetry Collection")
-        state_color = (210, 210, 210)
-    else:
-        lines.append(f"Traffic: {prediction.label} | confidence={prediction.confidence:.1%}")
-        state_color = _STATE_COLORS[prediction.state]
-
-    for index, line in enumerate(lines):
-        cv2.putText(
-            frame,
-            line,
-            (24, 38 + index * 28),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            0.58,
-            state_color if index == len(lines) - 1 else (245, 245, 245),
-            2,
-            cv2.LINE_AA,
-        )
+        inference_enabled=inference_enabled,
+        state=prediction.state if prediction is not None else None,
+        confidence=prediction.confidence if prediction is not None else None,
+        evidence=prediction.evidence if prediction is not None else None,
+        incident_candidate=(
+            prediction.incident_candidate if prediction is not None else False
+        ),
+        measurement_quality=(
+            reliable_count / quality_attempts if quality_attempts else None
+        ),
+    )
 
 
 def _prediction_record(
@@ -225,6 +177,7 @@ def analyze_video(
     *,
     model_variant: str | None = None,
     prediction_provider: PredictionProvider | None = None,
+    hud_config: HudConfig | None = None,
     max_frames: int | None = None,
     status_every_seconds: float = 2.0,
 ) -> VideoAnalysisResult:
@@ -282,6 +235,7 @@ def analyze_video(
         captured_at = normalize_timestamp(captured_at).to_pydatetime()
 
     accumulator = MinuteTelemetryAccumulator(clip_id=clip_id)
+    active_hud_config = hud_config or HudConfig()
     records: list[dict[str, object]] = []
     classification_records: list[dict[str, object]] = []
     latest_prediction: TrafficStatePrediction | None = None
@@ -347,17 +301,34 @@ def analyze_video(
                     recovered_gap=recovered_gap,
                     flow_tracking_ratio=flow_ratio,
                 )
-                _draw_track(
+                detection = _nearest_detection(track, detections)
+                if detection is None:
+                    cx, cy = track.centroid
+                    bbox = (cx - 30, cy - 20, cx + 30, cy + 20)
+                else:
+                    bbox = detection.bbox
+                draw_track_annotation(
                     frame,
-                    track,
-                    _nearest_detection(track, detections),
-                    smoothed,
-                    stationary,
+                    bbox=bbox,
+                    vehicle_type=track.vehicle_type,
+                    track_id=track.track_id,
+                    speed=smoothed,
+                    stationary=stationary,
+                    config=active_hud_config,
                 )
 
             frame_index += 1
             elapsed = frame_index / fps
-            _draw_status_panel(frame, accumulator, latest_prediction, elapsed)
+            render_hud(
+                frame,
+                _build_hud_snapshot(
+                    accumulator,
+                    latest_prediction,
+                    elapsed,
+                    inference_enabled=prediction_provider is not None,
+                ),
+                active_hud_config,
+            )
             writer.write(frame)
 
             if frame_index % frames_per_minute == 0:

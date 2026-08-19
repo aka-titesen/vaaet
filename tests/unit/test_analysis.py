@@ -13,6 +13,7 @@ from vaaet.features.engineering import engineer_features
 from vaaet.vision import analysis
 from vaaet.vision.analysis import TrafficStatePrediction, analyze_video
 from vaaet.vision.detector import Detection
+from vaaet.vision.hud import HudConfig
 
 
 class _FakeDetector:
@@ -61,18 +62,19 @@ def test_analyze_video_with_and_without_prediction_provider(tmp_path, monkeypatc
     def provider(_telemetry: object) -> TrafficStatePrediction:
         nonlocal provider_calls
         provider_calls += 1
-        return TrafficStatePrediction(0, "Normal", 0.9)
+        return TrafficStatePrediction(2, "Congested", 0.9, incident_candidate=True)
 
     inference = analyze_video(
         source,
         tmp_path / "inference.mp4",
         prediction_provider=provider,
+        hud_config=HudConfig(debug=True),
         max_frames=60,
         status_every_seconds=0.2,
     )
     assert inference.video_path.is_file()
     assert inference.classifications is not None
-    assert inference.classifications.iloc[-1]["state_label"] == "Normal"
+    assert inference.classifications.iloc[-1]["state_label"] == "Congested"
     assert provider_calls == 1
 
 

@@ -220,6 +220,7 @@ def test_inference_centralizes_and_documents_supported_workflow_configuration() 
         "REVIEW_MODE =": 1,
         "DOWNLOAD_ANNOTATED_VIDEO =": 1,
         "SHOW_DASHBOARD =": 1,
+        "HUD_DEBUG =": 1,
     }
     for assignment, expected_count in assignments.items():
         assert code.count(assignment) == expected_count
@@ -240,6 +241,7 @@ def test_inference_centralizes_and_documents_supported_workflow_configuration() 
     assert "Candidate bundles are offline-only" in code
     assert "if IN_COLAB and DOWNLOAD_ANNOTATED_VIDEO" in code
     assert "if not SHOW_DASHBOARD" in code
+    assert "HudConfig(debug=HUD_DEBUG)" in code
 
     for heading in (
         "Inferencia piloto rápida",
@@ -316,6 +318,16 @@ def test_inference_uses_shared_analysis_and_validates_bundle() -> None:
     assert "retrain_with_feedback" not in code
     assert "model.output_shape[-1]" in code
     assert "dict(label_mapping) != dict(STATE_LABELS)" in code
+
+
+def test_annotated_video_workflows_default_to_public_shared_hud() -> None:
+    collection = _code(NOTEBOOKS["collection"])
+    inference = _code(NOTEBOOKS["inference"])
+    for code in (collection, inference):
+        assert code.count("HUD_DEBUG = False") == 1
+        assert "from vaaet.vision.hud import HudConfig" in code
+        assert "hud_config=HudConfig(debug=HUD_DEBUG)" in code
+    assert 'incident_candidate=bool(latest.get("accident_rule_triggered", False))' in inference
 
 
 def test_notebooks_use_profile_specific_database_api() -> None:

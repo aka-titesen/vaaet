@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import inspect
+
 import numpy as np
 import pytest
 
@@ -64,6 +66,29 @@ def test_unknown_speed_and_accumulated_total_are_not_misrepresented() -> None:
     assert hud._format_speed(None) == "-- km/h"
     assert hud._format_speed(0.0) == "0 km/h"
     assert hud._total_vehicle_count(_snapshot().cumulative_counts) == 128
+    assert (
+        hud._format_total_vehicle_count(_snapshot().cumulative_counts)
+        == "TOTAL VEHICULOS: 128"
+    )
+
+
+def test_vehicle_counts_use_text_only_labels() -> None:
+    assert hud._vehicle_count_labels(_snapshot().cumulative_counts) == (
+        "AUTO 95",
+        "CAMION 8",
+        "BUS 7",
+        "MOTO 14",
+        "BICI 4",
+    )
+    source = inspect.getsource(hud)
+    assert "_draw_vehicle_icon" not in source
+
+
+def test_cards_use_subtle_blur_without_outer_contours() -> None:
+    source = inspect.getsource(hud._draw_blurred_card)
+    assert "min(15," in source
+    assert "blurred, 0.68, tint, 0.32" in source
+    assert "drawContours" not in source
 
 
 @pytest.mark.parametrize(

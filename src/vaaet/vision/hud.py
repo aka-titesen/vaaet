@@ -104,7 +104,6 @@ _NEUTRAL_COLOR = (224, 144, 74)
 _TEXT_COLOR = (245, 247, 250)
 _MUTED_TEXT_COLOR = (191, 199, 209)
 _CARD_TINT = (24, 27, 32)
-_CARD_BORDER = (118, 126, 138)
 _INCIDENT_COLOR = (48, 48, 225)
 
 
@@ -126,6 +125,17 @@ def _format_speed(average_speed: float | None, *, debug: bool = False) -> str:
 
 def _total_vehicle_count(counts: Mapping[str, int]) -> int:
     return sum(max(int(value), 0) for value in counts.values())
+
+
+def _format_total_vehicle_count(counts: Mapping[str, int]) -> str:
+    return f"TOTAL VEHICULOS: {_total_vehicle_count(counts)}"
+
+
+def _vehicle_count_labels(counts: Mapping[str, int]) -> tuple[str, ...]:
+    return tuple(
+        f"{_VEHICLE_LABELS[kind]} {max(int(counts.get(kind, 0)), 0)}"
+        for kind in ("car", "truck", "bus", "motorcycle", "bicycle")
+    )
 
 
 def format_track_label(
@@ -230,17 +240,15 @@ def _draw_blurred_card(
     roi = frame[y1:y2, x1:x2]
     if roi.size == 0:
         return
-    kernel = min(31, roi.shape[0], roi.shape[1])
+    kernel = min(15, roi.shape[0], roi.shape[1])
     if kernel % 2 == 0:
         kernel -= 1
     blurred = cv2.GaussianBlur(roi, (kernel, kernel), 0) if kernel >= 3 else roi.copy()
     tint = np.full_like(blurred, _CARD_TINT)
-    composite = cv2.addWeighted(blurred, 0.42, tint, 0.58, 0)
+    composite = cv2.addWeighted(blurred, 0.68, tint, 0.32, 0)
     radius = max(3, round(min(roi.shape[:2]) * 0.09))
     mask = _rounded_mask(roi.shape[0], roi.shape[1], radius)
     np.copyto(roi, composite, where=mask[..., None].astype(bool))
-    contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    cv2.drawContours(roi, contours, -1, _CARD_BORDER, 1, cv2.LINE_AA)
     if accent is not None:
         accent_width = max(3, round(bounds.width * 0.014))
         cv2.rectangle(
@@ -335,44 +343,6 @@ def _draw_speedometer(
     cv2.circle(frame, center, max(1, size // 12), color, -1, cv2.LINE_AA)
 
 
-def _draw_vehicle_icon(
-    frame: np.ndarray,
-    vehicle_type: str,
-    origin: tuple[int, int],
-    size: int,
-) -> None:
-    import cv2
-
-    x, y = origin
-    color = _VEHICLE_COLORS.get(vehicle_type, _MUTED_TEXT_COLOR)
-    thickness = max(1, size // 10)
-    if vehicle_type in {"motorcycle", "bicycle"}:
-        radius = max(2, size // 5)
-        left = (x + radius, y + size - radius)
-        right = (x + size - radius, y + size - radius)
-        cv2.circle(frame, left, radius, color, thickness, cv2.LINE_AA)
-        cv2.circle(frame, right, radius, color, thickness, cv2.LINE_AA)
-        cv2.line(frame, left, (x + size // 2, y + size // 3), color, thickness, cv2.LINE_AA)
-        cv2.line(frame, (x + size // 2, y + size // 3), right, color, thickness, cv2.LINE_AA)
-        cv2.line(frame, left, right, color, thickness, cv2.LINE_AA)
-        if vehicle_type == "motorcycle":
-            cv2.line(frame, (x + size // 2, y + size // 3), (x + 3 * size // 4, y + size // 4), color, thickness, cv2.LINE_AA)
-        return
-    body_top = y + size // 3 if vehicle_type != "bus" else y + size // 6
-    cv2.rectangle(frame, (x, body_top), (x + size, y + 4 * size // 5), color, thickness, cv2.LINE_AA)
-    if vehicle_type == "car":
-        cv2.line(frame, (x + size // 4, body_top), (x + size // 2, y + size // 6), color, thickness, cv2.LINE_AA)
-        cv2.line(frame, (x + size // 2, y + size // 6), (x + 3 * size // 4, body_top), color, thickness, cv2.LINE_AA)
-    elif vehicle_type == "truck":
-        cv2.line(frame, (x + 2 * size // 3, body_top), (x + 2 * size // 3, y + 4 * size // 5), color, thickness, cv2.LINE_AA)
-    elif vehicle_type == "bus":
-        for offset in (size // 4, size // 2, 3 * size // 4):
-            cv2.line(frame, (x + offset, body_top + 2), (x + offset, y + size // 2), color, thickness, cv2.LINE_AA)
-    wheel_radius = max(2, size // 9)
-    for wheel_x in (x + size // 4, x + 3 * size // 4):
-        cv2.circle(frame, (wheel_x, y + 4 * size // 5), wheel_radius, color, -1, cv2.LINE_AA)
-
-
 def _status_values(snapshot: HudSnapshot) -> tuple[str, str, tuple[int, int, int]]:
     if not snapshot.inference_enabled:
         return "RECOLECCION DE TELEMETRIA", "MODO ADQUISICION", _NEUTRAL_COLOR
@@ -438,26 +408,24 @@ def _render_counts_card(
     scale = max(0.42, min(1.35, bounds.height / 146))
     left = bounds.x1 + max(10, round(16 * scale))
     title_y = bounds.y1 + max(21, round(30 * scale))
-    total = _total_vehicle_count(snapshot.cumulative_counts)
-    _put_text(frame, "VEHICULOS DEL CLIP", (left, title_y), scale=0.43 * scale, color=_MUTED_TEXT_COLOR, thickness=2)
-    total_text = str(total)
-    total_width = max(20, round(len(total_text) * 15 * scale))
-    _put_text(frame, total_text, (bounds.x2 - total_width - round(10 * scale), title_y), scale=0.62 * scale, thickness=2)
+    _put_text(
+        frame,
+        _format_total_vehicle_count(snapshot.cumulative_counts),
+        (left, title_y),
+        scale=0.43 * scale,
+        color=_MUTED_TEXT_COLOR,
+        thickness=2,
+    )
 
-    kinds = ("car", "truck", "bus", "motorcycle", "bicycle")
     columns = 3
     cell_width = max(1, (bounds.width - 2 * (left - bounds.x1)) // columns)
     row_height = max(24, round(46 * scale))
     first_row_y = bounds.y1 + round(66 * scale)
-    icon_size = max(13, round(20 * scale))
-    for index, kind in enumerate(kinds):
+    for index, label in enumerate(_vehicle_count_labels(snapshot.cumulative_counts)):
         row, column = divmod(index, columns)
         x = left + column * cell_width
         y = first_row_y + row * row_height
-        _draw_vehicle_icon(frame, kind, (x, y - icon_size + 3), icon_size)
-        value = max(int(snapshot.cumulative_counts.get(kind, 0)), 0)
-        label = f"{_VEHICLE_LABELS[kind]} {value}"
-        _put_text(frame, label, (x + icon_size + round(5 * scale), y), scale=0.32 * scale, thickness=1)
+        _put_text(frame, label, (x, y), scale=0.34 * scale, thickness=1)
 
 
 def _render_compact(
@@ -475,18 +443,16 @@ def _render_compact(
     _draw_state_icon(frame, (left, top - icon_size + 2), icon_size, snapshot.state, state_color)
     _put_text(frame, title, (left + icon_size + 5, top), scale=0.48 * scale, thickness=2)
     speed = _format_speed(snapshot.average_speed, debug=config.debug)
-    total = _total_vehicle_count(snapshot.cumulative_counts)
-    summary = f"{speed} | VEHICULOS {total} | {format_elapsed_time(snapshot.elapsed_seconds)}"
+    total = _format_total_vehicle_count(snapshot.cumulative_counts)
+    summary = f"{speed} | {total} | {format_elapsed_time(snapshot.elapsed_seconds)}"
     _put_text(frame, summary, (left, min(bounds.y2 - 5, top + max(14, round(25 * scale)))), scale=0.39 * scale)
     if bounds.width >= 320:
-        kinds = ("car", "truck", "bus", "motorcycle", "bicycle")
         y = min(bounds.y2 - 4, top + max(28, round(48 * scale)))
-        cell = max(1, (bounds.width - 2 * (left - bounds.x1)) // len(kinds))
-        for index, kind in enumerate(kinds):
+        labels = _vehicle_count_labels(snapshot.cumulative_counts)
+        cell = max(1, (bounds.width - 2 * (left - bounds.x1)) // len(labels))
+        for index, label in enumerate(labels):
             x = left + index * cell
-            value = max(int(snapshot.cumulative_counts.get(kind, 0)), 0)
-            _draw_vehicle_icon(frame, kind, (x, y - icon_size + 2), icon_size)
-            _put_text(frame, str(value), (x + icon_size + 2, y), scale=0.34 * scale)
+            _put_text(frame, label, (x, y), scale=0.31 * scale)
     if snapshot.incident_candidate:
         _put_text(frame, "POSIBLE INCIDENTE - REVISAR", (left, bounds.y2 - 5), scale=0.36 * scale, color=_INCIDENT_COLOR, thickness=2)
     elif config.debug:

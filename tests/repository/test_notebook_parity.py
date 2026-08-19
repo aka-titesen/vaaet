@@ -204,6 +204,57 @@ def test_inference_finalizes_immutable_hitl_review_sessions() -> None:
     assert "export_completed_offline_review" not in code
 
 
+def test_inference_centralizes_and_documents_supported_workflow_configuration() -> None:
+    notebook = json.loads(NOTEBOOKS["inference"].read_text(encoding="utf-8"))
+    code = _code(NOTEBOOKS["inference"])
+    markdown = "\n".join(
+        "".join(cell.get("source", []))
+        for cell in notebook["cells"]
+        if cell.get("cell_type") == "markdown"
+    )
+    assignments = {
+        "ALLOW_PILOT_BUNDLE =": 1,
+        "ALLOW_EXPERIMENTAL_BUNDLE =": 1,
+        "PERSIST_TO_DATABASE =": 1,
+        "ENABLE_HUMAN_REVIEW =": 1,
+        "REVIEW_MODE =": 1,
+        "DOWNLOAD_ANNOTATED_VIDEO =": 1,
+        "SHOW_DASHBOARD =": 1,
+    }
+    for assignment, expected_count in assignments.items():
+        assert code.count(assignment) == expected_count
+
+    config_index = next(
+        index
+        for index, cell in enumerate(notebook["cells"])
+        if "# Workflow configuration — edit only this cell" in "".join(cell.get("source", []))
+    )
+    setup_index = next(
+        index
+        for index, cell in enumerate(notebook["cells"])
+        if "# Environment setup — run once per Colab runtime" in "".join(cell.get("source", []))
+    )
+    assert config_index < setup_index
+    assert 'if REVIEW_MODE not in {"priority", "all"}:' in code
+    assert 'DEPLOYMENT_STAGE == "candidate" and PERSIST_TO_DATABASE' in code
+    assert "Candidate bundles are offline-only" in code
+    assert "if IN_COLAB and DOWNLOAD_ANNOTATED_VIDEO" in code
+    assert "if not SHOW_DASHBOARD" in code
+
+    for heading in (
+        "Inferencia piloto rápida",
+        "Piloto con HITL portable",
+        "Persistencia operacional sin revisión",
+        "PostgreSQL con revisión prioritaria",
+        "Revisión completa de un clip",
+        "Candidato experimental",
+        "Bundle aprobado para producción",
+        "Clip menor a 60 segundos",
+    ):
+        assert heading in markdown
+    assert "try:\n    if df_telemetry" not in markdown
+
+
 def test_training_augmentation_handles_raw_and_feedback_inputs() -> None:
     code = _code(NOTEBOOKS["training"])
     guard = 'if "df_raw" not in globals() or not isinstance(df_raw, pd.DataFrame):'

@@ -28,11 +28,72 @@ from vaaet.settings import (
 from vaaet.training.lifecycle import ModelInputPolicy, apply_model_input_policy
 
 __all__ = [
+    "CLASSIFICATION_RESULT_COLUMNS",
     "apply_conservative_accident_gate",
     "apply_stable_state_policy",
     "classify_raw_telemetry",
     "classify_telemetry_dataframe",
 ]
+
+
+CLASSIFICATION_RESULT_COLUMNS: tuple[str, ...] = (
+    "model_traffic_state",
+    "model_state_label",
+    "model_confidence",
+    "probability_margin",
+    "decision_abstained",
+    "traffic_state",
+    "state_label",
+    "confidence",
+    "model_version",
+    "accident_low_speed",
+    "accident_recent_braking",
+    "accident_cumulative_braking",
+    "accident_persistent_low_speed",
+    "accident_quality_ok",
+    "accident_near_zero_motion",
+    "accident_stationary_confirmed",
+    "accident_motion_evidence",
+    "accident_evidence_score",
+    "accident_rule_triggered",
+    "accident_alert_started",
+    "accident_gate_applied",
+    "measurement_reliable",
+)
+
+_CLASSIFICATION_RESULT_DTYPES: Mapping[str, str] = {
+    "model_traffic_state": "Int64",
+    "model_state_label": "string",
+    "model_confidence": "float64",
+    "probability_margin": "float64",
+    "decision_abstained": "bool",
+    "traffic_state": "Int64",
+    "state_label": "string",
+    "confidence": "float64",
+    "model_version": "string",
+    "accident_low_speed": "bool",
+    "accident_recent_braking": "bool",
+    "accident_cumulative_braking": "bool",
+    "accident_persistent_low_speed": "bool",
+    "accident_quality_ok": "bool",
+    "accident_near_zero_motion": "bool",
+    "accident_stationary_confirmed": "bool",
+    "accident_motion_evidence": "bool",
+    "accident_evidence_score": "float64",
+    "accident_rule_triggered": "bool",
+    "accident_alert_started": "bool",
+    "accident_gate_applied": "bool",
+    "measurement_reliable": "bool",
+}
+
+
+def _empty_classification_result(frame: pd.DataFrame) -> pd.DataFrame:
+    """Return an empty frame that still satisfies the classification contract."""
+    out = frame.copy()
+    for column in CLASSIFICATION_RESULT_COLUMNS:
+        if column not in out:
+            out[column] = pd.Series(index=out.index, dtype=_CLASSIFICATION_RESULT_DTYPES[column])
+    return out
 
 
 def _ensure_feature_compatibility(scaler: Any, feature_cols: list[str]) -> None:
@@ -231,7 +292,7 @@ def classify_telemetry_dataframe(
     """Run the three-class MLP and the exact production decision chain."""
     del label_mapping  # Public labels are governed centrally by STATE_LABELS.
     if df_features.empty:
-        return df_features.copy()
+        return _empty_classification_result(df_features)
     active_features = feature_cols or FEATURE_COLS
     _ensure_feature_compatibility(scaler, active_features)
     if active_features != FEATURE_COLS:
@@ -279,7 +340,7 @@ def classify_raw_telemetry(
 ) -> pd.DataFrame:
     """Engineer complete minute windows and classify them safely."""
     if df_telemetry.empty:
-        return df_telemetry.copy()
+        return _empty_classification_result(df_telemetry)
     if inference_mode == "sprint":
         out = df_telemetry.copy()
         out["traffic_state"] = assign_instant_state(out).astype(int)
@@ -291,7 +352,7 @@ def classify_raw_telemetry(
 
     features = engineer_features(df_telemetry)
     if features.empty:
-        return features
+        return _empty_classification_result(features)
     return classify_telemetry_dataframe(
         features,
         model,

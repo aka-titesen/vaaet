@@ -13,6 +13,17 @@ Todos los cambios relevantes del proyecto VAAET se documentan en este archivo, s
 
 ---
 
+## [4.5.2] - 2026-08-19
+
+### Corregido
+
+- Manejo explícito de clips con un único minuto completo: conservan video y
+  telemetría sin intentar métricas, persistencia, HITL ni dashboard.
+- Esquema contractual de clasificación también para resultados vacíos, evitando
+  accesos inválidos a `traffic_state` cuando falta contexto temporal.
+- Mensajes y documentación alineados con el mínimo de dos minutos consecutivos
+  requerido por las features de diferencias.
+
 ## [4.5.1] - 2026-08-19
 
 ### Corregido

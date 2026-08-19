@@ -4,7 +4,7 @@
 
 | Campo | Valor |
 |---|---|
-| Proyecto | VAAET ML 4.5.1 |
+| Proyecto | VAAET ML 4.5.2 |
 | Modelo vigente | `mlp-v2.1` |
 | Estado inicial | Pilot weak-supervision hasta cumplir gates humanos |
 | Runtime | TensorFlow/Keras, Python 3.10–3.12, Google Colab |

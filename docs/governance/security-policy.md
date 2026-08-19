@@ -1,4 +1,4 @@
-# Política de seguridad y privacidad — VAAET ML 4.5.1
+# Política de seguridad y privacidad — VAAET ML 4.5.2
 
 PostgreSQL usa identidades separadas por workflow, TLS `verify-full`, permisos
 mínimos y funciones operativas con `search_path` fijo. La base exclusiva revoca

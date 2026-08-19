@@ -61,12 +61,15 @@ Después de aprobar un modelo, ejecutá localmente `dvc add artifacts/traffic-st
 
 El clasificador sólo consume minutos completos. Durante una ventana parcial se muestra el último estado estable. `Accident` nunca es automático: una evidencia persistente produce `Congested + accident_rule_triggered`; el código 3 exige feedback humano validado.
 
-La cantidad de filas temporales es `floor(duración_del_clip / 60)`: 16 segundos
+La cantidad de filas raw es `floor(duración_del_clip / 60)`: 16 segundos
 producen cero filas, 60 segundos producen una y 125 segundos producen dos; los
 cinco segundos finales del último ejemplo se conservan en el video anotado pero
-no se persisten como telemetría. Un clip menor a un minuto finaliza correctamente,
-descarga su video anotado y omite CSV, PostgreSQL, clasificación y HITL. Usá clips
-de varios minutos para comprobar transiciones, persistencia e histéresis.
+no se persisten como telemetría. Las features de diferencias usan el primer
+minuto como línea base, por lo que 60–119 segundos todavía producen cero filas
+clasificables; 120 segundos producen la primera. Estos casos finalizan
+correctamente, descargan el video anotado y omiten PostgreSQL, HITL y dashboard
+cuando no existe clasificación. Usá clips superiores a dos minutos para observar
+el estado dentro del video y comprobar transiciones, persistencia e histéresis.
 
 La revisión HITL es una celda explícita posterior al clip, no un pop-up durante
 inferencia. `priority` muestra incidentes candidatos, baja confianza, abstenciones

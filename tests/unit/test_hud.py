@@ -123,6 +123,7 @@ def test_status_copy_distinguishes_collection_warmup_and_stable_state() -> None:
     congested = hud._status_values(_snapshot(state=2, incident_candidate=True))
     assert collection[0] == "RECOLECCION DE TELEMETRIA"
     assert warmup[0] == "ANALIZANDO"
+    assert warmup[1] == "ESTADO AL COMPLETAR 2 MIN"
     assert congested[0] == "CONGESTION"
 
 

@@ -122,6 +122,11 @@ def test_notebooks_handle_clips_without_complete_minutes() -> None:
     assert "minimum required: 60.0s" in collection
     assert "minimum required: 60.0s" in inference
     assert "df_classified = None" in inference
+    assert "if df_classified.empty:" in inference
+    assert "at least two consecutive complete 60-second windows" in inference
+    assert inference.index("if df_classified.empty:") < inference.index(
+        'df_classified["traffic_state"].unique()'
+    )
     assert "INFERENCE_PIPELINE_RUN_ID = None" in inference
     assert "Feature engineering, classification, persistence, and HITL review were skipped" in inference
     assert "INFERENCE_PIPELINE_RUN_ID is not None" in inference
@@ -251,7 +256,7 @@ def test_inference_centralizes_and_documents_supported_workflow_configuration() 
         "Revisión completa de un clip",
         "Candidato experimental",
         "Bundle aprobado para producción",
-        "Clip menor a 60 segundos",
+        "Clip corto o con un solo minuto completo",
     ):
         assert heading in markdown
     assert "try:\n    if df_telemetry" not in markdown

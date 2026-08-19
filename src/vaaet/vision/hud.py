@@ -347,7 +347,7 @@ def _status_values(snapshot: HudSnapshot) -> tuple[str, str, tuple[int, int, int
     if not snapshot.inference_enabled:
         return "RECOLECCION DE TELEMETRIA", "MODO ADQUISICION", _NEUTRAL_COLOR
     if snapshot.state is None:
-        return "ANALIZANDO", "ESTADO AL COMPLETAR 1 MIN", _NEUTRAL_COLOR
+        return "ANALIZANDO", "ESTADO AL COMPLETAR 2 MIN", _NEUTRAL_COLOR
     return (
         _STATE_TITLES.get(snapshot.state, "ESTADO DESCONOCIDO"),
         "ESTADO ESTABLE",

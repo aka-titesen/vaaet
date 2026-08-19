@@ -7,8 +7,10 @@ import pandas as pd
 import pytest
 
 from vaaet.inference.traffic_state import (
+    CLASSIFICATION_RESULT_COLUMNS,
     apply_conservative_accident_gate,
     apply_stable_state_policy,
+    classify_raw_telemetry,
     classify_telemetry_dataframe,
 )
 from vaaet.settings import FEATURE_COLS
@@ -18,16 +20,20 @@ from vaaet.training.lifecycle import ModelInputPolicy
 class _DummyScaler:
     def __init__(self, n_features: int) -> None:
         self.n_features_in_ = n_features
+        self.transform_calls = 0
 
     def transform(self, values):
+        self.transform_calls += 1
         return np.asarray(values, dtype=float)
 
 
 class _DummyModel:
     def __init__(self, predictions: np.ndarray) -> None:
         self.predictions = predictions
+        self.predict_calls = 0
 
     def predict(self, values, verbose: int = 0):
+        self.predict_calls += 1
         if self.predictions.ndim == 1:
             return np.tile(self.predictions, (len(values), 1))
         return self.predictions
@@ -63,6 +69,32 @@ def _feature_rows(**overrides) -> pd.DataFrame:
     for key, value in overrides.items():
         base[key] = value
     return base
+
+
+def _raw_minutes(count: int) -> pd.DataFrame:
+    return pd.DataFrame(
+        {
+            "clip_id": ["clip_a"] * count,
+            "record_time": pd.date_range(
+                "2025-05-01T11:00:00Z",
+                periods=count,
+                freq="1min",
+            ),
+            "avg_speed": np.linspace(22.0, 18.0, count),
+            "total_vehicles": [6] * count,
+            "count_car": [4] * count,
+            "count_truck": [1] * count,
+            "count_bus": [0] * count,
+            "count_motorcycle": [1] * count,
+            "count_bicycle": [0] * count,
+            "speed_sample_count": [6] * count,
+            "rejected_speed_count": [0] * count,
+            "near_zero_motion_count": [0] * count,
+            "stationary_confirmed_count": [0] * count,
+            "speed_measurement_quality": [1.0] * count,
+            "optical_flow_tracking_ratio": [1.0] * count,
+        }
+    )
 
 
 class TestApplyConservativeAccidentGate:
@@ -184,6 +216,30 @@ class TestClassifyTelemetryDataFrame:
                 scaler,
                 input_policy=ModelInputPolicy.CANONICAL_V2,
             )
+
+
+class TestClassifyRawTelemetry:
+    def test_one_complete_minute_returns_contractual_empty_result(self) -> None:
+        scaler = _DummyScaler(len(FEATURE_COLS))
+        model = _DummyModel(np.array([0.9, 0.08, 0.02]))
+
+        result = classify_raw_telemetry(_raw_minutes(1), model, scaler)
+
+        assert result.empty
+        assert set(CLASSIFICATION_RESULT_COLUMNS).issubset(result.columns)
+        assert scaler.transform_calls == 0
+        assert model.predict_calls == 0
+
+    def test_two_complete_minutes_produce_first_classification(self) -> None:
+        scaler = _DummyScaler(len(FEATURE_COLS))
+        model = _DummyModel(np.array([0.9, 0.08, 0.02]))
+
+        result = classify_raw_telemetry(_raw_minutes(2), model, scaler)
+
+        assert len(result) == 1
+        assert int(result.iloc[0]["traffic_state"]) == 0
+        assert scaler.transform_calls == 1
+        assert model.predict_calls == 1
 
 
 class TestStableStatePolicy:

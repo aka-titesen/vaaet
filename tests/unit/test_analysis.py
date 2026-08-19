@@ -45,8 +45,8 @@ def _make_video(path: Path, *, frames: int = 60) -> None:
 
 
 def test_analyze_video_with_and_without_prediction_provider(tmp_path, monkeypatch) -> None:
-    source = tmp_path / "bridge_2025-05-01_08-00-00_to_08-01-00.mp4"
-    _make_video(source)
+    source = tmp_path / "bridge_2025-05-01_08-00-00_to_08-02-00.mp4"
+    _make_video(source, frames=120)
     monkeypatch.setattr(analysis, "YOLODetector", _FakeDetector)
     monkeypatch.setattr(analysis, "OpticalFlowEstimator", _FakeFlow)
 
@@ -59,9 +59,11 @@ def test_analyze_video_with_and_without_prediction_provider(tmp_path, monkeypatc
 
     provider_calls = 0
 
-    def provider(_telemetry: object) -> TrafficStatePrediction:
+    def provider(telemetry: pd.DataFrame) -> TrafficStatePrediction | None:
         nonlocal provider_calls
         provider_calls += 1
+        if len(telemetry) < 2:
+            return None
         return TrafficStatePrediction(2, "Congested", 0.9, incident_candidate=True)
 
     inference = analyze_video(
@@ -69,13 +71,48 @@ def test_analyze_video_with_and_without_prediction_provider(tmp_path, monkeypatc
         tmp_path / "inference.mp4",
         prediction_provider=provider,
         hud_config=HudConfig(debug=True),
-        max_frames=60,
+        max_frames=120,
         status_every_seconds=0.2,
     )
     assert inference.video_path.is_file()
     assert inference.classifications is not None
     assert inference.classifications.iloc[-1]["state_label"] == "Congested"
-    assert provider_calls == 1
+    assert provider_calls == 2
+
+
+def test_one_complete_minute_has_telemetry_without_stable_classification(
+    tmp_path, monkeypatch
+) -> None:
+    source = tmp_path / "bridge_2025-05-01_08-00-00_to_08-01-00.mp4"
+    _make_video(source, frames=60)
+    monkeypatch.setattr(analysis, "YOLODetector", _FakeDetector)
+    monkeypatch.setattr(analysis, "OpticalFlowEstimator", _FakeFlow)
+
+    def provider(telemetry: pd.DataFrame) -> TrafficStatePrediction | None:
+        return None if len(telemetry) < 2 else TrafficStatePrediction(0, "Normal", 0.9)
+
+    result = analyze_video(source, tmp_path / "one-minute.mp4", prediction_provider=provider)
+
+    assert len(result.telemetry) == 1
+    assert result.complete_minutes == 1
+    assert result.discarded_partial_seconds == 0.0
+    assert result.classifications is not None
+    assert result.classifications.empty
+
+
+def test_119_seconds_has_one_baseline_minute_and_partial_tail(
+    tmp_path, monkeypatch
+) -> None:
+    source = tmp_path / "bridge_2025-05-01_08-00-00_to_08-01-59.mp4"
+    _make_video(source, frames=119)
+    monkeypatch.setattr(analysis, "YOLODetector", _FakeDetector)
+    monkeypatch.setattr(analysis, "OpticalFlowEstimator", _FakeFlow)
+
+    result = analyze_video(source, tmp_path / "119-seconds.mp4")
+
+    assert len(result.telemetry) == 1
+    assert result.complete_minutes == 1
+    assert result.discarded_partial_seconds == 59.0
 
 
 def test_analyze_video_returns_canonical_empty_frames_for_short_clip(
@@ -124,12 +161,21 @@ def test_analyze_video_discards_only_the_partial_tail(tmp_path, monkeypatch) -> 
     monkeypatch.setattr(analysis, "YOLODetector", _FakeDetector)
     monkeypatch.setattr(analysis, "OpticalFlowEstimator", _FakeFlow)
 
-    result = analyze_video(source, tmp_path / "partial-tail.mp4")
+    def provider(telemetry: pd.DataFrame) -> TrafficStatePrediction | None:
+        return None if len(telemetry) < 2 else TrafficStatePrediction(0, "Normal", 0.9)
+
+    result = analyze_video(
+        source,
+        tmp_path / "partial-tail.mp4",
+        prediction_provider=provider,
+    )
 
     assert len(result.telemetry) == 2
     assert result.complete_minutes == 2
     assert result.processed_duration_seconds == 125.0
     assert result.discarded_partial_seconds == 5.0
+    assert result.classifications is not None
+    assert len(result.classifications) == 1
     assert str(result.telemetry["record_time"].dtype) == "datetime64[ns, UTC]"
     assert result.telemetry.iloc[0]["record_time"] == pd.Timestamp(
         "2025-05-01 11:01:00Z"

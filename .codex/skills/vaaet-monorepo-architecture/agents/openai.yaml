@@ -1,0 +1,4 @@
+interface:
+  display_name: "VAAET Monorepo Architecture"
+  short_description: "Guide VAAET ML and app boundaries"
+  default_prompt: "Use $vaaet-monorepo-architecture to plan VAAET repository evolution safely."

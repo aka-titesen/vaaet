@@ -1,0 +1,4 @@
+interface:
+  display_name: "VAAET Python Project Configuration"
+  short_description: "Configure Python projects safely"
+  default_prompt: "Use $vaaet-python-project-configuration to review VAAET project setup safely."

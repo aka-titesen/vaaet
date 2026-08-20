@@ -34,6 +34,14 @@ sólo las credenciales necesarias:
 | Entrenamiento | `VAAET_TRAINING_DB_USER`, `VAAET_TRAINING_DB_PASSWORD` |
 | Revisión | `VAAET_REVIEW_DB_USER`, `VAAET_REVIEW_DB_PASSWORD`, `VAAET_REVIEWER_ID` |
 
+Los cuatro perfiles pueden apuntar al mismo endpoint y base de datos. Sus
+credenciales permanecen separadas para aplicar mínimo privilegio y permitir
+rotación independiente. La disponibilidad de Secrets nunca habilita una
+operación por sí sola: recolección e inferencia escriben sólo con
+`PERSIST_TO_DATABASE=True`; entrenamiento consulta PostgreSQL únicamente con
+`ENABLE_POSTGRES_INGESTION=True`; la revisión depende además de
+`ENABLE_HUMAN_REVIEW=True`.
+
 Los notebooks consultan Secrets directamente: no copian contraseñas a variables,
 celdas ni outputs. `sslmode=require` se admite con advertencia; `disable` sólo en
 localhost. Los nombres `DB_*` funcionan de forma deprecada durante 4.x.

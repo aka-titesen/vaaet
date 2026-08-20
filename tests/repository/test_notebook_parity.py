@@ -262,6 +262,65 @@ def test_inference_centralizes_and_documents_supported_workflow_configuration() 
     assert "try:\n    if df_telemetry" not in markdown
 
 
+def test_collection_centralizes_safe_workflow_configuration() -> None:
+    notebook = json.loads(NOTEBOOKS["collection"].read_text(encoding="utf-8"))
+    code = _code(NOTEBOOKS["collection"])
+
+    assert code.count("PERSIST_TO_DATABASE =") == 1
+    assert code.count("HUD_DEBUG =") == 1
+    assert "PERSIST_TO_DATABASE = False" in code
+    config_index = next(
+        index
+        for index, cell in enumerate(notebook["cells"])
+        if "# Workflow configuration — edit only this cell"
+        in "".join(cell.get("source", []))
+    )
+    setup_index = next(
+        index
+        for index, cell in enumerate(notebook["cells"])
+        if "# Environment setup — run once per Colab runtime"
+        in "".join(cell.get("source", []))
+    )
+    assert config_index < setup_index
+
+
+def test_training_resolves_postgres_only_after_explicit_opt_in() -> None:
+    notebook = json.loads(NOTEBOOKS["training"].read_text(encoding="utf-8"))
+    code = _code(NOTEBOOKS["training"])
+
+    assert code.count("ENABLE_POSTGRES_INGESTION =") == 1
+    assert "ENABLE_POSTGRES_INGESTION = False" in code
+    assert code.count(
+        "get_optional_database_settings(DatabaseProfile.TRAINING)"
+    ) == 1
+    guard_index = code.index("if ENABLE_POSTGRES_INGESTION:")
+    settings_index = code.index(
+        "get_optional_database_settings(DatabaseProfile.TRAINING)"
+    )
+    assert guard_index < settings_index
+    assert "PostgreSQL ingestion is enabled, but the read-only training profile" in code
+    assert "PERSIST_TO_DATABASE" not in code
+
+    setup_index = next(
+        index
+        for index, cell in enumerate(notebook["cells"])
+        if "# Environment setup — run once per Colab runtime"
+        in "".join(cell.get("source", []))
+    )
+    config_index = next(
+        index
+        for index, cell in enumerate(notebook["cells"])
+        if "# Training workflow configuration — edit only this cell"
+        in "".join(cell.get("source", []))
+    )
+    upload_index = next(
+        index
+        for index, cell in enumerate(notebook["cells"])
+        if "# Cell 1b — Data Upload (Colab only)" in "".join(cell.get("source", []))
+    )
+    assert setup_index < config_index < upload_index
+
+
 def test_training_augmentation_handles_raw_and_feedback_inputs() -> None:
     code = _code(NOTEBOOKS["training"])
     guard = 'if "df_raw" not in globals() or not isinstance(df_raw, pd.DataFrame):'

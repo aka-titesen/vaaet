@@ -65,6 +65,15 @@ def _load_setup_function(name: str, namespace: dict[str, object] | None = None) 
     return execution_namespace[name]
 
 
+def _markdown(path: Path) -> str:
+    notebook = json.loads(path.read_text(encoding="utf-8"))
+    return "\n".join(
+        "".join(cell["source"])
+        for cell in notebook["cells"]
+        if cell["cell_type"] == "markdown"
+    )
+
+
 def test_runtime_preflight_accepts_supported_versions_and_rejects_future_python() -> None:
     validate = _load_setup_function("validate_runtime_version")
     validate((3, 10))  # type: ignore[operator]
@@ -163,25 +172,25 @@ def test_collection_uses_shared_analysis_and_data_contracts() -> None:
     assert "class VAAET" not in code
     assert "if result.telemetry.empty:" in code
     assert "if not result.telemetry.empty and RAW_CSV.is_file():" in code
-    assert "PostgreSQL persistence skipped" in code
+    assert "PostgreSQL omitido" in code
 
 
 def test_notebooks_handle_clips_without_complete_minutes() -> None:
     collection = _code(NOTEBOOKS["collection"])
     inference = _code(NOTEBOOKS["inference"])
 
-    assert "minimum required: 60.0s" in collection
-    assert "minimum required: 60.0s" in inference
+    assert "mínimo: 60.0s" in collection
+    assert "mínimo: 60.0s" in inference
     assert "df_classified = None" in inference
     assert "if df_classified.empty:" in inference
-    assert "at least two consecutive complete 60-second windows" in inference
+    assert "Se necesitan dos ventanas consecutivas de 60 segundos" in inference
     assert inference.index("if df_classified.empty:") < inference.index(
         'df_classified["traffic_state"].unique()'
     )
     assert "INFERENCE_PIPELINE_RUN_ID = None" in inference
-    assert "Feature engineering, classification, persistence, and HITL review were skipped" in inference
+    assert "Se omiten features, clasificación, PostgreSQL y revisión HITL" in inference
     assert "INFERENCE_PIPELINE_RUN_ID is not None" in inference
-    assert "HITL review skipped" in inference
+    assert "Revisión HITL omitida" in inference
 
 
 def test_training_uses_shared_feature_contracts() -> None:
@@ -196,7 +205,8 @@ def test_training_uses_shared_feature_contracts() -> None:
     assert "build_training_partitions(" in code
     assert "validation_data=(X_validation, y_validation)" in code
     assert "validation_split" not in code
-    assert "Dense(n_classes, activation=\"softmax\")" in code
+    assert "from vaaet.training.modeling import build_traffic_state_mlp" in code
+    assert "build_traffic_state_mlp(" in code
     assert "N_MODEL_STATES" in code
     assert "fit_temperature" in code
     assert "production_eligible" in code
@@ -213,7 +223,7 @@ def test_training_uses_shared_feature_contracts() -> None:
     assert "frozen_holdout=human_holdout_snapshot" in code
     assert "human_holdout_snapshot.descriptor" in code
     assert "/content/drive/MyDrive/vaaet-ml/data/holdouts" in code
-    assert "no ephemeral fallback is allowed" in code
+    assert "no se usará un fallback efímero" in code
     assert "compose_supervised_dataset(" in code
     assert "VersionedSeedStore" in code
     assert "DatasetArtifactAction.REUSE_OR_CREATE" in code
@@ -240,9 +250,9 @@ def test_training_prepares_postgres_backup_reader_in_colab() -> None:
     assert "https://www.postgresql.org/media/keys/ACCC4CF8.asc" in code
     assert "PostgresBackupSource(BACKUP_PATH" in code
     assert "Path(PG_RESTORE_PATH) if PG_RESTORE_PATH else None" in code
-    assert "Backup reader ready" in code
+    assert "Lector de backup listo" in code
     assert "for fname in uploaded" in code
-    assert "Immutable dataset root" in code
+    assert "Datos inmutables en Drive" in code
     assert "Detected backup table" in code
     assert "archive_table" in code
     assert "reader_version" in code
@@ -294,23 +304,85 @@ def test_inference_centralizes_and_documents_supported_workflow_configuration() 
     assert config_index < setup_index
     assert 'if REVIEW_MODE not in {"priority", "all"}:' in code
     assert 'DEPLOYMENT_STAGE == "candidate" and PERSIST_TO_DATABASE' in code
-    assert "Candidate bundles are offline-only" in code
+    assert "Los bundles candidatos son sólo offline" in code
     assert "if IN_COLAB and DOWNLOAD_ANNOTATED_VIDEO" in code
     assert "if not SHOW_DASHBOARD" in code
     assert "HudConfig(debug=HUD_DEBUG)" in code
 
     for heading in (
-        "Inferencia piloto rápida",
+        "Piloto offline recomendado",
         "Piloto con HITL portable",
-        "Persistencia operacional sin revisión",
-        "PostgreSQL con revisión prioritaria",
-        "Revisión completa de un clip",
-        "Candidato experimental",
-        "Bundle aprobado para producción",
-        "Clip corto o con un solo minuto completo",
+        "Persistencia sin revisión",
+        "PostgreSQL + revisión prioritaria",
+        'REVIEW_MODE="all"',
+        'ALLOW_EXPERIMENTAL_BUNDLE=True',
+        "bundle `production`",
+        "Menos de 60 segundos",
     ):
         assert heading in markdown
     assert "try:\n    if df_telemetry" not in markdown
+
+
+@pytest.mark.parametrize("path", NOTEBOOKS.values())
+def test_notebook_starts_with_colloquial_quick_start(path: Path) -> None:
+    markdown = _markdown(path)
+    assert "Usá esta notebook" in markdown
+    assert "Inicio rápido recomendado" in markdown
+    assert "<details>" in markdown
+    assert "</details>" in markdown
+
+
+def test_collection_documents_three_complete_safe_recipes() -> None:
+    markdown = _markdown(NOTEBOOKS["collection"])
+    assert "Recolección local recomendada" in markdown
+    assert "Recolección con PostgreSQL" in markdown
+    assert "Diagnóstico técnico" in markdown
+    assert markdown.count("PERSIST_TO_DATABASE =") == 3
+    assert markdown.count("HUD_DEBUG =") == 3
+
+
+def test_inference_documents_four_complete_recipes() -> None:
+    markdown = _markdown(NOTEBOOKS["inference"])
+    recipe_assignments = (
+        "ALLOW_PILOT_BUNDLE =",
+        "ALLOW_EXPERIMENTAL_BUNDLE =",
+        "PERSIST_TO_DATABASE =",
+        "ENABLE_HUMAN_REVIEW =",
+        "REVIEW_MODE =",
+        "DOWNLOAD_ANNOTATED_VIDEO =",
+        "SHOW_DASHBOARD =",
+        "HUD_DEBUG =",
+    )
+    for assignment in recipe_assignments:
+        assert markdown.count(assignment) == 4
+
+
+def test_training_documents_complete_seed_hitl_and_versioning_recipes() -> None:
+    markdown = _markdown(NOTEBOOKS["training"])
+    recipe_assignments = (
+        "TRAINING_MODE =",
+        "ENABLE_POSTGRES_INGESTION =",
+        "ENABLE_DATA_UPLOAD =",
+        "HUMAN_HOLDOUT_FROZEN =",
+        "HUMAN_HOLDOUT_ACTION =",
+        "HUMAN_HOLDOUT_UPDATE_REASON =",
+        "SEED_ARTIFACT_ACTION =",
+        "SEED_ARTIFACT_UPDATE_REASON =",
+    )
+    for assignment in recipe_assignments:
+        assert markdown.count(assignment) == 7
+
+
+def test_notebooks_delegate_model_and_dashboard_rendering() -> None:
+    inference_code = _code(NOTEBOOKS["inference"])
+    training_code = _code(NOTEBOOKS["training"])
+
+    assert "def show_dashboard" not in inference_code
+    assert "show_inference_dashboard" in inference_code
+    assert "def build_mlp_model" not in training_code
+    assert "build_traffic_state_mlp" in training_code
+    assert "plot_training_evaluation" in training_code
+    assert "plot_training_history" in training_code
 
 
 def test_collection_centralizes_safe_workflow_configuration() -> None:
@@ -377,15 +449,15 @@ def test_training_augmentation_handles_raw_and_feedback_inputs() -> None:
     guard = 'if "df_raw" not in globals() or not isinstance(df_raw, pd.DataFrame):'
     assert guard in code
     assert code.index(guard) < code.index("_n_before = len(df_raw)")
-    assert "Synthetic raw augmentation skipped outside the one-time seed bootstrap" in code
+    assert "Datos sintéticos omitidos: sólo se agregan durante el inicio semilla" in code
     assert "from vaaet.data.timestamps import normalize_timestamp_series" in code
-    assert "Canonical timestamp timezone" in code
+    assert "Zona horaria canónica" in code
 
 
 def test_training_documents_actual_synthetic_record_count() -> None:
     notebook = NOTEBOOKS["training"].read_text(encoding="utf-8")
-    assert "200 records total" in notebook
-    assert "100 records total" not in notebook
+    assert "200 registros" in notebook
+    assert "100 registros de entrenamiento" in notebook
 
 
 def test_training_compares_conservative_balance_candidates() -> None:

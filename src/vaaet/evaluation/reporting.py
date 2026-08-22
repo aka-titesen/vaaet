@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from math import sqrt
 
 import numpy as np
@@ -23,6 +23,9 @@ __all__ = [
     "expected_calibration_error",
     "select_validation_decision_policy",
     "build_classification_support_table",
+    "plot_training_evaluation",
+    "plot_training_history",
+    "show_inference_dashboard",
 ]
 
 CONFUSION_COST = np.array(
@@ -255,3 +258,215 @@ def build_class_support_notes(
             "All present classes currently have real support, but per-class metrics should still be reported separately."
         )
     return notes
+
+
+def plot_training_history(history: Mapping[str, Sequence[float]]) -> None:
+    """Render the selected candidate's training and validation curves."""
+    import matplotlib.pyplot as plt
+
+    required = {"loss", "val_loss", "accuracy", "val_accuracy"}
+    missing = sorted(required - set(history))
+    if missing:
+        raise ValueError(f"Training history is missing required series: {missing}")
+
+    figure, (loss_axis, accuracy_axis) = plt.subplots(1, 2, figsize=(14, 5))
+    loss_axis.plot(history["loss"], label="Entrenamiento")
+    loss_axis.plot(history["val_loss"], label="Validación")
+    loss_axis.set(xlabel="Época", ylabel="Pérdida", title="Pérdida durante el entrenamiento")
+    loss_axis.legend()
+    loss_axis.grid(True, alpha=0.3)
+
+    accuracy_axis.plot(history["accuracy"], label="Entrenamiento")
+    accuracy_axis.plot(history["val_accuracy"], label="Validación")
+    accuracy_axis.set(xlabel="Época", ylabel="Exactitud", title="Exactitud durante el entrenamiento")
+    accuracy_axis.legend()
+    accuracy_axis.grid(True, alpha=0.3)
+    figure.tight_layout()
+    plt.show()
+
+
+def plot_training_evaluation(
+    y_true: Sequence[int],
+    direct_predictions: Sequence[int],
+    final_predictions: Sequence[int],
+    probabilities: np.ndarray,
+    *,
+    state_labels: Mapping[int, str] = STATE_LABELS,
+) -> None:
+    """Render direct/final confusion matrices and the reliability diagram."""
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+    from sklearn.metrics import confusion_matrix
+
+    truth = np.asarray(y_true, dtype=int)
+    direct = np.asarray(direct_predictions, dtype=int)
+    final = np.asarray(final_predictions, dtype=int)
+    proba = np.asarray(probabilities, dtype=float)
+    if truth.ndim != 1 or direct.shape != truth.shape or final.shape != truth.shape:
+        raise ValueError("Predictions and targets must be one-dimensional and equally sized.")
+    if proba.shape != (len(truth), 3):
+        raise ValueError("probabilities must have shape (records, 3).")
+
+    labels = [0, 1, 2]
+    names = [state_labels[code] for code in labels]
+    direct_matrix = confusion_matrix(truth, direct, labels=labels)
+    final_matrix = confusion_matrix(truth, final, labels=labels)
+
+    figure, axes = plt.subplots(1, 2, figsize=(15, 6))
+    sns.heatmap(
+        direct_matrix,
+        annot=True,
+        fmt="d",
+        cmap="Greens",
+        xticklabels=names,
+        yticklabels=names,
+        ax=axes[0],
+    )
+    axes[0].set(xlabel="Predicción directa", ylabel="Estado esperado", title="Salida directa del MLP")
+    sns.heatmap(
+        final_matrix,
+        annot=True,
+        fmt="d",
+        cmap="Blues",
+        xticklabels=names,
+        yticklabels=names,
+        ax=axes[1],
+    )
+    axes[1].set(
+        xlabel="Estado final",
+        ylabel="Estado esperado",
+        title="Después de umbrales e histéresis",
+    )
+    figure.tight_layout()
+    plt.show()
+
+    confidence = proba.max(axis=1)
+    correct = proba.argmax(axis=1) == truth
+    bin_confidence: list[float] = []
+    bin_accuracy: list[float] = []
+    edges = np.linspace(0.0, 1.0, 11)
+    for lower, upper in zip(edges[:-1], edges[1:], strict=True):
+        mask = (confidence > lower) & (confidence <= upper)
+        if mask.any():
+            bin_confidence.append(float(confidence[mask].mean()))
+            bin_accuracy.append(float(correct[mask].mean()))
+
+    figure, axis = plt.subplots(figsize=(5, 5))
+    axis.plot([0, 1], [0, 1], "--", color="gray", label="Calibración ideal")
+    axis.plot(bin_confidence, bin_accuracy, marker="o", label="MLP calibrado")
+    axis.set(
+        xlabel="Confianza media",
+        ylabel="Exactitud observada",
+        title="Confiabilidad de la confianza",
+    )
+    axis.legend()
+    figure.tight_layout()
+    plt.show()
+
+
+def show_inference_dashboard(
+    frame: pd.DataFrame,
+    *,
+    state_labels: Mapping[int, str] = STATE_LABELS,
+) -> None:
+    """Render a Spanish, non-technical summary of classified video minutes."""
+    import matplotlib.pyplot as plt
+
+    required = {"traffic_state", "avg_speed", "confidence"}
+    missing = sorted(required - set(frame.columns))
+    if missing:
+        raise ValueError(f"Inference dashboard is missing required columns: {missing}")
+    if frame.empty:
+        raise ValueError("Inference dashboard requires at least one classified minute.")
+
+    figure = plt.figure(figsize=(20, 10))
+    state_colors = {0: "#2ecc71", 1: "#f39c12", 2: "#e74c3c", 3: "#8e44ad"}
+    vehicle_colors = {
+        "car": "#3498db",
+        "truck": "#e67e22",
+        "bus": "#e74c3c",
+        "motorcycle": "#2ecc71",
+        "bicycle": "#9b59b6",
+    }
+    minute_axis = range(len(frame))
+
+    distribution_axis = figure.add_subplot(2, 3, 1)
+    distribution = frame["traffic_state"].value_counts().sort_index()
+    distribution_axis.bar(
+        [state_labels[int(code)] for code in distribution.index],
+        distribution.values,
+        color=[state_colors.get(int(code), "#999999") for code in distribution.index],
+    )
+    distribution_axis.set(title="Minutos por estado", ylabel="Minutos")
+
+    speed_axis = figure.add_subplot(2, 3, 2)
+    speed_axis.plot(minute_axis, frame["avg_speed"], color="#3498db", linewidth=1.5)
+    speed_axis.set(
+        title="Velocidad media a lo largo del clip",
+        xlabel="Minuto clasificable",
+        ylabel="Velocidad (km/h)",
+    )
+    speed_axis.grid(True, alpha=0.3)
+
+    confidence_axis = figure.add_subplot(2, 3, 3)
+    confidence_axis.hist(frame["confidence"], bins=20, color="#9b59b6", edgecolor="white")
+    confidence_axis.axvline(0.8, color="#e74c3c", linestyle="--", linewidth=1)
+    confidence_axis.set(title="Confianza del modelo", xlabel="Confianza", ylabel="Minutos")
+
+    counts_axis = figure.add_subplot(2, 3, 4)
+    count_columns = [
+        column
+        for column in (
+            "count_car",
+            "count_truck",
+            "count_bus",
+            "count_motorcycle",
+            "count_bicycle",
+        )
+        if column in frame.columns
+    ]
+    if count_columns:
+        counts = frame[count_columns].fillna(0)
+        counts_axis.stackplot(
+            minute_axis,
+            *[counts[column] for column in count_columns],
+            labels=[column.removeprefix("count_") for column in count_columns],
+            colors=[
+                vehicle_colors.get(column.removeprefix("count_"), "#999999")
+                for column in count_columns
+            ],
+            alpha=0.8,
+        )
+        counts_axis.legend(loc="upper left", fontsize=7)
+    counts_axis.set(title="Vehículos detectados por tipo", xlabel="Minuto", ylabel="Cantidad")
+
+    relation_axis = figure.add_subplot(2, 3, 5)
+    relation_axis.scatter(
+        frame.get("total_vehicles", pd.Series(0, index=frame.index)),
+        frame["avg_speed"],
+        c=[state_colors.get(int(code), "#999999") for code in frame["traffic_state"]],
+        alpha=0.7,
+        edgecolors="white",
+        linewidth=0.5,
+    )
+    relation_axis.set(
+        title="Velocidad frente al volumen",
+        xlabel="Vehículos por minuto",
+        ylabel="Velocidad media (km/h)",
+    )
+    relation_axis.grid(True, alpha=0.3)
+
+    summary_axis = figure.add_subplot(2, 3, 6)
+    summary_axis.axis("off")
+    summary = [
+        f"Minutos clasificados: {len(frame)}",
+        f"Velocidad media: {frame['avg_speed'].mean():.1f} km/h",
+        f"Confianza media: {frame['confidence'].mean():.3f}",
+        f"Minutos con confianza menor a 0.8: {int(frame['confidence'].lt(0.8).sum())}",
+    ]
+    if "total_vehicles" in frame:
+        summary.append(f"Vehículos contabilizados: {frame['total_vehicles'].sum():.0f}")
+    summary_axis.text(0.08, 0.5, "\n".join(summary), fontsize=11, va="center")
+    summary_axis.set_title("Resumen del clip")
+    figure.tight_layout()
+    plt.show()

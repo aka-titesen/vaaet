@@ -176,7 +176,17 @@ def test_notebook_extras_match_workflows() -> None:
     }
     for notebook in ACTIVE_NOTEBOOKS:
         code = _concatenate_code_cells(notebook)
-        assert f"[{expected[notebook.name]}]" in code
+        assert f'WORKFLOW_EXTRAS = "{expected[notebook.name]}"' in code
+
+
+def test_python_313_is_declared_and_exercised_by_ci() -> None:
+    pyproject = (REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8")
+    workflow = (REPO_ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
+
+    assert 'requires-python = ">=3.10,<3.14"' in pyproject
+    assert '"Programming Language :: Python :: 3.13"' in pyproject
+    assert 'python_version >= \'3.13\'' in pyproject
+    assert 'python-version: ["3.10", "3.11", "3.12", "3.13"]' in workflow
 
 
 def test_active_code_uses_semantic_telemetry_contract_names() -> None:

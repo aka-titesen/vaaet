@@ -1,4 +1,4 @@
-# VAAET ML 4.5.2
+# VAAET ML 4.5.3
 
 PostgreSQL se organiza en `vaaet_raw`, `vaaet_ml`, `vaaet_feedback` y
 `vaaet_ops`. Este último registra el ciclo de cada workflow sin almacenar
@@ -25,6 +25,8 @@ predictions -> explicit HITL review -> vaaet_feedback.human_validations
 - `data/sample/`: ejemplos pequeños, anónimos y aptos para Git.
 
 ## Instalación local
+
+VAAET ML admite Python 3.10–3.13.
 
 ```bash
 python -m pip install -e ".[vision,training,visualization,database,dev]"

@@ -8,7 +8,7 @@ Complementa USER_GUIDE.md y SAD.md. -->
 | Campo | Detalles |
 |---|---|
 | **Nombre del Proyecto** | VAAET — Video Advanced Analysis of Traffic |
-| **Versión** | 4.5.2 |
+| **Versión** | 4.5.3 |
 | **Estado** | Aprobado |
 | **Responsable Técnico** | Facundo Nicolás González |
 | **Última Revisión** | 2026-07-23 |
@@ -51,7 +51,7 @@ flowchart LR
 
 | Entorno | Plataforma | Propósito | Datos |
 |---|---|---|---|
-| **Desarrollo local** | Python 3.10–3.12 | Desarrollo y testing de `src/vaaet/` | Datos sintéticos, sin GPU |
+| **Desarrollo local** | Python 3.10–3.13 | Desarrollo y testing de `src/vaaet/` | Datos sintéticos, sin GPU |
 | **Google Colab** | Colab Free/Pro | Ejecución de notebooks (entorno principal) | Videos reales, GPU disponible |
 | **CI** | GitHub Actions + PostgreSQL 17 | Validación automática | Tests puros y migración/grants reales, sin GPU |
 

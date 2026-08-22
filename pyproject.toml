@@ -4,11 +4,11 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "vaaet-ml"
-version = "4.5.2"
+version = "4.5.3"
 description = "Video Advanced Analysis of Traffic — Sistema de análisis vehicular avanzado para el Puente Gral. Manuel Belgrano"
 readme = "README.md"
 license = "MIT"
-requires-python = ">=3.10,<3.13"
+requires-python = ">=3.10,<3.14"
 authors = [
     {name = "Facundo Nicolás González"},
 ]
@@ -20,6 +20,7 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
     "Topic :: Scientific/Engineering :: Image Recognition",
 ]
@@ -36,7 +37,8 @@ vision = [
     "ultralytics-opencv-headless>=8.3,<9",
 ]
 training = [
-    "tensorflow>=2.19,<2.21",
+    "tensorflow>=2.19,<2.21; python_version < '3.13'",
+    "tensorflow>=2.20,<2.21; python_version >= '3.13'",
     "imbalanced-learn>=0.13,<1",
 ]
 database = [

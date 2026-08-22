@@ -7,7 +7,7 @@ description: Build, review, refactor, or test professional Python for VAAET Data
 
 ## Apply this operating model
 
-Build production-quality Python 3.10–3.12 for Data Science, computer vision, MLOps, and notebooks. Optimize for correctness, maintainability, observability, testability, and reproducibility—not abstraction for its own sake.
+Build production-quality Python 3.10–3.13 for Data Science, computer vision, MLOps, and notebooks. Optimize for correctness, maintainability, observability, testability, and reproducibility—not abstraction for its own sake.
 
 - Keep notebooks as orchestration and visualization interfaces. Move reusable business logic into `src/vaaet/`; do not mutate `sys.path`.
 - Preserve VAAET layers: settings/contracts/artifacts, data, features, vision, inference, evaluation, and training.

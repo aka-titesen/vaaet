@@ -4,10 +4,10 @@
 
 | Campo | Valor |
 |---|---|
-| Proyecto | VAAET ML 4.5.2 |
+| Proyecto | VAAET ML 4.5.3 |
 | Modelo vigente | `mlp-v2.1` |
 | Estado inicial | Pilot weak-supervision hasta cumplir gates humanos |
-| Runtime | TensorFlow/Keras, Python 3.10–3.12, Google Colab |
+| Runtime | TensorFlow/Keras, Python 3.10–3.13, Google Colab |
 | Artefacto | Bundle DVC contrato v2 |
 
 ## Uso previsto

@@ -7,7 +7,7 @@ description: Configure, review, or harden VAAET Python project setup. Use for vi
 
 ## Preserve VAAET's source of truth
 
-Use `pyproject.toml` as the sole dependency, build, test, and Ruff configuration source. VAAET supports Python 3.10–3.12; do not widen that range without explicit authorization.
+Use `pyproject.toml` as the sole dependency, build, test, and Ruff configuration source. VAAET supports Python 3.10–3.13; do not widen that range without explicit authorization.
 
 Keep its dependency groups intentionally separate:
 

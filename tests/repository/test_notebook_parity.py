@@ -44,6 +44,57 @@ def test_colab_uses_wheel_and_local_uses_editable_install(path: Path) -> None:
 
 
 @pytest.mark.parametrize("path", NOTEBOOKS.values())
+def test_notebook_install_is_captured_strict_and_single(path: Path) -> None:
+    code = _code(path)
+    assert code.count("install_project(install_command, extras=WORKFLOW_EXTRAS)") == 1
+    assert "subprocess.check_call(install_command)" not in code
+    assert "result = subprocess.run(command, capture_output=True, text=True, check=False)" in code
+    assert "----- pip stdout -----" in code
+    assert "----- pip stderr -----" in code
+    assert "runtime 2026.07" in code
+
+
+def _load_setup_function(name: str, namespace: dict[str, object] | None = None) -> object:
+    tree = ast.parse(_code(NOTEBOOKS["collection"]))
+    function = next(
+        node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name == name
+    )
+    module = ast.Module(body=[function], type_ignores=[])
+    execution_namespace = dict(namespace or {})
+    exec(compile(module, name, "exec"), execution_namespace)
+    return execution_namespace[name]
+
+
+def test_runtime_preflight_accepts_supported_versions_and_rejects_future_python() -> None:
+    validate = _load_setup_function("validate_runtime_version")
+    validate((3, 10))  # type: ignore[operator]
+    validate((3, 13))  # type: ignore[operator]
+    with pytest.raises(RuntimeError, match="supports Python 3.10–3.13"):
+        validate((3, 14))  # type: ignore[operator]
+
+
+def test_install_failure_preserves_pip_diagnostics(capsys: pytest.CaptureFixture[str]) -> None:
+    completed = SimpleNamespace(
+        returncode=1,
+        stdout="resolver stdout",
+        stderr="requires-python mismatch",
+    )
+    fake_subprocess = SimpleNamespace(run=lambda *args, **kwargs: completed)
+    fake_sys = SimpleNamespace(version="3.13.1 managed-colab")
+    install = _load_setup_function(
+        "install_project",
+        {"subprocess": fake_subprocess, "sys": fake_sys},
+    )
+
+    with pytest.raises(RuntimeError, match="Python 3.13.1"):
+        install(["python", "-m", "pip", "install"], extras="vision")  # type: ignore[operator]
+
+    output = capsys.readouterr().out
+    assert "resolver stdout" in output
+    assert "requires-python mismatch" in output
+
+
+@pytest.mark.parametrize("path", NOTEBOOKS.values())
 def test_notebook_clears_cache_and_validates_package_origin(path: Path) -> None:
     code = _code(path)
     assert 'module_name == "vaaet"' in code

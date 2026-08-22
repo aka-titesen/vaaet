@@ -1,6 +1,6 @@
 # Modelo PostgreSQL — `vaaet-db-v2`
 
-VAAET ML 4.5.2 usa PostgreSQL 14+ y Alembic como única autoridad DDL. Los
+VAAET ML 4.5.3 usa PostgreSQL 14+ y Alembic como única autoridad DDL. Los
 notebooks nunca crean ni alteran tablas. La revisión vigente encadena la
 [migración base](../../migrations/versions/20260804_0001_postgres_schemas_hitl.py)
 y el [hardening 4.2](../../migrations/versions/20260806_0002_postgres_hardening_pipeline_runs.py).

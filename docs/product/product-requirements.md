@@ -8,7 +8,7 @@ Complementa SAD.md (arquitectura) y KPIs/KPIs.md (métricas). -->
 | Campo | Detalles |
 |---|---|
 | **Nombre del Proyecto** | VAAET — Video Advanced Analysis of Traffic |
-| **Versión** | 4.5.2 |
+| **Versión** | 4.5.3 |
 | **Fecha de Creación** | 2025-03-06 |
 | **Estado** | Aprobado |
 | **Responsable Técnico** | Facundo Nicolás González |

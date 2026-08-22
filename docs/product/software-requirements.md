@@ -9,7 +9,7 @@ y SAD.md (arquitectura). -->
 | Campo | Detalles |
 |---|---|
 | **Nombre del Proyecto** | VAAET — Video Advanced Analysis of Traffic |
-| **Versión** | 4.5.2 |
+| **Versión** | 4.5.3 |
 | **Fecha de Creación** | 2025-03-06 |
 | **Estado** | Aprobado |
 | **Responsable Técnico** | Facundo Nicolás González |
@@ -119,7 +119,7 @@ El sistema realiza cuatro funciones principales:
 
 - Todo código compartido debe residir en `src/` con type hints y docstrings
 - Los notebooks deben ser orquestadores que importan funciones de `src/`
-- El sistema debe ser compatible con Python 3.10–3.12 y Google Colab Free/Pro
+- El sistema debe ser compatible con Python 3.10–3.13 y Google Colab Free/Pro
 - `src/vaaet/settings.py` debe ser la única fuente de verdad para constantes y umbrales
 
 ---

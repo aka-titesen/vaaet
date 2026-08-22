@@ -1,4 +1,4 @@
-# Guía de contribución — VAAET ML 4.0.0
+# Guía de contribución — VAAET ML 4.5.3
 
 Antes de modificar el proyecto, leé [AGENTS.md](AGENTS.md) y el ADR aplicable en
 [`docs/architecture/decisions/`](docs/architecture/decisions/).
@@ -18,7 +18,7 @@ Antes de modificar el proyecto, leé [AGENTS.md](AGENTS.md) y el ADR aplicable e
 
 ## Entorno y calidad
 
-Python soportado: 3.10–3.12.
+Python soportado: 3.10–3.13.
 
 ```bash
 python -m pip install -e ".[vision,training,visualization,dev]"

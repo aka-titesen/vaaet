@@ -2,7 +2,16 @@
 
 ## Runtime
 
-Seleccioná **Runtime > Change runtime type > GPU**. VAAET soporta Python 3.10–3.12 y está preparado para el runtime Colab 2026.04 (Python 3.12, NumPy 2.0 y TensorFlow 2.19). La primera celda muestra versiones, GPU y commit para que cada ejecución sea auditable.
+Seleccioná **Runtime > Change runtime type > GPU**. VAAET soporta Python
+3.10–3.13. Los runtimes administrados actuales pueden exponer Python 3.13; la
+celda de setup valida la versión antes de instalar y usa TensorFlow 2.20 como
+mínimo en ese intérprete. La primera celda muestra versiones, GPU y commit para
+que cada ejecución sea auditable.
+
+Si una incompatibilidad externa impide usar Python 3.13, seleccioná
+temporalmente **Runtime Version 2026.07**, que ofrece Python 3.12.13, NumPy 2.0.2
+y TensorFlow 2.20. No intentes reemplazar Python mediante `apt` o `pip` dentro
+del notebook.
 
 Referencias oficiales: [versiones del runtime de Colab](https://research.google.com/colaboratory/runtime-version-faq.html) e [instalación headless de Ultralytics](https://docs.ultralytics.com/quickstart/).
 
@@ -15,6 +24,13 @@ Referencias oficiales: [versiones del runtime de Colab](https://research.google.
    experimental independiente.
 
 Cada notebook clona o actualiza el repositorio en `/content/vaaet`, define un único `REPO_ROOT` e instala una vez un wheel local con sus extras. La instalación no es editable en Colab porque el nombre `/content/vaaet` puede interpretarse como un paquete namespace y ocultar `src/vaaet`; después de instalar se limpia el caché de módulos y se valida el origen real del paquete. El desarrollo local sí conserva `pip install -e`.
+
+La instalación captura la salida de `pip`. Si falla, la celda muestra stdout y
+stderr completos, la versión de Python y los extras solicitados antes de
+detenerse. No continúes con las celdas siguientes: actualizá el repositorio y
+repetí la celda de setup. Si la sesión quedó con instalaciones parciales,
+reiniciá el runtime y ejecutá `Run All`; como recuperación temporal podés usar
+el runtime 2026.07 indicado arriba.
 
 El diagnóstico `pip check` puede informar inconsistencias globales ajenas a VAAET —por ejemplo, `ipython` sin el paquete opcional `jedi`—; la advertencia se muestra, pero no bloquea los imports explícitos del workflow. En CI, donde el entorno es limpio, `pip check` continúa siendo estricto.
 

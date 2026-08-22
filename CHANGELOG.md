@@ -13,6 +13,17 @@ Todos los cambios relevantes del proyecto VAAET se documentan en este archivo, s
 
 ---
 
+## [4.5.3] - 2026-08-22
+
+### Corregido
+
+- Compatibilidad oficial con Python 3.13 en metadata, dependencias condicionales
+  de TensorFlow y matriz de CI, conservando Python 3.10–3.12.
+- Preflight de runtime en los tres notebooks antes de instalar dependencias.
+- Diagnóstico completo y accionable de stdout/stderr cuando `pip` no puede
+  instalar VAAET en un runtime administrado de Colab.
+- Runtime Colab 2026.07 con Python 3.12.13 documentado como fallback temporal.
+
 ## [4.5.2] - 2026-08-19
 
 ### Corregido

@@ -1,4 +1,4 @@
-# Documentación de VAAET ML 4.5.2
+# Documentación de VAAET ML 4.5.3
 
 ## Puntos de entrada
 
@@ -14,6 +14,7 @@
 - [Operación PostgreSQL](operations/postgresql-guide.md)
 - [Requisitos de producto](product/product-requirements.md)
 - [Plan de pruebas](quality/test-plan.md)
+- [Planes de ejecución gobernados](governance/plans/)
 - [Modelo PostgreSQL](architecture/data-model.md)
 - [ADR-0015: PostgreSQL seguro e HITL](architecture/decisions/0015-postgresql-namespaces-security-and-hitl.md)
 - [ADR-0016: hardening PostgreSQL y ejecuciones](architecture/decisions/0016-postgresql-hardening-and-pipeline-runs.md)

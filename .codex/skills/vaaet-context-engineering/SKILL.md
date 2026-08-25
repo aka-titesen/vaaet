@@ -108,8 +108,9 @@ ACK humano antes de iniciar la siguiente.
 
 ## 2. Versionado y trazabilidad
 
-- Convención vigente: Conventional Commits, por ejemplo
-  `feat(vision): add ordered telemetry persistence`.
+- Convención vigente: Conventional Commits en español argentino rioplatense
+  formal, por ejemplo `feat(vision): incorporá persistencia ordenada de
+  telemetría`.
 - Ticket o issue: prefijarlo o referenciarlo sólo cuando exista una política de
   proyecto que lo requiera.
 - Gitmoji: no usarlo como requisito hasta que una decisión del repositorio lo
@@ -134,7 +135,7 @@ restantes y el comando de commit sugerido; esperar el ACK humano.
 - [ ] <tarea acotada>
 - [ ] <test, migración o validación requerida>
 - Review humano (ACK): Pendiente
-- Commit propuesto: `git commit -m "<type>(<scope>): <resumen imperativo>"`
+- Commit propuesto: `git commit -m "<type>(<scope>): <verbo en voseo formal + resultado>"`
 
 ### [Pendiente] Fase 3: <nombre>
 

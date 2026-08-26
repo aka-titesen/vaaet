@@ -13,6 +13,16 @@ Todos los cambios relevantes del proyecto VAAET se documentan en este archivo, s
 
 ---
 
+## [Unreleased]
+
+### Añadido
+
+- Notebook read-only de evaluación Champion–Challenger para bundles MLP v2,
+  con validación del holdout humano congelado, métricas comparables e intervalos
+  bootstrap reproducibles.
+- Perfil y comparación de deriva de covariables para cohortes
+  `traffic-features-v2`, con controles de calidad, PSI y procedencia.
+
 ## [4.5.3] - 2026-08-22
 
 ### Corregido

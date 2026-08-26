@@ -1,1 +1,1 @@
-"""Evaluation and reporting services."""
+"""Evaluation, Champion--Challenger comparison, drift, and reporting services."""

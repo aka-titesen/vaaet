@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import Iterator, Mapping, Sequence
 
 import pandas as pd
-from sqlalchemy import URL, create_engine, text
+from sqlalchemy import URL, bindparam, create_engine, text
 from sqlalchemy.engine import Engine
 from sqlalchemy.exc import OperationalError, ProgrammingError
 from sqlalchemy.pool import QueuePool
@@ -474,6 +474,67 @@ def load_telemetry(
             active_engine.dispose()
 
 
+def load_telemetry_window(
+    *,
+    start: pd.Timestamp,
+    end: pd.Timestamp,
+    pipeline_run_ids: Sequence[str] = (),
+    clip_ids: Sequence[str] = (),
+    settings: DatabaseSettings | Mapping[str, str] | None = None,
+    engine: Engine | None = None,
+) -> pd.DataFrame:
+    """Load a bounded v2 raw-telemetry cohort through a read-only query.
+
+    The caller must provide a half-open UTC interval. Optional pipeline and clip
+    filters are parameterized rather than interpolated so a notebook cannot turn
+    its configuration into arbitrary SQL.
+    """
+    start_time = pd.Timestamp(start)
+    end_time = pd.Timestamp(end)
+    if start_time.tzinfo is None or end_time.tzinfo is None:
+        raise ValueError("Telemetry window bounds must be timezone-aware.")
+    if end_time <= start_time:
+        raise ValueError("Telemetry window end must be after start.")
+    if any(not isinstance(value, str) or not value.strip() for value in pipeline_run_ids):
+        raise ValueError("Pipeline run filters must be non-empty strings.")
+    if any(not isinstance(value, str) or not value.strip() for value in clip_ids):
+        raise ValueError("Clip filters must be non-empty strings.")
+
+    clauses = ["record_time >= :start", "record_time < :end"]
+    params: dict[str, object] = {"start": start_time, "end": end_time}
+    if pipeline_run_ids:
+        clauses.append("pipeline_run_id IN :pipeline_run_ids")
+        params["pipeline_run_ids"] = list(pipeline_run_ids)
+    if clip_ids:
+        clauses.append("clip_id IN :clip_ids")
+        params["clip_ids"] = list(clip_ids)
+    statement = text(
+        f"""
+SELECT id, pipeline_run_id, clip_id, record_time, avg_speed,
+       count_car, count_truck, count_bus, count_motorcycle, count_bicycle,
+       total_vehicles, near_zero_motion_count, stationary_confirmed_count,
+       rejected_speed_count, recovered_track_count, speed_sample_count,
+       speed_measurement_quality, optical_flow_tracking_ratio,
+       telemetry_schema_version
+FROM {RAW_TABLE}
+WHERE {' AND '.join(clauses)}
+ORDER BY clip_id, record_time
+"""
+    )
+    if pipeline_run_ids:
+        statement = statement.bindparams(bindparam("pipeline_run_ids", expanding=True))
+    if clip_ids:
+        statement = statement.bindparams(bindparam("clip_ids", expanding=True))
+
+    owns_engine = engine is None
+    active_engine = engine or get_engine(settings)
+    try:
+        return pd.read_sql(statement, active_engine, params=params)
+    finally:
+        if owns_engine:
+            active_engine.dispose()
+
+
 def load_human_ground_truth(
     settings: DatabaseSettings | Mapping[str, str] | None = None,
     engine: Engine | None = None,
@@ -732,6 +793,7 @@ __all__ = [
     "load_human_ground_truth",
     "load_reviewer_id",
     "load_telemetry",
+    "load_telemetry_window",
     "parse_sql_dump",
     "parse_sql_dump_tables",
     "restore_backup_to_sql",

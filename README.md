@@ -21,6 +21,7 @@ predictions -> explicit HITL review -> vaaet_feedback.human_validations
 - `notebooks/data-collection/collect_traffic_telemetry.ipynb`: adquisición opcional y reutilizable.
 - `notebooks/training/train_traffic_state_classifier.ipynb`: 19 features, entrenamiento, evaluación y bundle.
 - `notebooks/inference/analyze_traffic_video.ipynb`: video anotado, estado del tráfico y persistencia opcional.
+- `notebooks/evaluation/evaluate_models_and_eda.ipynb`: auditoría read-only Champion--Challenger y drift de las 19 features sobre cohortes explícitas.
 - `src/vaaet/`: lógica compartida instalable; los notebooks sólo orquestan.
 - `data/sample/`: ejemplos pequeños, anónimos y aptos para Git.
 
@@ -53,6 +54,14 @@ versionados bajo Google Drive. Los nuevos registros no alteran ese benchmark;
 una actualización explícita genera otra fotografía y conserva la anterior. El
 fingerprint del holdout queda registrado en el manifiesto del modelo, conforme
 a [ADR-0018](docs/architecture/decisions/0018-versioned-frozen-human-holdouts.md).
+
+Después de entrenar un candidato HITL, el notebook de evaluación carga los dos
+bundles sólo tras validar sus manifiestos y exige el ZIP exacto del holdout cuyo
+fingerprint ambos declaran. Compara exclusivamente los tres estados estables,
+aplica la cadena de serving de cada bundle y presenta diferencias emparejadas;
+no modifica DVC, artefactos, PostgreSQL ni la decisión humana de promoción. Su
+EDA de drift requiere cohortes `traffic-features-v2` y puede leer telemetría v2
+acotada con el perfil `training` de sólo lectura.
 
 La futura Web App pertenece a otro repositorio y consumirá únicamente bundles validados. La [documentación](docs/index.md) y la [guía de Colab](docs/operations/colab-guide.md) describen el flujo completo.
 

@@ -11,6 +11,7 @@
 - [Protocolo de anotación humana](ml/human-annotation-protocol.md)
 - [Guía de usuario](operations/user-guide.md)
 - [Guía de Google Colab](operations/colab-guide.md)
+- [Notebook de evaluación Champion--Challenger](../notebooks/evaluation/evaluate_models_and_eda.ipynb)
 - [Operación PostgreSQL](operations/postgresql-guide.md)
 - [Requisitos de producto](product/product-requirements.md)
 - [Plan de pruebas](quality/test-plan.md)
@@ -29,4 +30,6 @@
 - `governance/`: planificación, seguridad y registros legales.
 
 Los agentes de IA deben leer `AGENTS.md` y `llms.txt` antes de editar. Los tres
-workflows activos son adquisición, entrenamiento e inferencia.
+workflows operacionales son adquisición, entrenamiento e inferencia; el notebook
+de evaluación es un auditor read-only posterior al entrenamiento y no crea un
+`pipeline_run` ni persiste datos.

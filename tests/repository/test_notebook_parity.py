@@ -15,6 +15,8 @@ NOTEBOOKS = {
     "training": REPO_ROOT / "notebooks/training/train_traffic_state_classifier.ipynb",
     "inference": REPO_ROOT / "notebooks/inference/analyze_traffic_video.ipynb",
 }
+EVALUATION_NOTEBOOK = REPO_ROOT / "notebooks/evaluation/evaluate_models_and_eda.ipynb"
+ALL_NOTEBOOKS = {**NOTEBOOKS, "evaluation": EVALUATION_NOTEBOOK}
 
 
 def _code(path: Path) -> str:
@@ -26,7 +28,7 @@ def _code(path: Path) -> str:
     )
 
 
-@pytest.mark.parametrize("path", NOTEBOOKS.values())
+@pytest.mark.parametrize("path", ALL_NOTEBOOKS.values())
 def test_notebook_has_one_editable_install_and_no_import_hacks(path: Path) -> None:
     code = _code(path)
     assert code.count('"-e"') == 1
@@ -34,7 +36,7 @@ def test_notebook_has_one_editable_install_and_no_import_hacks(path: Path) -> No
     assert "install_if_missing" not in code
 
 
-@pytest.mark.parametrize("path", NOTEBOOKS.values())
+@pytest.mark.parametrize("path", ALL_NOTEBOOKS.values())
 def test_colab_uses_wheel_and_local_uses_editable_install(path: Path) -> None:
     code = _code(path)
     assert "install_command.append" in code
@@ -43,7 +45,7 @@ def test_colab_uses_wheel_and_local_uses_editable_install(path: Path) -> None:
     assert code.index("if IN_COLAB:") < code.index("install_command.append")
 
 
-@pytest.mark.parametrize("path", NOTEBOOKS.values())
+@pytest.mark.parametrize("path", ALL_NOTEBOOKS.values())
 def test_notebook_install_is_captured_strict_and_single(path: Path) -> None:
     code = _code(path)
     assert code.count("install_project(install_command, extras=WORKFLOW_EXTRAS)") == 1
@@ -103,7 +105,7 @@ def test_install_failure_preserves_pip_diagnostics(capsys: pytest.CaptureFixture
     assert "requires-python mismatch" in output
 
 
-@pytest.mark.parametrize("path", NOTEBOOKS.values())
+@pytest.mark.parametrize("path", ALL_NOTEBOOKS.values())
 def test_notebook_clears_cache_and_validates_package_origin(path: Path) -> None:
     code = _code(path)
     assert 'module_name == "vaaet"' in code
@@ -141,7 +143,7 @@ def test_origin_validator_accepts_wheel_in_colab(tmp_path: Path) -> None:
     assert result == package_file.resolve()
 
 
-@pytest.mark.parametrize("path", NOTEBOOKS.values())
+@pytest.mark.parametrize("path", ALL_NOTEBOOKS.values())
 def test_notebook_pip_check_is_visible_but_non_blocking(path: Path) -> None:
     code = _code(path)
     assert code.count('"pip", "check"') == 1
@@ -157,9 +159,10 @@ def test_notebooks_keep_workflow_smoke_imports() -> None:
         "collection": ("cv2", "numpy", "pandas", "psycopg2", "sqlalchemy", "torch", "ultralytics"),
         "training": ("joblib", "numpy", "pandas", "psycopg2", "sqlalchemy", "tensorflow"),
         "inference": ("cv2", "joblib", "numpy", "pandas", "psycopg2", "sqlalchemy", "tensorflow", "ultralytics"),
+        "evaluation": ("joblib", "numpy", "pandas", "psycopg2", "sqlalchemy", "tensorflow"),
     }
     for workflow, import_names in expected_imports.items():
-        code = _code(NOTEBOOKS[workflow])
+        code = _code(ALL_NOTEBOOKS[workflow])
         for import_name in import_names:
             assert import_name in code
 
@@ -323,13 +326,30 @@ def test_inference_centralizes_and_documents_supported_workflow_configuration() 
     assert "try:\n    if df_telemetry" not in markdown
 
 
-@pytest.mark.parametrize("path", NOTEBOOKS.values())
+@pytest.mark.parametrize("path", ALL_NOTEBOOKS.values())
 def test_notebook_starts_with_colloquial_quick_start(path: Path) -> None:
     markdown = _markdown(path)
     assert "Usá esta notebook" in markdown
     assert "Inicio rápido recomendado" in markdown
     assert "<details>" in markdown
     assert "</details>" in markdown
+
+
+def test_evaluation_notebook_is_read_only_and_uses_shared_services() -> None:
+    code = _code(EVALUATION_NOTEBOOK)
+    markdown = _markdown(EVALUATION_NOTEBOOK)
+
+    assert "load_evaluation_bundle" in code
+    assert "evaluate_champion_challenger" in code
+    assert "build_feature_cohort_from_raw_telemetry" in code
+    assert "load_telemetry_window" in code
+    assert "DatabaseProfile.TRAINING" in code
+    assert "current.json" in code
+    assert "PipelineRunMetadata" not in code
+    assert "pipeline_run(" not in code
+    assert "persist_" not in code
+    assert "promotion_blockers" in code
+    assert "Accident" in markdown
 
 
 def test_collection_documents_three_complete_safe_recipes() -> None:

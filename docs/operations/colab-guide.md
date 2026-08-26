@@ -19,7 +19,10 @@ Referencias oficiales: [versiones del runtime de Colab](https://research.google.
 
 1. Ejecutá adquisición sólo cuando necesites ampliar la telemetría inicial.
 2. Ejecutá entrenamiento cuando cambie el dataset y revisá el informe de elegibilidad antes de conservar el bundle.
-3. Ejecutá inferencia con un clip y un bundle v2 validado. Un piloto requiere
+3. Ejecutá `notebooks/evaluation/evaluate_models_and_eda.ipynb` para comparar un
+   Champion y un Challenger con el ZIP exacto del holdout humano congelado; sus
+   métricas son read-only y la promoción sigue siendo manual.
+4. Ejecutá inferencia con un clip y un bundle v2 validado. Un piloto requiere
    `ALLOW_PILOT_BUNDLE=True`; un candidato no aprobado requiere una autorización
    experimental independiente.
 
@@ -81,6 +84,7 @@ Después de aprobar un modelo, ejecutá localmente `dvc add artifacts/traffic-st
 - Adquisición: MP4 → MP4 anotado + `data/raw/traffic_data_raw.csv` + `vaaet_raw.traffic_data` opcional.
 - Entrenamiento semilla: raw explícito → 19 features → paquete semilla + bundle piloto.
 - Reentrenamiento HITL: paquete semilla + features validadas → bundle candidato.
+- Evaluación: Champion + Challenger + holdout humano exacto → evidencia comparativa manual.
 - Inferencia: MP4 + bundle → MP4 anotado + features/predicciones PostgreSQL opcionales.
 
 El clasificador sólo consume minutos completos. Durante una ventana parcial se muestra el último estado estable. `Accident` nunca es automático: una evidencia persistente produce `Congested + accident_rule_triggered`; el código 3 exige feedback humano validado.
@@ -159,6 +163,12 @@ Cada workflow registra un `pipeline_run_id`. Con PostgreSQL usa el schema
 `vaaet_ops`; sin conexión genera un manifiesto JSON redactado en
 `data/processed/pipeline-runs/`. Estos manifiestos no contienen rutas privadas,
 credenciales, DSN, certificados ni mensajes de excepción.
+
+El notebook de evaluación no es un workflow operacional ni registra
+`pipeline_run`: sólo carga bundles y cohortes declaradas. Para drift acepta un
+CSV/ZIP con `traffic-features-v2` o consulta `vaaet_raw.traffic_data` con el
+perfil `training`, intervalo UTC `[inicio, fin)` y filtros explícitos de clips o
+ejecuciones. Nunca acepta `current.json` como sustituto del ZIP de holdout exacto.
 
 El cliente es una dependencia del sistema operativo y por eso no forma parte de `pyproject.toml`. Si PGDG no está disponible o la instalación falla, cargá `traffic_data_raw.csv`; el notebook conserva el diagnóstico original y no continúa con datos vacíos.
 

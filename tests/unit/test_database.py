@@ -17,12 +17,59 @@ from vaaet.data.database import (
     DatabaseProfile,
     DatabaseSettings,
     _settings_url,
+    load_telemetry_window,
 )
 
 
 def test_human_ground_truth_uses_effective_validated_label() -> None:
     normalized = " ".join(HUMAN_GROUND_TRUTH_QUERY.split())
     assert "vaaet_feedback.effective_human_labels" in normalized
+
+
+def test_telemetry_window_requires_aware_ordered_bounds() -> None:
+    with pytest.raises(ValueError, match="timezone-aware"):
+        load_telemetry_window(
+            start=pd.Timestamp("2026-01-01"),
+            end=pd.Timestamp("2026-01-02"),
+        )
+    with pytest.raises(ValueError, match="end must be after start"):
+        load_telemetry_window(
+            start=pd.Timestamp("2026-01-02T00:00:00Z"),
+            end=pd.Timestamp("2026-01-01T00:00:00Z"),
+        )
+
+
+def test_telemetry_window_binds_optional_filters_without_sql_interpolation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: dict[str, object] = {}
+
+    def fake_read_sql(statement, engine, *, params):
+        captured["statement"] = str(statement)
+        captured["engine"] = engine
+        captured["params"] = params
+        return pd.DataFrame({"clip_id": ["clip-a"]})
+
+    monkeypatch.setattr("vaaet.data.database.pd.read_sql", fake_read_sql)
+    engine = object()
+    result = load_telemetry_window(
+        start=pd.Timestamp("2026-01-01T00:00:00Z"),
+        end=pd.Timestamp("2026-01-02T00:00:00Z"),
+        pipeline_run_ids=("run-a",),
+        clip_ids=("clip-a",),
+        engine=engine,  # type: ignore[arg-type]
+    )
+
+    assert result["clip_id"].tolist() == ["clip-a"]
+    assert captured["engine"] is engine
+    assert "pipeline_run_id IN" in str(captured["statement"])
+    assert "clip_id IN" in str(captured["statement"])
+    assert captured["params"] == {
+        "start": pd.Timestamp("2026-01-01T00:00:00Z"),
+        "end": pd.Timestamp("2026-01-02T00:00:00Z"),
+        "pipeline_run_ids": ["run-a"],
+        "clip_ids": ["clip-a"],
+    }
 
 
 class TestBuildConnectionUrl:

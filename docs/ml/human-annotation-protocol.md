@@ -12,4 +12,4 @@ revisado y nota; una alerta automática nunca constituye ground truth. El holdou
 marcado como `test` queda congelado y no puede utilizarse para ajustar reglas,
 umbrales, calibración o arquitectura.
 
-La plantilla canónica está en `data/sample/traffic-state-annotation-template.csv`.
+La plantilla canónica está en `vaaet-ml/data/sample/traffic-state-annotation-template.csv`.

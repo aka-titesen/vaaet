@@ -15,7 +15,7 @@ Fuentes revisadas:
 
 - [ADR-0013](../../architecture/decisions/0013-on-demand-data-collection-workflow.md)
   a [ADR-0019](../../architecture/decisions/0019-immutable-seed-and-hitl-datasets.md).
-- `pyproject.toml`, los tres notebooks activos y `.github/workflows/ci.yml`.
+- `vaaet-ml/pyproject.toml`, los tres notebooks activos y `.github/workflows/ci.yml`.
 - [Guía de Colab](../../operations/colab-guide.md) y contexto raíz del repositorio.
 
 Invariantes: no cambiar las 19 features, MLP, estados públicos, umbrales,

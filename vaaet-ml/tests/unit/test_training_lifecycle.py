@@ -6,8 +6,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from vaaet.settings import FEATURE_COLS
-from vaaet.training.lifecycle import (
+from vaaet_ml.settings import FEATURE_COLS
+from vaaet_ml.training.lifecycle import (
     LEGACY_NEUTRAL_FEATURES,
     ModelInputPolicy,
     TrainingMode,

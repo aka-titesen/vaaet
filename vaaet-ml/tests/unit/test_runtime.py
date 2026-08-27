@@ -4,10 +4,10 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
-
-from vaaet import runtime
 from vaaet.exceptions import RuntimeConfigurationError
-from vaaet.runtime import (
+
+from vaaet_ml import runtime
+from vaaet_ml.runtime import (
     _framework_gpu_available,
     _nvidia_smi,
     _pip_check,
@@ -29,13 +29,16 @@ def test_validate_python_version_rejects_unsupported_runtime() -> None:
 def test_package_origin_rejects_namespace_package(tmp_path: Path) -> None:
     package = SimpleNamespace(__file__=None, __path__=[str(tmp_path / "vaaet")])
     with pytest.raises(RuntimeConfigurationError, match="namespace package"):
-        _validate_package_origin(package, tmp_path, True)
+        _validate_package_origin(package, tmp_path, "vaaet", True)
 
 
 def test_package_origin_accepts_colab_wheel(tmp_path: Path) -> None:
     package_file = tmp_path / "site-packages" / "vaaet" / "__init__.py"
     package = SimpleNamespace(__file__=str(package_file), __path__=[str(package_file.parent)])
-    assert _validate_package_origin(package, tmp_path / "workspace" / "vaaet-ml", True) == package_file.resolve()
+    assert (
+        _validate_package_origin(package, tmp_path / "workspace" / "vaaet-ml", "vaaet", True)
+        == package_file.resolve()
+    )
 
 
 def test_gpu_preflight_rejects_an_unknown_framework() -> None:

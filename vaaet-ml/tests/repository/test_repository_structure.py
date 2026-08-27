@@ -32,7 +32,7 @@ def test_training_and_ingestion_modules_import_without_cycles() -> None:
         [
             sys.executable,
             "-c",
-            "import vaaet.data.ingestion; import vaaet.training.partitions; "
+            "import vaaet_ml.data.ingestion; import vaaet_ml.training.partitions; "
             "import vaaet.inference.traffic_state",
         ],
         cwd=REPO_ROOT,
@@ -127,7 +127,7 @@ def test_active_notebooks_use_canonical_feature_count_and_repository_root() -> N
         assert 'WORKSPACE_DIR = Path("/content/vaaet")' in code
         assert 'ML_ROOT = WORKSPACE_DIR / "vaaet-ml"' in code
         assert "REPO_ROOT" in code
-        assert code.count('"-e"') == 1
+        assert code.count('"-e"') == 2
     diagram = (
         WORKSPACE_ROOT / "docs" / "architecture" / "diagrams" / "intelligence-pipeline.md"
     ).read_text(encoding="utf-8")
@@ -176,13 +176,15 @@ def test_removed_directories_are_absent() -> None:
 
 def test_notebook_extras_match_workflows() -> None:
     expected = {
-        "collect_traffic_telemetry.ipynb": "vision,database",
-        "train_traffic_state_classifier.ipynb": "training,visualization,database",
-        "analyze_traffic_video.ipynb": "vision,training,visualization,database",
+        "collect_traffic_telemetry.ipynb": ("vision", "database"),
+        "train_traffic_state_classifier.ipynb": ("inference", "training,visualization,database"),
+        "analyze_traffic_video.ipynb": ("vision,inference", "visualization,database"),
     }
     for notebook in ACTIVE_NOTEBOOKS:
         code = _concatenate_code_cells(notebook)
-        assert f'WORKFLOW_EXTRAS = "{expected[notebook.name]}"' in code
+        core_extras, ml_extras = expected[notebook.name]
+        assert f'CORE_REQUIREMENT = f"{{CORE_ROOT}}[{core_extras}]"' in code
+        assert f'ML_REQUIREMENT = f"{{ML_ROOT}}[{ml_extras}]"' in code
 
 
 def test_python_313_is_declared_and_exercised_by_ci() -> None:
@@ -205,7 +207,7 @@ def test_active_code_uses_semantic_telemetry_contract_names() -> None:
 
 
 def test_active_database_queries_do_not_select_star() -> None:
-    for path in REPO_ROOT.joinpath("src", "vaaet", "data").glob("*.py"):
+    for path in REPO_ROOT.joinpath("src", "vaaet_ml", "data").glob("*.py"):
         assert "SELECT *" not in path.read_text(encoding="utf-8").upper()
 
 
@@ -214,5 +216,8 @@ def test_monorepo_keeps_single_shared_workspace_roots() -> None:
     assert (WORKSPACE_ROOT / ".dvc").is_dir()
     assert (WORKSPACE_ROOT / "docs").is_dir()
     assert (WORKSPACE_ROOT / "vaaet-app" / "README.md").is_file()
+    assert (WORKSPACE_ROOT / "vaaet-core" / "pyproject.toml").is_file()
+    assert (WORKSPACE_ROOT / "vaaet-core" / "src" / "vaaet").is_dir()
     assert (ML_ROOT / "pyproject.toml").is_file()
+    assert (ML_ROOT / "src" / "vaaet_ml").is_dir()
     assert (ML_ROOT / "artifacts" / "traffic-state").is_dir()

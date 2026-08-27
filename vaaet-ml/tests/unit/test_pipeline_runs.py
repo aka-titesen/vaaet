@@ -6,7 +6,7 @@ import json
 
 import pytest
 
-from vaaet.data.pipeline_runs import (
+from vaaet_ml.data.pipeline_runs import (
     PipelineRunMetadata,
     PipelineWorkflow,
     pipeline_run,

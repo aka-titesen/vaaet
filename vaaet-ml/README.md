@@ -22,7 +22,9 @@ predictions -> explicit HITL review -> vaaet_feedback.human_validations
 - `notebooks/training/train_traffic_state_classifier.ipynb`: 19 features, entrenamiento, evaluación y bundle.
 - `notebooks/inference/analyze_traffic_video.ipynb`: video anotado, estado del tráfico y persistencia opcional.
 - `notebooks/evaluation/evaluate_models_and_eda.ipynb`: auditoría read-only Champion--Challenger y drift de las 19 features sobre cohortes explícitas.
-- `src/vaaet/`: lógica compartida instalable; los notebooks sólo orquestan.
+- `../vaaet-core/src/vaaet/`: lógica portable de percepción, telemetría,
+  clasificación y bundles; los notebooks la importan como `vaaet`.
+- `src/vaaet_ml/`: datos, entrenamiento, evaluación y runtime de laboratorio.
 - `data/sample/`: ejemplos pequeños, anónimos y aptos para Git.
 
 ## Instalación local
@@ -30,13 +32,19 @@ predictions -> explicit HITL review -> vaaet_feedback.human_validations
 VAAET ML admite Python 3.10–3.13.
 
 ```bash
-python -m pip install -e ".[vision,training,visualization,database,dev]"
+python -m pip install -e "../vaaet-core[vision,inference,dev]"
+python -m pip install -e ".[training,visualization,database,dev]"
 python -m pip check
 ruff check src tests scripts
 pytest
 ```
 
-Cada notebook tiene una sola celda de preparación: clona o actualiza `https://github.com/zgfnicolas/vaaet` en `/content/vaaet`, resuelve `ML_ROOT=/content/vaaet/vaaet-ml`, instala sólo sus extras y ejecuta el preflight tipado (origen instalado, commit, framework/GPU, `nvidia-smi`, RAM, disco y `pip check`). Los imports del workflow siguen siendo obligatorios y CI mantiene `pip check` estricto. No se usan `requirements.txt`, `sys.path` ni instaladores ad hoc.
+Cada notebook tiene una sola celda de preparación: clona o actualiza
+`https://github.com/zgfnicolas/vaaet` en `/content/vaaet`, resuelve
+`CORE_ROOT=/content/vaaet/vaaet-core` y `ML_ROOT=/content/vaaet/vaaet-ml`,
+instala ambos componentes con los extras del workflow y ejecuta el preflight
+tipado. Los imports operativos usan `vaaet`; los de laboratorio, `vaaet_ml`.
+No se usan `requirements.txt`, `sys.path` ni instaladores ad hoc.
 
 ## Contrato del modelo
 

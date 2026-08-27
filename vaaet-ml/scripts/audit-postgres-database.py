@@ -10,7 +10,7 @@ from typing import Any
 from sqlalchemy import text
 from sqlalchemy.engine import Connection
 
-from vaaet.data.database import (
+from vaaet_ml.data.database import (
     DatabaseProfile,
     database_engine,
     load_database_settings,

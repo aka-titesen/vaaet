@@ -5,7 +5,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from vaaet.evaluation.reporting import (
+from vaaet_ml.evaluation.reporting import (
     build_class_support_notes,
     build_classification_support_table,
     expected_confusion_cost,

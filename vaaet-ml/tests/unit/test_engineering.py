@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
-
 from vaaet.features.engineering import engineer_features
-from vaaet.features.synthetic import augment_with_synthetic
-from vaaet.settings import DATA_ORIGIN_COL, FEATURE_COLS, SYNTHETIC_SCENARIO_COL
+
+from vaaet_ml.features.synthetic import augment_with_synthetic
+from vaaet_ml.settings import DATA_ORIGIN_COL, FEATURE_COLS, SYNTHETIC_SCENARIO_COL
 
 
 class TestEngineerFeatures:

@@ -1,6 +1,8 @@
 # Arquitectura de software — VAAET ML 4.5.3
 
-VAAET ML es un pipeline MLOps batch con adquisición bajo demanda, entrenamiento, inferencia y feedback. Colab orquesta ejecuciones manuales; el paquete `vaaet` concentra lógica comprobable y `vaaet-ml/pyproject.toml` es la única fuente de dependencias.
+VAAET separa un core operativo portable de un laboratorio MLOps batch. Colab
+orquesta ejecuciones manuales; `vaaet-core` expone `vaaet` y `vaaet-ml` expone
+`vaaet_ml` para datos, entrenamiento, evaluación y notebooks.
 
 ```mermaid
 flowchart LR
@@ -26,15 +28,17 @@ flowchart LR
 | Capa | Ruta | Responsabilidad |
 |---|---|---|
 | Orquestación | `vaaet-ml/notebooks/` | UI Colab, selección de entradas y descargas |
-| Visión | `vaaet-ml/src/vaaet/vision/` | YOLO, tracking, flujo óptico, velocidad, HUD y telemetría |
-| Features | `vaaet-ml/src/vaaet/features/` | 19 features, etiquetas y datos sintéticos trazables |
-| Inferencia | `vaaet-ml/src/vaaet/inference/` | MLP de tres estados, histéresis y candidato conservador de incidente |
-| Datos | `vaaet-ml/src/vaaet/data/` | CSV, PostgreSQL, snapshots, catálogo HITL e input locks |
-| Contratos | `contracts.py`, `artifacts.py` | Esquemas y bundle portable |
-| Evaluación | `vaaet-ml/src/vaaet/evaluation/` | Calibración y reporting |
-| Entrenamiento | `vaaet-ml/src/vaaet/training/` | Modos seed/HITL, memoria proxy, holdout versionado y balanceo conservador |
+| Core operativo | `vaaet-core/src/vaaet/` | Visión, telemetría, 19 features, estados, contratos e inferencia manifest-first |
+| Datos de laboratorio | `vaaet-ml/src/vaaet_ml/data/` | CSV, PostgreSQL, snapshots, catálogo HITL e input locks |
+| Evaluación | `vaaet-ml/src/vaaet_ml/evaluation/` | Comparación, drift y reporting |
+| Entrenamiento | `vaaet-ml/src/vaaet_ml/training/` | Modos seed/HITL, memoria proxy, holdout y balanceo |
+| Features sintéticas | `vaaet-ml/src/vaaet_ml/features/` | Datos trazables exclusivamente de entrenamiento |
 
-`vaaet.vision.analysis.analyze_video()` es el límite común entre adquisición e inferencia. Sin proveedor de predicción muestra “Telemetry Collection”; con proveedor incorpora estado y confianza. El módulo no importa TensorFlow.
+`vaaet.vision.analysis.analyze_video()` es el límite común entre adquisición e
+inferencia. `TrafficStateEngine` encapsula la clasificación por minuto sobre un
+bundle ya validado; no implementa I/O remoto, colas ni persistencia. Sin
+proveedor de predicción muestra “Telemetry Collection”; con proveedor incorpora
+estado y confianza. El módulo no importa TensorFlow.
 
 El notebook de entrenamiento expone dos entradas explícitas que convergen antes
 del split: `SEED_BOOTSTRAP` calcula features desde raw y produce un piloto;
@@ -48,13 +52,15 @@ exacta en un input lock. El mismo `input_policy` del manifiesto se usa en servin
 - Google Drive transporta el bundle y conserva semilla, sesiones HITL, input locks y holdouts humanos entre sesiones Colab.
 - DVC versiona el directorio `vaaet-ml/artifacts/traffic-state` como una unidad.
 - Los pesos YOLO se descargan en runtime y no pertenecen al repositorio.
-- La futura Web App vivirá en `vaaet-app/`, consumirá únicamente una API versionada
-  y nunca accederá directamente a bundles, DVC, Drive, PostgreSQL ni `vaaet-ml`.
+- La futura Web App vivirá en `vaaet-app/`, consumirá únicamente una API
+  versionada y nunca accederá directamente a bundles, DVC, Drive, PostgreSQL ni
+  módulos Python. Los workers de API usarán `vaaet-core`; el adaptador API será
+  dueño de trabajos asíncronos, storage y persistencia.
 
 ## Calidad
 
 GitHub Actions cubre Python 3.10–3.13, instalación de todos los extras, `pip check`, smoke imports, Ruff, pytest, compilación de tres notebooks, enlaces, DVC y ausencia de binarios ML en Git. GPU, Drive, videos reales y PostgreSQL se validan manualmente en Colab.
 
-Decisiones principales: [ADR-0009](decisions/0009-modular-three-stage-architecture.md), [ADR-0010](decisions/0010-mlops-pipeline-19-features.md), [ADR-0012](decisions/0012-ml-web-boundary-and-artifact-contract.md), [ADR-0013](decisions/0013-on-demand-data-collection-workflow.md), [ADR-0014](decisions/0014-hierarchical-traffic-state-and-incident-policy.md), [ADR-0015](decisions/0015-postgresql-namespaces-security-and-hitl.md), [ADR-0016](decisions/0016-postgresql-hardening-and-pipeline-runs.md), [ADR-0017](decisions/0017-seed-bootstrap-and-hitl-retraining.md), [ADR-0018](decisions/0018-versioned-frozen-human-holdouts.md) y [ADR-0019](decisions/0019-immutable-seed-and-hitl-datasets.md).
+Decisiones principales: [ADR-0009](decisions/0009-modular-three-stage-architecture.md), [ADR-0010](decisions/0010-mlops-pipeline-19-features.md), [ADR-0013](decisions/0013-on-demand-data-collection-workflow.md), [ADR-0014](decisions/0014-hierarchical-traffic-state-and-incident-policy.md), [ADR-0015](decisions/0015-postgresql-namespaces-security-and-hitl.md), [ADR-0016](decisions/0016-postgresql-hardening-and-pipeline-runs.md), [ADR-0017](decisions/0017-seed-bootstrap-and-hitl-retraining.md), [ADR-0018](decisions/0018-versioned-frozen-human-holdouts.md), [ADR-0019](decisions/0019-immutable-seed-and-hitl-datasets.md) y [ADR-0021](decisions/0021-portable-core-and-ml-laboratory-boundary.md).
 
 Los diagramas complementarios están en el [índice de diagramas](diagrams/index.md).

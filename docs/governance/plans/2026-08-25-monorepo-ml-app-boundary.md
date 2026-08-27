@@ -41,7 +41,7 @@ se mezclan con cambios de comportamiento ML.
 
 ### [Completada] Fase 3: orquestación y operaciones Colab
 
-- [x] Extraer bootstrap, diagnóstico y configuraciones tipadas a `vaaet-ml/src/vaaet/`.
+- [x] Extraer bootstrap, diagnóstico y configuraciones tipadas al core y al laboratorio.
 - [x] Reducir las celdas de notebooks y comprobar `Run All` seguro.
 - Evidencia: auditor de cuatro notebooks sin errores ni celdas largas; compileall y
       enlaces Markdown correctos. Ruff y pytest siguen pendientes del entorno `.venv`

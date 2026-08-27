@@ -1,6 +1,6 @@
 # ADR-0020: Monorepo Git único y límite de aplicación
 
-- Estado: aceptada
+- Estado: aceptada; actualizada por ADR-0021 para la separación core/laboratorio
 - Fecha: 2026-08-25
 - Decisores: Facundo Nicolás González
 - Sustituye: la decisión multi-repo de ADR-0012; conserva su contrato portable
@@ -25,8 +25,9 @@ vaaet/
 └─ .github/        # automatización de raíz
 ```
 
-`vaaet-ml` conserva la distribución `vaaet-ml`, el paquete importable `vaaet`,
-los extras declarados en su `pyproject.toml` y todos los contratos ML vigentes.
+La distribución `vaaet-ml` y los contratos ML vigentes se conservan. La
+propiedad del import portable `vaaet` y la separación `vaaet_ml` de laboratorio
+se definen en ADR-0021.
 El bundle v2 de cuatro archivos continúa siendo el único intercambio entre ML y
 serving. DVC conserva sus remotos en la raíz y gobierna
 `vaaet-ml/artifacts/traffic-state/` como una unidad atómica.
@@ -46,7 +47,7 @@ accederá a PostgreSQL, DVC, Google Drive, binarios ML ni módulos Python.
 - La reubicación no promociona artefactos ni cambia su elegibilidad, lineage,
   snapshots, holdouts, catálogos o input locks.
 - Los notebooks continúan siendo orquestadores Colab y la lógica reutilizable
-  permanece en `src/vaaet/` dentro de `vaaet-ml`.
+  se separa en el core portable y el laboratorio según ADR-0021.
 
 ## Consecuencias
 

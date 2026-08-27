@@ -3,8 +3,8 @@ from __future__ import annotations
 import pandas as pd
 import pytest
 
-from vaaet.data.datasets import grouped_temporal_train_validation_test_split
-from vaaet.evaluation.dataset_validation import (
+from vaaet_ml.data.datasets import grouped_temporal_train_validation_test_split
+from vaaet_ml.evaluation.dataset_validation import (
     audit_training_dataset,
     validate_training_partitions,
 )

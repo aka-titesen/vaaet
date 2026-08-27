@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pandas as pd
 
-from vaaet.data.review import prepare_inference_review
+from vaaet_ml.data.review import prepare_inference_review
 
 
 def test_disabled_review_has_no_queue_or_persistence(capsys) -> None:

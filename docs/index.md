@@ -4,6 +4,7 @@
 
 - [Arquitectura de software](architecture/software-architecture.md)
 - [ADR-0020: monorepo ML y frontera de aplicación](architecture/decisions/0020-single-git-monorepo-and-application-boundary.md)
+- [ADR-0021: core portable y laboratorio ML](architecture/decisions/0021-portable-core-and-ml-laboratory-boundary.md)
 - [Contrato del bundle](ml/model-artifact-contract.md)
 - [ADR de inicio semilla y HITL](architecture/decisions/0017-seed-bootstrap-and-hitl-retraining.md)
 - [ADR de holdout humano congelado](architecture/decisions/0018-versioned-frozen-human-holdouts.md)

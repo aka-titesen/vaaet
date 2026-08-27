@@ -7,7 +7,7 @@ import pytest
 matplotlib = pytest.importorskip("matplotlib")
 matplotlib.use("Agg")
 
-from vaaet.evaluation.reporting import (  # noqa: E402
+from vaaet_ml.evaluation.reporting import (  # noqa: E402
     plot_training_evaluation,
     plot_training_history,
     show_inference_dashboard,

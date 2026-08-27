@@ -21,7 +21,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from vaaet.data.database import load_from_backup
+from vaaet_ml.data.database import load_from_backup
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 

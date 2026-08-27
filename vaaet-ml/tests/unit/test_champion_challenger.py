@@ -5,16 +5,16 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import pytest
-
 from vaaet.artifacts import FEATURE_SCHEMA_VERSION
-from vaaet.evaluation.champion_challenger import (
+
+from vaaet_ml.evaluation.champion_challenger import (
     EvaluationBundle,
     evaluate_champion_challenger,
     paired_bootstrap_intervals,
     validate_evaluation_pair,
 )
-from vaaet.settings import FEATURE_COLS
-from vaaet.training.holdout import HumanHoldoutConfig, resolve_human_holdout
+from vaaet_ml.settings import FEATURE_COLS
+from vaaet_ml.training.holdout import HumanHoldoutConfig, resolve_human_holdout
 
 
 class _IdentityScaler:

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pandas as pd
 
-from vaaet.data.datasets import (
+from vaaet_ml.data.datasets import (
     CANONICAL_RAW_TELEMETRY_COLUMNS,
     build_group_ids,
     group_aware_train_test_split,

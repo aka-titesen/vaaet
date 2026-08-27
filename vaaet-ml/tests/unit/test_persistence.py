@@ -5,7 +5,7 @@ from __future__ import annotations
 import pandas as pd
 import pytest
 
-from vaaet.data.persistence import (
+from vaaet_ml.data.persistence import (
     INSERT_RAW_SQL,
     UPSERT_FEATURE_SQL,
     UPSERT_PREDICTION_SQL,

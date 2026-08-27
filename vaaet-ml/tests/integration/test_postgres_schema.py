@@ -10,14 +10,14 @@ import pytest
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import IntegrityError
 
-from vaaet.data.ingestion import (
+from vaaet_ml.data.ingestion import (
     PostgresBackupSource,
     TrainingIngestionPlan,
     load_training_inputs,
 )
-from vaaet.data.persistence import persist_classified_telemetry
-from vaaet.data.review import HumanValidation, persist_human_validation
-from vaaet.training.lifecycle import TrainingMode
+from vaaet_ml.data.persistence import persist_classified_telemetry
+from vaaet_ml.data.review import HumanValidation, persist_human_validation
+from vaaet_ml.training.lifecycle import TrainingMode
 
 ADMIN_URL = os.getenv("VAAET_DATABASE_ADMIN_URL")
 pytestmark = pytest.mark.postgres

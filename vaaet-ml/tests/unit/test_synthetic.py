@@ -4,17 +4,17 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
-
-from vaaet.data.timestamps import normalize_timestamp_series, traffic_local_hour
-from vaaet.evaluation.dataset_validation import audit_training_dataset
 from vaaet.features.engineering import engineer_features
-from vaaet.features.synthetic import (
+from vaaet.timestamps import normalize_timestamp_series, traffic_local_hour
+
+from vaaet_ml.evaluation.dataset_validation import audit_training_dataset
+from vaaet_ml.features.synthetic import (
     SYNTHETIC_ID_OFFSET,
     augment_with_synthetic,
     generate_accident_sequences,
     generate_congestion_sequences,
 )
-from vaaet.settings import (
+from vaaet_ml.settings import (
     DATA_ORIGIN_COL,
     LABELING_THRESHOLDS,
     RANDOM_SEED,

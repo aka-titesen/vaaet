@@ -78,12 +78,12 @@ El sistema realiza cuatro funciones principales:
 | RF-004 | Tracking persistente | El sistema debe mantener IDs únicos por vehículo usando SORT con distancia euclidiana máxima de 100px y mismo tipo de vehículo. | P0 |
 | RF-005 | Estimación de velocidad | El sistema debe estimar velocidad individual por vehículo usando: compensación de flujo óptico, corrección de perspectiva por zona Y, filtros de plausibilidad por tipo de vehículo, y agregación robusta por minuto. | P0 |
 | RF-006 | Detección de estacionarios | El sistema debe clasificar vehículos como estacionarios mediante conjunción AND de 6 criterios estadísticos con histéresis de entrada/salida. | P1 |
-| RF-007 | Feature engineering | El sistema debe transformar la telemetría cruda en 19 features según `vaaet-ml/src/vaaet/settings.py:FEATURE_COLS`. | P0 |
+| RF-007 | Feature engineering | El sistema debe transformar la telemetría cruda en 19 features según `vaaet-core/src/vaaet/settings.py:FEATURE_COLS`. | P0 |
 | RF-008 | Clasificación jerárquica | El MLP debe emitir Normal/Reduced/Congested; Accident sólo puede resultar de un override humano validado. | P0 |
-| RF-009 | Persistencia en BD | El sistema debe persistir mediante `vaaet-ml/src/vaaet/data/persistence.py` con upsert idempotente y degradación limpia sin BD. | P1 |
+| RF-009 | Persistencia en BD | El laboratorio debe persistir mediante `vaaet-ml/src/vaaet_ml/data/persistence.py` con upsert idempotente y degradación limpia sin BD. | P1 |
 | RF-010 | Video anotado | El sistema debe generar un video de salida con bounding boxes, tipo + ID, velocidad, y HUD informativo. | P1 |
 | RF-011 | Soporte multi-cámara | El sistema debe detectar automáticamente layouts de 1, 2 o 4 cámaras y procesar cada ROI independientemente. | P1 |
-| RF-012 | Auto-etiquetado | El sistema debe asignar etiquetas usando reglas calibradas (ver `vaaet-ml/src/vaaet/settings.py:LABELING_THRESHOLDS`). | P0 |
+| RF-012 | Auto-etiquetado | El sistema debe asignar etiquetas usando reglas calibradas (ver `vaaet-core/src/vaaet/settings.py:LABELING_THRESHOLDS`). | P0 |
 | RF-013 | Datos sintéticos trazables | Congested sintético sólo puede entrar en train con peso reducido; Accident sintético sólo prueba el detector. | P1 |
 | RF-014 | HITL | Revisión agrega validaciones append-only y entrenamiento consume sólo `effective_human_labels`. | P0 |
 
@@ -120,7 +120,7 @@ El sistema realiza cuatro funciones principales:
 - Todo código compartido debe residir en `src/` con type hints y docstrings
 - Los notebooks deben ser orquestadores que importan funciones de `src/`
 - El sistema debe ser compatible con Python 3.10–3.13 y Google Colab Free/Pro
-- `vaaet-ml/src/vaaet/settings.py` debe ser la única fuente de verdad para constantes y umbrales
+- `vaaet-core/src/vaaet/settings.py` es la fuente de verdad para constantes y umbrales algorítmicos
 
 ---
 

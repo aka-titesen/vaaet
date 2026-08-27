@@ -52,11 +52,14 @@ print(manifest["model_version"])
 
 ## Google Colab
 
-Los notebooks copian siempre los cuatro archivos. Si se usa DVC directamente:
+Los notebooks copian siempre los cuatro archivos y no instalan DVC por separado.
+La administración de DVC se realiza localmente desde el workspace:
 
-```python
-!pip install -q "dvc[gdrive]>=3.50.0"
-!dvc pull vaaet-ml/artifacts/traffic-state.dvc
+```bash
+python -m pip install -e "./vaaet-core"
+python -m pip install -e "./vaaet-ml[dvc]"
+python -m pip check
+dvc pull vaaet-ml/artifacts/traffic-state.dvc
 ```
 
 Google Drive es el remote predeterminado; S3 y local son alternativas declaradas

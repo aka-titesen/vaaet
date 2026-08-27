@@ -3,6 +3,8 @@
 Este directorio contiene herramientas auxiliares; no forma parte del runtime de
 los notebooks.
 
+- `notebook_bootstrap.py`: resuelve los extras declarados y refresca los dos
+  paquetes desde el checkout antes del preflight de cada notebook.
 - `convert-postgres-backup.py`: convierte un backup PostgreSQL a CSV para Colab.
 - `export-training-dataset.py`: crea y verifica `vaaet-training-dataset-v1.zip` desde exports CSV administrativos.
 - `evaluate-telemetry-exports.py`: compara resultados exportados de telemetría.

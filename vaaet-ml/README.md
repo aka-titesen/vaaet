@@ -31,12 +31,18 @@ predictions -> explicit HITL review -> vaaet_feedback.human_validations
 
 VAAET ML admite Python 3.10–3.13.
 
+Desde la raíz del monorepo, creá y activá una `.venv` aislada. Instalá primero
+el core y luego el laboratorio, siempre con `python -m pip`:
+
 ```bash
-python -m pip install -e "../vaaet-core[vision,inference,dev]"
-python -m pip install -e ".[training,visualization,database,dev]"
+python -m venv .venv
+# Activá .venv con tu shell.
+python -m pip install --upgrade pip
+python -m pip install -e "./vaaet-core[vision,inference,dev]"
+python -m pip install -e "./vaaet-ml[training,visualization,database,dev]"
 python -m pip check
-ruff check src tests scripts
-pytest
+ruff check vaaet-ml/src vaaet-ml/tests vaaet-ml/scripts
+pytest vaaet-ml/tests
 ```
 
 Cada notebook tiene una sola celda de preparación: clona o actualiza
@@ -45,6 +51,8 @@ Cada notebook tiene una sola celda de preparación: clona o actualiza
 instala ambos componentes con los extras del workflow y ejecuta el preflight
 tipado. Los imports operativos usan `vaaet`; los de laboratorio, `vaaet_ml`.
 No se usan `requirements.txt`, `sys.path` ni instaladores ad hoc.
+Para administrar el bundle DVC desde una máquina local, instalá el extra
+`./vaaet-ml[dvc]`; los notebooks no instalan DVC por separado.
 
 ## Contrato del modelo
 

@@ -8,5 +8,9 @@ La futura API instalará `../vaaet-core`, validará el bundle v2 mediante
 contrato HTTP versionado. La Web App consumirá exclusivamente esa API; no debe
 acceder a PostgreSQL, DVC, Google Drive, artefactos binarios ni módulos Python.
 
+No se puede desplegar una API que ejecute `vaaet-core[vision]` hasta verificar
+una licencia Ultralytics Enterprise aplicable fuera de Git. Consultá el
+[registro de licencias de terceros](../docs/governance/third-party-licenses.md).
+
 La arquitectura está gobernada por
 [ADR-0021](../docs/architecture/decisions/0021-portable-core-and-ml-laboratory-boundary.md).

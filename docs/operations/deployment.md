@@ -65,18 +65,26 @@ Se activa mediante **push** o **pull request** a `main`.
 
 Pipeline definido en `.github/workflows/ci.yml`:
 
-1. **Instalación**: `pip install -e ".[vision,training,visualization,database,dev]"`
-2. **Consistencia**: `pip check` y smoke imports
-3. **Calidad**: Ruff y `pytest tests/ -v --tb=short`
-4. **Notebooks**: compilación de adquisición, entrenamiento e inferencia
-5. **Repositorio**: enlaces, DVC y ausencia de binarios ML en Git
+1. **Core**: instala `vaaet-core[vision,inference,dev]` y valida percepción,
+   inferencia, Ruff y tests en Python 3.10–3.13.
+2. **Laboratorio ML**: instala primero el core local y luego los extras ML de
+   entrenamiento, visualización, base de datos y desarrollo.
+3. **Integración**: instala ambos componentes desde el workspace y verifica sus
+   imports y el bundle DVC de raíz.
+4. **PostgreSQL**: instala core + ML local, aplica migraciones en el servicio de
+   prueba y ejecuta las pruebas marcadas `postgres`.
+5. **Documentación**: verifica enlaces internos del monorepo desde la raíz.
+6. **DVC**: instala `./vaaet-ml[dvc]` sobre el core local, ejecuta `pip check`
+   e inspecciona DVC desde la raíz.
 
 ### 3.2 Despliegue (Manual)
 
 VAAET no tiene despliegue automatizado porque el runtime es Google Colab. El "despliegue" consiste en:
 
 1. El usuario abre el notebook en Colab desde GitHub
-2. La primera celda clona o actualiza el repo, instala una vez y ejecuta `pip check`
+2. La primera celda clona o actualiza el repo, resuelve extras sólo cuando
+   cambian los `pyproject.toml`, refresca los dos paquetes locales sin reinstalar
+   dependencias pesadas y ejecuta el preflight con `pip check`
 3. Entrenamiento genera el bundle; inferencia lo valida antes de cargarlo
 
 Ver la [guía de Colab](colab-guide.md) para Secrets, Drive y recuperación ante reinicios.
@@ -91,6 +99,24 @@ Ejecutá la primera celda del notebook sin añadir comandos manuales. Esta clona
 actualiza `/content/vaaet`, resuelve `vaaet-core` y `vaaet-ml`, instala ambos componentes locales con los extras del workflow,
 limpia imports anteriores y valida que `vaaet` provenga del paquete instalado.
 El modo editable se reserva para desarrollo local.
+
+## 4.1 Instalación local del monorepo
+
+Desde la raíz, creá y activá una `.venv` con Python 3.10–3.13. Instalá siempre
+el core antes del laboratorio y elegí sólo los extras del workflow:
+
+```bash
+python -m venv .venv
+# Activá .venv con tu shell.
+python -m pip install --upgrade pip
+python -m pip install -e "./vaaet-core[vision,inference,dev]"
+python -m pip install -e "./vaaet-ml[training,visualization,database,dev]"
+python -m pip check
+```
+
+Para DVC local, instalá `python -m pip install -e "./vaaet-ml[dvc]"` después
+del core. No existe un paquete instalable en la raíz ni se usan
+`requirements.txt` o lockfiles.
 
 ### Configuración de BD (opcional)
 

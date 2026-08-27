@@ -5,10 +5,11 @@ Antes de modificar el proyecto, leé [AGENTS.md](AGENTS.md) y el ADR aplicable e
 
 ## Reglas fundamentales
 
-- La lógica compartida vive en `src/vaaet/`; los notebooks sólo orquestan.
-- Los imports internos usan `vaaet.*` después de una instalación editable.
-- `src/vaaet/settings.py` es la fuente única de constantes, rutas y umbrales.
-- Los tres notebooks son orquestadores; la lógica compartida vive en `src/vaaet/`.
+- La lógica portable vive en `../vaaet-core/src/vaaet/`; los notebooks sólo orquestan.
+- Los imports de laboratorio usan `vaaet_ml.*`; las operaciones usan `vaaet.*`.
+- `../vaaet-core/src/vaaet/settings.py` define contratos y umbrales; este
+  componente define rutas de laboratorio y configuración DB en `src/vaaet_ml/settings.py`.
+- Los notebooks instalan primero el core y luego ML.
 - Las 19 features, cuatro estados, esquema PostgreSQL y arquitectura MLP son
   contratos; cualquier cambio requiere aprobación y un ADR nuevo.
 - Los pesos YOLO y binarios `.keras`/`.joblib` no se versionan con Git. El bundle
@@ -21,7 +22,8 @@ Antes de modificar el proyecto, leé [AGENTS.md](AGENTS.md) y el ADR aplicable e
 Python soportado: 3.10–3.13.
 
 ```bash
-python -m pip install -e ".[vision,training,visualization,dev]"
+python -m pip install -e "../vaaet-core[vision,inference,dev]"
+python -m pip install -e ".[training,visualization,database,dev]"
 ruff check src tests scripts
 pytest tests/ -v --tb=short
 python -m compileall -q src tests scripts
@@ -38,7 +40,7 @@ remoto se valida manualmente en Google Colab.
   [ADR-0008](../docs/architecture/decisions/0008-keras-traffic-state-classifier.md).
 - Inferencia: `notebooks/inference/analyze_traffic_video.ipynb` y
   [ADR-0009](../docs/architecture/decisions/0009-modular-three-stage-architecture.md).
-- Bundle y límite web: [ADR-0020](../docs/architecture/decisions/0020-single-git-monorepo-and-application-boundary.md).
+- Bundle y límite core/API: [ADR-0021](../docs/architecture/decisions/0021-portable-core-and-ml-laboratory-boundary.md).
 - DVC: [guía DVC](../docs/ml/dvc-guide.md).
 
 Actualizá [CHANGELOG.md](CHANGELOG.md) y la documentación cuando cambie un

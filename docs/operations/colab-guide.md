@@ -26,7 +26,12 @@ Referencias oficiales: [versiones del runtime de Colab](https://research.google.
    `ALLOW_PILOT_BUNDLE=True`; un candidato no aprobado requiere una autorización
    experimental independiente.
 
-Cada notebook clona o actualiza el repositorio en `/content/vaaet`, define `ML_ROOT=/content/vaaet/vaaet-ml` y hace una instalación no editable desde ese componente. La instalación no es editable en Colab porque el checkout puede ocultar `vaaet-ml/src/vaaet`; después de instalar se limpia el caché de módulos y se valida el origen real del paquete. El desarrollo local sí conserva `pip install -e`.
+Cada notebook clona o actualiza el repositorio en `/content/vaaet`, define
+`CORE_ROOT=/content/vaaet/vaaet-core` y `ML_ROOT=/content/vaaet/vaaet-ml`, e
+instala primero el core y luego ML de forma no editable. La instalación no es
+editable en Colab porque el checkout puede ocultar paquetes locales; después se
+limpia el caché de módulos y se valida el origen real de `vaaet` y `vaaet_ml`.
+El desarrollo local sí conserva `pip install -e` para ambos componentes.
 
 Antes de tareas costosas, la misma celda informa commit, versión de Python, origen instalado, RAM, disco libre en `/content`, GPU del framework y `nvidia-smi` si existe. Colección, entrenamiento e inferencia se detienen si Colab no tiene GPU; evaluación continúa read-only sin exigirla.
 

@@ -5,13 +5,13 @@ from __future__ import annotations
 import pandas as pd
 import pytest
 
-from vaaet.data.ingestion import load_dataset_package
-from vaaet.data.review import (
+from vaaet_ml.data.ingestion import load_dataset_package
+from vaaet_ml.data.review import (
     HumanValidation,
     export_offline_review_package,
     select_review_queue,
 )
-from vaaet.settings import FEATURE_COLS
+from vaaet_ml.settings import FEATURE_COLS
 
 
 def test_accident_requires_context_and_note() -> None:

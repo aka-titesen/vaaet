@@ -46,23 +46,18 @@ Verifican el funcionamiento aislado de cada módulo en `src/`.
 
 | Archivo de Test | Módulo Testeado | Cobertura |
 |---|---|---|
-| `tests/unit/test_settings.py` | `vaaet-ml/src/vaaet/settings.py` | Constantes, umbrales, rutas |
-| `tests/contracts/test_contracts.py` | `vaaet-ml/src/vaaet/contracts.py` | Validación de contratos de datos |
-| `tests/unit/test_engineering.py` | `vaaet-ml/src/vaaet/features/engineering.py` | Feature engineering de 19 columnas |
-| `tests/unit/test_labeling.py` | `vaaet-ml/src/vaaet/features/labeling.py` | Auto-etiquetado de 4 estados |
-| `tests/unit/test_traffic_state.py` | `vaaet-ml/src/vaaet/inference/traffic_state.py` | Tres salidas, histéresis, candidato de incidente y override humano |
-| `tests/unit/test_database.py` | `vaaet-ml/src/vaaet/data/database.py` | Factory de engine, credenciales |
-| `tests/unit/test_persistence.py` | `vaaet-ml/src/vaaet/data/persistence.py` | Persistencia en BD |
-| `tests/unit/test_vision.py` | `vaaet-ml/src/vaaet/vision/` | Pipeline de percepción completo |
-| `tests/unit/test_optical_flow.py` | `vaaet-ml/src/vaaet/vision/optical_flow.py` | Estimador de flujo óptico |
-| `tests/unit/test_telemetry.py` | `vaaet-ml/src/vaaet/vision/telemetry.py` | Extracción de telemetría |
-| `tests/unit/test_analysis.py` | `vaaet-ml/src/vaaet/vision/analysis.py` | Video anotado con/sin clasificación |
-| `tests/unit/test_calibration.py` | `vaaet-ml/src/vaaet/evaluation/calibration.py` | Calibración de velocidad |
-| `tests/unit/test_datasets.py` | `vaaet-ml/src/vaaet/data/datasets.py` | Carga y validación de datos |
-| `tests/unit/test_synthetic.py` | `vaaet-ml/src/vaaet/features/synthetic.py` | Generación de datos sintéticos |
-| `tests/unit/test_video.py` | `vaaet-ml/src/vaaet/vision/video.py` | Utilidades de video I/O |
-| `tests/unit/test_reporting.py` | `vaaet-ml/src/vaaet/evaluation/reporting.py` | Reportes y visualizaciones |
-| `tests/unit/test_human_holdout.py` | `vaaet-ml/src/vaaet/training/holdout.py` | Snapshot, checksums, versiones, idempotencia y leakage |
+| `vaaet-core/tests/contracts/test_contracts.py` | `vaaet-core/src/vaaet/contracts.py` | Validación de contratos de datos |
+| `vaaet-core/tests/unit/test_engine.py` | `vaaet-core/src/vaaet/inference/engine.py` | Clasificación tipada sin closures de notebook |
+| `vaaet-core/tests/unit/test_traffic_state.py` | `vaaet-core/src/vaaet/inference/traffic_state.py` | Tres salidas, histéresis y candidato conservador |
+| `vaaet-core/tests/unit/test_vision.py` | `vaaet-core/src/vaaet/vision/` | Pipeline de percepción completo |
+| `vaaet-core/tests/unit/test_analysis.py` | `vaaet-core/src/vaaet/vision/analysis.py` | Video anotado con/sin clasificación |
+| `vaaet-ml/tests/unit/test_settings.py` | `vaaet-ml/src/vaaet_ml/settings.py` | Rutas de laboratorio y DB |
+| `vaaet-ml/tests/unit/test_database.py` | `vaaet-ml/src/vaaet_ml/data/database.py` | Factory de engine y credenciales |
+| `vaaet-ml/tests/unit/test_persistence.py` | `vaaet-ml/src/vaaet_ml/data/persistence.py` | Persistencia de laboratorio |
+| `vaaet-ml/tests/unit/test_datasets.py` | `vaaet-ml/src/vaaet_ml/data/datasets.py` | Carga y validación de datos |
+| `vaaet-ml/tests/unit/test_synthetic.py` | `vaaet-ml/src/vaaet_ml/features/synthetic.py` | Generación de datos de entrenamiento |
+| `vaaet-ml/tests/unit/test_reporting.py` | `vaaet-ml/src/vaaet_ml/evaluation/reporting.py` | Reportes y visualizaciones |
+| `vaaet-ml/tests/unit/test_human_holdout.py` | `vaaet-ml/src/vaaet_ml/training/holdout.py` | Snapshot, checksums, versiones, idempotencia y leakage |
 | `tests/repository/test_notebook_parity.py` | Notebooks ↔ paquete | Paridad de código |
 | `tests/repository/test_repository_structure.py` | Repositorio | Higiene, rutas y enlaces |
 
@@ -71,7 +66,7 @@ Verifican el funcionamiento aislado de cada módulo en `src/`.
 Validan la interacción entre módulos sin mocks.
 
 - **Herramienta:** pytest con fixtures compartidos en `conftest.py`
-- **Entorno:** DataFrames sintéticos generados por `vaaet-ml/src/vaaet/features/synthetic.py`
+- **Entorno:** DataFrames sintéticos generados por `vaaet-ml/src/vaaet_ml/features/synthetic.py`
 - **Mocks:** para unidades puras; schemas, migración, vistas y grants se prueban con PostgreSQL 17 real en CI
 
 ### 2.3 Pruebas de Paridad
@@ -128,7 +123,7 @@ pytest tests/test_features.py -v
 |---|---|
 | Tests que dependen de GPU | Todos los tests de `src/` pueden ejecutarse en CPU |
 | Tests que dependen de BD PostgreSQL | Mocks en `test_db.py` y `test_persistence.py` |
-| Videos reales no disponibles | DataFrames sintéticos y generador en `vaaet-ml/src/vaaet/features/synthetic.py` |
+| Videos reales no disponibles | DataFrames sintéticos y generador en `vaaet-ml/src/vaaet_ml/features/synthetic.py` |
 | Notebooks no ejecutables en CI | Validación sintáctica con `ast.parse()` como proxy |
 
 ---

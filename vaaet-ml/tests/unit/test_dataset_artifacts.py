@@ -7,9 +7,9 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import pytest
-
 from vaaet.artifacts import FEATURE_SCHEMA_VERSION
-from vaaet.data.dataset_artifacts import (
+
+from vaaet_ml.data.dataset_artifacts import (
     CatalogSelection,
     DatasetArtifactAction,
     HitlCatalogSource,
@@ -21,9 +21,9 @@ from vaaet.data.dataset_artifacts import (
     import_legacy_hitl_package,
     load_hitl_catalog_feedback,
 )
-from vaaet.data.ingestion import create_dataset_package
-from vaaet.data.review import HumanValidation
-from vaaet.settings import FEATURE_COLS
+from vaaet_ml.data.ingestion import create_dataset_package
+from vaaet_ml.data.review import HumanValidation
+from vaaet_ml.settings import FEATURE_COLS
 
 
 def _feature_values(value: float = 1.0) -> dict[str, float]:
@@ -482,7 +482,7 @@ def test_catalog_rejects_cross_package_validation_branch(tmp_path: Path) -> None
     )
     package_dir = root / "2026" / "08" / "10" / "branch"
     package = package_dir / "vaaet-training-dataset-v1.zip"
-    from vaaet.data.dataset_artifacts import _frames_fingerprint, _sha256_file
+    from vaaet_ml.data.dataset_artifacts import _frames_fingerprint, _sha256_file
 
     fingerprint = _frames_fingerprint(
         {"features": features, "predictions": predictions, "validations": validations}
@@ -515,7 +515,7 @@ def test_catalog_rejects_cross_package_validation_branch(tmp_path: Path) -> None
 
 
 def test_catalog_resolves_valid_cross_package_correction_chain(tmp_path: Path) -> None:
-    from vaaet.data.dataset_artifacts import _frames_fingerprint, _sha256_file
+    from vaaet_ml.data.dataset_artifacts import _frames_fingerprint, _sha256_file
 
     root = tmp_path / "reviews"
     feature_id = str(uuid.uuid4())

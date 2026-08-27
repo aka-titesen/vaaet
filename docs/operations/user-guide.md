@@ -12,7 +12,11 @@ libre para la circulación. `HUD_DEBUG=True` agrega IDs, confianza, evidencia y 
 sólo para diagnóstico técnico. Un candidato de incidente se muestra como `POSIBLE
 INCIDENTE - REVISAR` y conserva el estado automático `Congested`.
 
-Ejecutá cada notebook de arriba hacia abajo. La primera celda instala exactamente los extras declarados en `vaaet-ml/pyproject.toml`; no agregues celdas de instalación. La persistencia PostgreSQL está deshabilitada por defecto y requiere Secrets de Colab o variables de entorno.
+Ejecutá cada notebook de arriba hacia abajo. La primera celda instala primero los
+extras operativos de `vaaet-core/pyproject.toml` y luego los de laboratorio de
+`vaaet-ml/pyproject.toml`; no agregues celdas de instalación. La persistencia
+PostgreSQL está deshabilitada por defecto y requiere Secrets de Colab o variables
+de entorno.
 
 El nombre recomendado del video es `bridge_YYYY-MM-DD_HH-MM-SS_to_HH-MM-SS.mp4`. Un nombre libre funciona, pero `record_time` se deriva de la hora de procesamiento y tiene menor trazabilidad.
 

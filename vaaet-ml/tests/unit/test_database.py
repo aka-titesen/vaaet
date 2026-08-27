@@ -1,4 +1,4 @@
-"""Tests for vaaet.data.database utilities.
+"""Tests for vaaet_ml.data.database utilities.
 
 Only pure functions are tested. Actual DB connections require credentials
 and are marked with ``@pytest.mark.db`` (skipped by default).
@@ -12,7 +12,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from vaaet.data.database import (
+from vaaet_ml.data.database import (
     HUMAN_GROUND_TRUTH_QUERY,
     DatabaseProfile,
     DatabaseSettings,
@@ -50,7 +50,7 @@ def test_telemetry_window_binds_optional_filters_without_sql_interpolation(
         captured["params"] = params
         return pd.DataFrame({"clip_id": ["clip-a"]})
 
-    monkeypatch.setattr("vaaet.data.database.pd.read_sql", fake_read_sql)
+    monkeypatch.setattr("vaaet_ml.data.database.pd.read_sql", fake_read_sql)
     engine = object()
     result = load_telemetry_window(
         start=pd.Timestamp("2026-01-01T00:00:00Z"),
@@ -114,7 +114,7 @@ class TestDatabaseSettingsLoader:
         import sys
         import types
 
-        from vaaet.data.database import load_database_settings
+        from vaaet_ml.data.database import load_database_settings
 
         values = {
             "VAAET_DB_HOST": "db.example.com",
@@ -146,7 +146,7 @@ class TestDatabaseSettingsLoader:
         assert "VAAET_TRAINING_DB_PASSWORD" not in os.environ
 
     def test_reads_from_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        from vaaet.data.database import load_database_settings
+        from vaaet_ml.data.database import load_database_settings
 
         monkeypatch.setenv("VAAET_DB_HOST", "test-host")
         monkeypatch.setenv("VAAET_DB_PORT", "5433")
@@ -161,8 +161,8 @@ class TestDatabaseSettingsLoader:
         assert config.database == "test-db"
 
     def test_default_port(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        from vaaet.data.database import load_database_settings
-        from vaaet.settings import DEFAULT_DB_PORT
+        from vaaet_ml.data.database import load_database_settings
+        from vaaet_ml.settings import DEFAULT_DB_PORT
 
         monkeypatch.setenv("VAAET_DB_HOST", "host")
         monkeypatch.setenv("VAAET_DB_NAME", "db")
@@ -177,7 +177,7 @@ class TestDatabaseSettingsLoader:
     def test_legacy_environment_is_visible_and_deprecated(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        from vaaet.data.database import load_database_settings
+        from vaaet_ml.data.database import load_database_settings
 
         for name in (
             "VAAET_DB_HOST",
@@ -199,7 +199,7 @@ class TestDatabaseSettingsLoader:
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """interactive=False must raise RuntimeError when env vars are missing."""
-        from vaaet.data.database import load_database_settings
+        from vaaet_ml.data.database import load_database_settings
 
         for var in (
             "VAAET_DB_HOST", "VAAET_DB_PORT", "VAAET_DB_NAME",
@@ -215,7 +215,7 @@ class TestDatabaseSettingsLoader:
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         pytest.importorskip("dotenv")
-        from vaaet.data.database import load_database_settings
+        from vaaet_ml.data.database import load_database_settings
 
         names = (
             "VAAET_DB_HOST",
@@ -250,7 +250,7 @@ class TestRestoreBackupToSql:
     """Test restore_backup_to_sql() error handling (no pg_restore needed)."""
 
     def test_missing_backup_file(self, tmp_path: Path) -> None:
-        from vaaet.data.database import restore_backup_to_sql
+        from vaaet_ml.data.database import restore_backup_to_sql
 
         with pytest.raises(FileNotFoundError, match="Backup file not found"):
             restore_backup_to_sql(tmp_path / "nonexistent.backup")
@@ -258,7 +258,7 @@ class TestRestoreBackupToSql:
     def test_missing_pg_restore(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        from vaaet.data.database import restore_backup_to_sql
+        from vaaet_ml.data.database import restore_backup_to_sql
 
         # Create a dummy backup file
         backup = tmp_path / "test.backup"
@@ -271,7 +271,7 @@ class TestRestoreBackupToSql:
             restore_backup_to_sql(backup)
 
     def test_missing_explicit_pg_restore(self, tmp_path: Path) -> None:
-        from vaaet.data.database import restore_backup_to_sql
+        from vaaet_ml.data.database import restore_backup_to_sql
 
         backup = tmp_path / "test.backup"
         backup.write_bytes(b"PGDMP")
@@ -285,13 +285,13 @@ class TestRestoreBackupToSql:
     def test_rejects_non_executable_explicit_pg_restore(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        from vaaet.data.database import restore_backup_to_sql
+        from vaaet_ml.data.database import restore_backup_to_sql
 
         backup = tmp_path / "test.backup"
         backup.write_bytes(b"PGDMP")
         pg_restore = tmp_path / "pg_restore"
         pg_restore.write_text("binary", encoding="utf-8")
-        monkeypatch.setattr("vaaet.data.database.os.access", lambda *_: False)
+        monkeypatch.setattr("vaaet_ml.data.database.os.access", lambda *_: False)
 
         with pytest.raises(ValueError, match="not executable"):
             restore_backup_to_sql(backup, pg_restore_path=pg_restore)
@@ -301,7 +301,7 @@ class TestRestoreBackupToSql:
     ) -> None:
         from unittest.mock import MagicMock
 
-        from vaaet.data.database import restore_backup_to_sql
+        from vaaet_ml.data.database import restore_backup_to_sql
 
         backup = tmp_path / "test.backup"
         backup.write_bytes(b"PGDMP")
@@ -310,7 +310,7 @@ class TestRestoreBackupToSql:
         output = tmp_path / "dump.sql"
         calls: list[list[str]] = []
 
-        monkeypatch.setattr("vaaet.data.database.os.access", lambda *_: True)
+        monkeypatch.setattr("vaaet_ml.data.database.os.access", lambda *_: True)
 
         def fake_run(command, **_kwargs):
             calls.append(command)
@@ -319,7 +319,7 @@ class TestRestoreBackupToSql:
             output.write_text("-- restored", encoding="utf-8")
             return MagicMock(returncode=0, stdout="", stderr="")
 
-        monkeypatch.setattr("vaaet.data.database.subprocess.run", fake_run)
+        monkeypatch.setattr("vaaet_ml.data.database.subprocess.run", fake_run)
 
         result = restore_backup_to_sql(
             backup,
@@ -338,13 +338,13 @@ class TestRestoreBackupToSql:
         """pg_restore stderr with 'unsupported version' must raise RuntimeError."""
         from unittest.mock import MagicMock, patch
 
-        from vaaet.data.database import restore_backup_to_sql
+        from vaaet_ml.data.database import restore_backup_to_sql
 
         backup = tmp_path / "test.backup"
         backup.write_bytes(b"\x00" * 100)
 
         # Mock shutil.which to return a fake pg_restore path
-        monkeypatch.setattr("vaaet.data.database.shutil.which", lambda _: "/usr/bin/pg_restore")
+        monkeypatch.setattr("vaaet_ml.data.database.shutil.which", lambda _: "/usr/bin/pg_restore")
 
         # Mock subprocess.run to simulate version mismatch
         ver_result = MagicMock(returncode=0, stdout="pg_restore (PostgreSQL) 14.0")
@@ -362,7 +362,7 @@ class TestRestoreBackupToSql:
                 return ver_result
             return run_result  # actual pg_restore call
 
-        with patch("vaaet.data.database.subprocess.run", side_effect=fake_run):
+        with patch("vaaet_ml.data.database.subprocess.run", side_effect=fake_run):
             with pytest.raises(RuntimeError, match=r"version mismatch .*binary="):
                 restore_backup_to_sql(backup)
 
@@ -371,7 +371,7 @@ class TestRestoreBackupToSql:
     ) -> None:
         from unittest.mock import MagicMock
 
-        from vaaet.data.database import restore_backup_to_sql
+        from vaaet_ml.data.database import restore_backup_to_sql
 
         backup = tmp_path / "legacy.backup"
         backup.write_bytes(b"PGDMP")
@@ -381,7 +381,7 @@ class TestRestoreBackupToSql:
         commands: list[list[str]] = []
         selected_toc = ""
 
-        monkeypatch.setattr("vaaet.data.database.os.access", lambda *_: True)
+        monkeypatch.setattr("vaaet_ml.data.database.os.access", lambda *_: True)
 
         def fake_run(command, **_kwargs):
             nonlocal selected_toc
@@ -405,7 +405,7 @@ class TestRestoreBackupToSql:
             )
             return MagicMock(returncode=0, stdout="", stderr="")
 
-        monkeypatch.setattr("vaaet.data.database.subprocess.run", fake_run)
+        monkeypatch.setattr("vaaet_ml.data.database.subprocess.run", fake_run)
 
         result = restore_backup_to_sql(
             backup,
@@ -426,14 +426,14 @@ class TestRestoreBackupToSql:
     ) -> None:
         from unittest.mock import MagicMock
 
-        from vaaet.data.database import restore_backup_to_sql
+        from vaaet_ml.data.database import restore_backup_to_sql
 
         backup = tmp_path / "legacy.backup"
         backup.write_bytes(b"PGDMP")
         pg_restore = tmp_path / "pg_restore-17"
         pg_restore.write_text("binary", encoding="utf-8")
         output = tmp_path / "partial.sql"
-        monkeypatch.setattr("vaaet.data.database.os.access", lambda *_: True)
+        monkeypatch.setattr("vaaet_ml.data.database.os.access", lambda *_: True)
 
         def fake_run(command, **_kwargs):
             if "--version" in command:
@@ -443,7 +443,7 @@ class TestRestoreBackupToSql:
             output.write_text("-- partial", encoding="utf-8")
             return MagicMock(returncode=1, stdout="", stderr="selection failed")
 
-        monkeypatch.setattr("vaaet.data.database.subprocess.run", fake_run)
+        monkeypatch.setattr("vaaet_ml.data.database.subprocess.run", fake_run)
 
         with pytest.raises(RuntimeError, match="exit 1"):
             restore_backup_to_sql(
@@ -456,13 +456,13 @@ class TestRestoreBackupToSql:
     ) -> None:
         from unittest.mock import MagicMock
 
-        from vaaet.data.database import restore_backup_to_sql
+        from vaaet_ml.data.database import restore_backup_to_sql
 
         backup = tmp_path / "other.backup"
         backup.write_bytes(b"PGDMP")
         pg_restore = tmp_path / "pg_restore-17"
         pg_restore.write_text("binary", encoding="utf-8")
-        monkeypatch.setattr("vaaet.data.database.os.access", lambda *_: True)
+        monkeypatch.setattr("vaaet_ml.data.database.os.access", lambda *_: True)
 
         def fake_run(command, **_kwargs):
             if "--version" in command:
@@ -475,7 +475,7 @@ class TestRestoreBackupToSql:
                 stderr="",
             )
 
-        monkeypatch.setattr("vaaet.data.database.subprocess.run", fake_run)
+        monkeypatch.setattr("vaaet_ml.data.database.subprocess.run", fake_run)
 
         with pytest.raises(ValueError, match="did not match requested TABLE DATA"):
             restore_backup_to_sql(
@@ -489,14 +489,14 @@ class TestRestoreBackupToSql:
     ) -> None:
         from unittest.mock import MagicMock
 
-        from vaaet.data.database import restore_backup_to_sql
+        from vaaet_ml.data.database import restore_backup_to_sql
 
         backup = tmp_path / "legacy.backup"
         backup.write_bytes(b"PGDMP")
         pg_restore = tmp_path / "pg_restore-17"
         pg_restore.write_text("binary", encoding="utf-8")
         output = tmp_path / "invalid.sql"
-        monkeypatch.setattr("vaaet.data.database.os.access", lambda *_: True)
+        monkeypatch.setattr("vaaet_ml.data.database.os.access", lambda *_: True)
 
         def fake_run(command, **_kwargs):
             if "--version" in command:
@@ -512,7 +512,7 @@ class TestRestoreBackupToSql:
             output.write_text("-- no COPY data", encoding="utf-8")
             return MagicMock(returncode=0, stdout="", stderr="")
 
-        monkeypatch.setattr("vaaet.data.database.subprocess.run", fake_run)
+        monkeypatch.setattr("vaaet_ml.data.database.subprocess.run", fake_run)
 
         with pytest.raises(ValueError, match="no COPY block"):
             restore_backup_to_sql(
@@ -529,13 +529,13 @@ def test_backup_catalog_recognizes_modern_and_legacy_tables(
 ) -> None:
     from unittest.mock import MagicMock
 
-    from vaaet.data.database import inspect_backup_catalog
+    from vaaet_ml.data.database import inspect_backup_catalog
 
     backup = tmp_path / "full.backup"
     backup.write_bytes(b"PGDMP")
     binary = tmp_path / "pg_restore"
     binary.write_text("binary", encoding="utf-8")
-    monkeypatch.setattr("vaaet.data.database.os.access", lambda *_: True)
+    monkeypatch.setattr("vaaet_ml.data.database.os.access", lambda *_: True)
     catalog = """
     1; 0 1 TABLE DATA vaaet_raw traffic_data owner
     2; 0 2 TABLE DATA vaaet_ml telemetry_features owner
@@ -544,7 +544,7 @@ def test_backup_catalog_recognizes_modern_and_legacy_tables(
     5; 0 5 TABLE DATA public unrelated owner
     """
     monkeypatch.setattr(
-        "vaaet.data.database.subprocess.run",
+        "vaaet_ml.data.database.subprocess.run",
         lambda *_args, **_kwargs: MagicMock(returncode=0, stdout=catalog, stderr=""),
     )
     assert inspect_backup_catalog(backup, pg_restore_path=binary) == (
@@ -560,15 +560,15 @@ def test_backup_catalog_rejects_corrupt_archive(
 ) -> None:
     from unittest.mock import MagicMock
 
-    from vaaet.data.database import inspect_backup_catalog
+    from vaaet_ml.data.database import inspect_backup_catalog
 
     backup = tmp_path / "corrupt.backup"
     backup.write_bytes(b"bad")
     binary = tmp_path / "pg_restore"
     binary.write_text("binary", encoding="utf-8")
-    monkeypatch.setattr("vaaet.data.database.os.access", lambda *_: True)
+    monkeypatch.setattr("vaaet_ml.data.database.os.access", lambda *_: True)
     monkeypatch.setattr(
-        "vaaet.data.database.subprocess.run",
+        "vaaet_ml.data.database.subprocess.run",
         lambda *_args, **_kwargs: MagicMock(
             returncode=1, stdout="", stderr="input file does not appear to be a valid archive"
         ),
@@ -580,7 +580,7 @@ def test_backup_catalog_rejects_corrupt_archive(
 def test_load_from_backup_propagates_explicit_pg_restore_path(tmp_path: Path) -> None:
     from unittest.mock import patch
 
-    from vaaet.data.database import load_from_backup
+    from vaaet_ml.data.database import load_from_backup
 
     backup = tmp_path / "traffic_data.backup"
     backup.write_bytes(b"PGDMP")
@@ -590,8 +590,8 @@ def test_load_from_backup_propagates_explicit_pg_restore_path(tmp_path: Path) ->
 
     expected = pd.DataFrame({"id": [1]})
     with (
-        patch("vaaet.data.database.restore_backup_to_sql", return_value=sql_path) as restore,
-        patch("vaaet.data.database.parse_sql_dump", return_value=expected),
+        patch("vaaet_ml.data.database.restore_backup_to_sql", return_value=sql_path) as restore,
+        patch("vaaet_ml.data.database.parse_sql_dump", return_value=expected),
     ):
         result = load_from_backup(backup, pg_restore_path=pg_restore)
 
@@ -624,13 +624,13 @@ class TestParseSqlDump:
         return sql_file
 
     def test_parses_correct_row_count(self, sample_sql: Path) -> None:
-        from vaaet.data.database import parse_sql_dump
+        from vaaet_ml.data.database import parse_sql_dump
 
         df = parse_sql_dump(sample_sql)
         assert len(df) == 3
 
     def test_parses_correct_columns(self, sample_sql: Path) -> None:
-        from vaaet.data.database import parse_sql_dump
+        from vaaet_ml.data.database import parse_sql_dump
 
         df = parse_sql_dump(sample_sql)
         expected = {
@@ -648,7 +648,7 @@ class TestParseSqlDump:
         assert set(df.columns) == expected
 
     def test_numeric_types(self, sample_sql: Path) -> None:
-        from vaaet.data.database import parse_sql_dump
+        from vaaet_ml.data.database import parse_sql_dump
 
         df = parse_sql_dump(sample_sql)
         assert pd.api.types.is_numeric_dtype(df["avg_speed"])
@@ -656,27 +656,27 @@ class TestParseSqlDump:
         assert pd.api.types.is_numeric_dtype(df["total_vehicles"])
 
     def test_datetime_parsing(self, sample_sql: Path) -> None:
-        from vaaet.data.database import parse_sql_dump
+        from vaaet_ml.data.database import parse_sql_dump
 
         df = parse_sql_dump(sample_sql)
         assert pd.api.types.is_datetime64_any_dtype(df["record_time"])
         assert df.iloc[0]["record_time"] == pd.Timestamp("2024-01-15 11:00:00Z")
 
     def test_speed_values(self, sample_sql: Path) -> None:
-        from vaaet.data.database import parse_sql_dump
+        from vaaet_ml.data.database import parse_sql_dump
 
         df = parse_sql_dump(sample_sql)
         assert df["avg_speed"].iloc[0] == pytest.approx(55.3)
         assert df["avg_speed"].iloc[2] == pytest.approx(12.1)
 
     def test_missing_file(self, tmp_path: Path) -> None:
-        from vaaet.data.database import parse_sql_dump
+        from vaaet_ml.data.database import parse_sql_dump
 
         with pytest.raises(FileNotFoundError, match="SQL file not found"):
             parse_sql_dump(tmp_path / "nonexistent.sql")
 
     def test_no_copy_block(self, tmp_path: Path) -> None:
-        from vaaet.data.database import parse_sql_dump
+        from vaaet_ml.data.database import parse_sql_dump
 
         sql_file = tmp_path / "empty.sql"
         sql_file.write_text("-- empty dump\nSELECT 1;\n", encoding="utf-8")
@@ -685,7 +685,7 @@ class TestParseSqlDump:
 
     def test_null_handling(self, tmp_path: Path) -> None:
         """Postgres NULL (\\N) should be parsed as NaN/NA."""
-        from vaaet.data.database import parse_sql_dump
+        from vaaet_ml.data.database import parse_sql_dump
 
         content = textwrap.dedent("""\
             COPY public.traffic_data (id, clip_id, record_time, avg_speed, count_car, count_truck, count_bus, count_motorcycle, count_bicycle, total_vehicles) FROM stdin;
@@ -698,7 +698,7 @@ class TestParseSqlDump:
         assert pd.isna(df["avg_speed"].iloc[0])
 
     def test_preserves_telemetry_v2_columns(self, tmp_path: Path) -> None:
-        from vaaet.data.database import parse_sql_dump
+        from vaaet_ml.data.database import parse_sql_dump
 
         sql_file = tmp_path / "v2.sql"
         sql_file.write_text(
@@ -715,7 +715,7 @@ class TestParseSqlDump:
         assert frame.iloc[0]["telemetry_schema_version"] == "traffic-telemetry-v2"
 
     def test_preserves_empty_copy_schema(self, tmp_path: Path) -> None:
-        from vaaet.data.database import parse_sql_dump_tables
+        from vaaet_ml.data.database import parse_sql_dump_tables
 
         sql_file = tmp_path / "empty-table.sql"
         sql_file.write_text(

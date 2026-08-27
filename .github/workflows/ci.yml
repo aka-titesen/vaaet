@@ -9,6 +9,7 @@ on:
     branches: [main]
     paths:
       - "vaaet-ml/**"
+      - "vaaet-core/**"
       - "vaaet-app/**"
       - "docs/**"
       - ".github/workflows/**"
@@ -21,6 +22,7 @@ on:
     branches: [main]
     paths:
       - "vaaet-ml/**"
+      - "vaaet-core/**"
       - "vaaet-app/**"
       - "docs/**"
       - ".github/workflows/**"
@@ -31,11 +33,11 @@ on:
       - "README.md"
 
 jobs:
-  test:
+  core:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: vaaet-ml
+        working-directory: vaaet-core
     strategy:
       matrix:
         python-version: ["3.10", "3.11", "3.12", "3.13"]
@@ -48,23 +50,52 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Instalar dependencias
+      - name: Instalar core y sus extras operativos
         run: |
           python -m pip install --upgrade pip
-          python -m pip install -e ".[vision,training,visualization,database,dev]"
+          python -m pip install -e ".[vision,inference,dev]"
 
       - name: Verificar dependencias e imports
         run: |
           python -m pip check
-          python -c "import cv2, imblearn, joblib, numpy, pandas, psycopg2, sklearn, sqlalchemy, tensorflow, ultralytics"
+          python -c "import cv2, joblib, numpy, pandas, sklearn, tensorflow, ultralytics, vaaet"
 
       - name: Ejecutar Ruff
-        run: ruff check src tests scripts migrations
+        run: ruff check src tests
 
       - name: Compilar módulos Python
-        run: python -m compileall -q src tests scripts migrations
+        run: python -m compileall -q src tests
 
-      - name: Ejecutar tests unitarios, contractuales y de repositorio
+      - name: Ejecutar tests operativos y contractuales del core
+        run: pytest -v --tb=short -x -m "not postgres"
+
+  ml:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: vaaet-ml
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Instalar core local y laboratorio ML
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e "../vaaet-core[vision,inference]"
+          python -m pip install -e ".[training,visualization,database,dev]"
+      - name: Verificar imports separados
+        run: |
+          python -m pip check
+          python -c "import vaaet, vaaet_ml; import vaaet_ml.data.ingestion; import vaaet.inference"
+      - name: Ejecutar Ruff
+        run: ruff check src tests scripts migrations
+      - name: Compilar módulos Python
+        run: python -m compileall -q src tests scripts migrations
+      - name: Ejecutar tests del laboratorio
         run: pytest -v --tb=short -x -m "not postgres"
 
       - name: Verificar compilación de notebooks
@@ -98,6 +129,24 @@ jobs:
           print('Binarios ML versionados:', bad)
           sys.exit(bool(bad))
           "
+
+  workspace-integration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Instalar ambos componentes desde el workspace
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e "vaaet-core"
+          python -m pip install -e "vaaet-ml"
+      - name: Verificar contratos de importación y DVC de raíz
+        run: |
+          python -c "import vaaet, vaaet_ml; assert vaaet.__version__ == '0.1.0'; assert vaaet_ml.__version__ == '4.5.3'"
+          test -d .dvc
+          test -d vaaet-ml/artifacts/traffic-state
 
   docs-links:
     runs-on: ubuntu-latest
@@ -168,7 +217,9 @@ jobs:
           python-version: "3.12"
 
       - name: Instalar dependencias de base de datos
-        run: pip install -e ".[database,dev]"
+        run: |
+          pip install -e "../vaaet-core[inference]"
+          pip install -e ".[database,dev]"
 
       - name: Instalar cliente PostgreSQL 17
         run: |

@@ -9,9 +9,9 @@ from unittest.mock import patch
 
 import pandas as pd
 import pytest
-
 from vaaet.artifacts import FEATURE_SCHEMA_VERSION
-from vaaet.data.ingestion import (
+
+from vaaet_ml.data.ingestion import (
     RAW_REQUIRED_COLUMNS,
     DatasetPackageSource,
     FeedbackPolicy,
@@ -24,8 +24,8 @@ from vaaet.data.ingestion import (
     load_dataset_package,
     load_training_inputs,
 )
-from vaaet.settings import FEATURE_COLS
-from vaaet.training.lifecycle import TrainingMode
+from vaaet_ml.settings import FEATURE_COLS
+from vaaet_ml.training.lifecycle import TrainingMode
 
 
 def _features(state: int = 1) -> pd.DataFrame:
@@ -311,14 +311,14 @@ def test_raw_backup_extracts_only_requested_raw_table(tmp_path: Path) -> None:
         "vaaet_feedback.human_validations",
     )
     with (
-        patch("vaaet.data.ingestion.inspect_backup_catalog", return_value=catalog),
+        patch("vaaet_ml.data.ingestion.inspect_backup_catalog", return_value=catalog),
         patch(
-            "vaaet.data.ingestion.get_pg_restore_version",
+            "vaaet_ml.data.ingestion.get_pg_restore_version",
             return_value="pg_restore (PostgreSQL) 17.10",
         ),
-        patch("vaaet.data.ingestion.restore_backup_to_sql", return_value=restored) as restore,
+        patch("vaaet_ml.data.ingestion.restore_backup_to_sql", return_value=restored) as restore,
         patch(
-            "vaaet.data.ingestion.parse_sql_dump_tables",
+            "vaaet_ml.data.ingestion.parse_sql_dump_tables",
             return_value={"vaaet_raw.traffic_data": raw},
         ),
     ):
@@ -358,16 +358,16 @@ def test_legacy_raw_backup_reports_table_and_preserves_columns(tmp_path: Path) -
     )
     with (
         patch(
-            "vaaet.data.ingestion.inspect_backup_catalog",
+            "vaaet_ml.data.ingestion.inspect_backup_catalog",
             return_value=("public.traffic_data",),
         ),
         patch(
-            "vaaet.data.ingestion.get_pg_restore_version",
+            "vaaet_ml.data.ingestion.get_pg_restore_version",
             return_value="pg_restore (PostgreSQL) 17.10",
         ),
-        patch("vaaet.data.ingestion.restore_backup_to_sql", return_value=restored),
+        patch("vaaet_ml.data.ingestion.restore_backup_to_sql", return_value=restored),
         patch(
-            "vaaet.data.ingestion.parse_sql_dump_tables",
+            "vaaet_ml.data.ingestion.parse_sql_dump_tables",
             return_value={"public.traffic_data": raw},
         ),
     ):
@@ -391,16 +391,16 @@ def test_explicit_empty_raw_backup_fails_with_specific_table(tmp_path: Path) -> 
     empty_raw = pd.DataFrame(columns=sorted(RAW_REQUIRED_COLUMNS))
     with (
         patch(
-            "vaaet.data.ingestion.inspect_backup_catalog",
+            "vaaet_ml.data.ingestion.inspect_backup_catalog",
             return_value=("public.traffic_data",),
         ),
         patch(
-            "vaaet.data.ingestion.get_pg_restore_version",
+            "vaaet_ml.data.ingestion.get_pg_restore_version",
             return_value="pg_restore (PostgreSQL) 17.10",
         ),
-        patch("vaaet.data.ingestion.restore_backup_to_sql", return_value=restored),
+        patch("vaaet_ml.data.ingestion.restore_backup_to_sql", return_value=restored),
         patch(
-            "vaaet.data.ingestion.parse_sql_dump_tables",
+            "vaaet_ml.data.ingestion.parse_sql_dump_tables",
             return_value={"public.traffic_data": empty_raw},
         ),
     ):

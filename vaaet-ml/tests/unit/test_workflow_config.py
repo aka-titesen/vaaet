@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import pytest
-
 from vaaet.exceptions import RuntimeConfigurationError
-from vaaet.workflow_config import (
+
+from vaaet_ml.workflow_config import (
     EvaluationWorkflowConfig,
     InferenceWorkflowConfig,
     TrainingWorkflowConfig,

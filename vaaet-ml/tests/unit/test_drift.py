@@ -3,14 +3,14 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 import pytest
-
 from vaaet.artifacts import FEATURE_SCHEMA_VERSION
-from vaaet.evaluation.drift import (
+
+from vaaet_ml.evaluation.drift import (
     build_feature_cohort,
     build_feature_cohort_from_raw_telemetry,
     compare_feature_cohorts,
 )
-from vaaet.settings import FEATURE_COLS
+from vaaet_ml.settings import FEATURE_COLS
 
 
 def _cohort(*, offset: float = 0.0) -> pd.DataFrame:

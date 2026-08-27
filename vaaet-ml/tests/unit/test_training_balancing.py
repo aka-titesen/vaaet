@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from vaaet.training.balancing import (
+from vaaet_ml.training.balancing import (
     BalanceStrategy,
     build_balance_candidates,
     compute_capped_balanced_weights,

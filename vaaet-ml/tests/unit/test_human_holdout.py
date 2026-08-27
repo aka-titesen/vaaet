@@ -7,10 +7,10 @@ from pathlib import Path
 
 import pandas as pd
 import pytest
-
 from vaaet.artifacts import FEATURE_SCHEMA_VERSION
-from vaaet.settings import FEATURE_COLS
-from vaaet.training.holdout import (
+
+from vaaet_ml.settings import FEATURE_COLS
+from vaaet_ml.training.holdout import (
     CURRENT_POINTER_FILE,
     FileSystemHoldoutStore,
     HumanHoldoutAction,

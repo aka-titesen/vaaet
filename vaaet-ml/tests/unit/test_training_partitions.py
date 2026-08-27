@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import pandas as pd
 import pytest
-
 from vaaet.artifacts import FEATURE_SCHEMA_VERSION
-from vaaet.settings import FEATURE_COLS
-from vaaet.training.holdout import HumanHoldoutConfig, resolve_human_holdout
-from vaaet.training.lifecycle import TrainingMode
-from vaaet.training.partitions import build_training_partitions
+
+from vaaet_ml.settings import FEATURE_COLS
+from vaaet_ml.training.holdout import HumanHoldoutConfig, resolve_human_holdout
+from vaaet_ml.training.lifecycle import TrainingMode
+from vaaet_ml.training.partitions import build_training_partitions
 
 
 def _frame(*, human: bool, prefix: str, state_offset: int = 0) -> pd.DataFrame:

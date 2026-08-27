@@ -26,17 +26,15 @@ classifiers = [
 ]
 
 dependencies = [
-    "numpy>=1.26,<2.2",
-    "pandas>=2.2,<3",
-    "joblib>=1.4,<2",
-    "scikit-learn>=1.5,<2",
+    "vaaet-core==0.1.0",
 ]
 
 [project.optional-dependencies]
 vision = [
-    "ultralytics-opencv-headless>=8.3,<9",
+    "vaaet-core[vision]==0.1.0",
 ]
 training = [
+    "vaaet-core[inference]==0.1.0",
     "tensorflow>=2.19,<2.21; python_version < '3.13'",
     "tensorflow>=2.20,<2.21; python_version >= '3.13'",
     "imbalanced-learn>=0.13,<1",
@@ -67,7 +65,7 @@ Repository = "https://github.com/zgfnicolas/vaaet"
 
 [tool.setuptools.packages.find]
 where = ["src"]
-include = ["vaaet*"]
+include = ["vaaet_ml*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

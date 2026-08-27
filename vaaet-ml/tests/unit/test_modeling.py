@@ -4,8 +4,8 @@ import pytest
 
 tf = pytest.importorskip("tensorflow")
 
-from vaaet.settings import FEATURE_COLS, N_MODEL_STATES  # noqa: E402
-from vaaet.training.modeling import build_traffic_state_mlp  # noqa: E402
+from vaaet_ml.settings import FEATURE_COLS, N_MODEL_STATES  # noqa: E402
+from vaaet_ml.training.modeling import build_traffic_state_mlp  # noqa: E402
 
 
 def test_build_traffic_state_mlp_preserves_canonical_contract() -> None:

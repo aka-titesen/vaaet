@@ -51,7 +51,7 @@ flowchart LR
 
 | Entorno | Plataforma | Propósito | Datos |
 |---|---|---|---|
-| **Desarrollo local** | Python 3.10–3.13 | Desarrollo y testing de `vaaet-ml/src/vaaet/` | Datos sintéticos, sin GPU |
+| **Desarrollo local** | Python 3.10–3.13 | Desarrollo y testing de `vaaet-core/src/vaaet/` y `vaaet-ml/src/vaaet_ml/` | Datos sintéticos, sin GPU |
 | **Google Colab** | Colab Free/Pro | Ejecución de notebooks (entorno principal) | Videos reales, GPU disponible |
 | **CI** | GitHub Actions + PostgreSQL 17 | Validación automática | Tests puros y migración/grants reales, sin GPU |
 
@@ -88,7 +88,7 @@ Ver la [guía de Colab](colab-guide.md) para Secrets, Drive y recuperación ante
 ### Primera celda — Setup del entorno
 
 Ejecutá la primera celda del notebook sin añadir comandos manuales. Esta clona o
-actualiza `/content/vaaet`, resuelve `/content/vaaet/vaaet-ml`, instala un wheel local con los extras del workflow,
+actualiza `/content/vaaet`, resuelve `vaaet-core` y `vaaet-ml`, instala ambos componentes locales con los extras del workflow,
 limpia imports anteriores y valida que `vaaet` provenga del paquete instalado.
 El modo editable se reserva para desarrollo local.
 

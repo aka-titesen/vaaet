@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from vaaet.data.ingestion import create_dataset_package, load_dataset_package
+from vaaet_ml.data.ingestion import create_dataset_package, load_dataset_package
 
 
 def _read(path: Path | None) -> pd.DataFrame | None:

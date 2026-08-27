@@ -46,10 +46,10 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-
 from vaaet.features.engineering import engineer_features
 from vaaet.features.labeling import assign_traffic_state
-from vaaet.settings import STATE_LABELS
+
+from vaaet_ml.settings import STATE_LABELS
 
 LABEL_TO_STATE = {name.lower(): code for code, name in STATE_LABELS.items()}
 DEFAULT_JOIN_KEYS = ["clip_id", "minute_index"]

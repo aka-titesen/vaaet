@@ -4,7 +4,7 @@
         # Physics-First Speed Calculation Flow
 
         Detail of the active `estimate_speed()` + `analyze_video()` pipeline in
-        `vaaet-ml/src/vaaet/vision/speed.py` and `vaaet-ml/src/vaaet/vision/analysis.py`.
+        `vaaet-core/src/vaaet/vision/speed.py` and `vaaet-core/src/vaaet/vision/analysis.py`.
 
         ```mermaid
         flowchart TD

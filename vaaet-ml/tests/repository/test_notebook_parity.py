@@ -7,7 +7,10 @@ from pathlib import Path
 
 import pytest
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
+ML_ROOT = Path(__file__).resolve().parents[2]
+WORKSPACE_ROOT = ML_ROOT.parent
+CORE_ROOT = WORKSPACE_ROOT / "vaaet-core"
+REPO_ROOT = ML_ROOT
 NOTEBOOKS = {
     "collection": REPO_ROOT / "notebooks/data-collection/collect_traffic_telemetry.ipynb",
     "training": REPO_ROOT / "notebooks/training/train_traffic_state_classifier.ipynb",
@@ -29,7 +32,7 @@ def _code(path: Path) -> str:
 @pytest.mark.parametrize("path", ALL_NOTEBOOKS.values())
 def test_notebook_has_one_editable_install_and_no_import_hacks(path: Path) -> None:
     code = _code(path)
-    assert code.count('"-e"') == 1
+    assert code.count('"-e"') == 2
     assert "sys.path.insert" not in code
     assert "install_if_missing" not in code
 
@@ -37,10 +40,10 @@ def test_notebook_has_one_editable_install_and_no_import_hacks(path: Path) -> No
 @pytest.mark.parametrize("path", ALL_NOTEBOOKS.values())
 def test_colab_uses_wheel_and_local_uses_editable_install(path: Path) -> None:
     code = _code(path)
-    assert "install_command.append" in code
+    assert "install_command.extend([CORE_REQUIREMENT, ML_REQUIREMENT])" in code
     assert "install_command.extend" in code
-    assert code.count('"-e"') == 1
-    assert code.index("if IN_COLAB:") < code.index("install_command.append")
+    assert code.count('"-e"') == 2
+    assert code.index("if IN_COLAB:") < code.index("install_command.extend([CORE_REQUIREMENT, ML_REQUIREMENT])")
 
 
 @pytest.mark.parametrize("path", ALL_NOTEBOOKS.values())
@@ -48,7 +51,7 @@ def test_notebook_install_is_captured_strict_and_single(path: Path) -> None:
     code = _code(path)
     assert "subprocess.check_call(install_command)" not in code
     assert code.count("subprocess.run(install_command, capture_output=True, text=True, check=False)") == 1
-    assert "VAAET installation failed with extras=" in code
+    assert "La instalación local de VAAET Core y ML falló." in code
     assert "bootstrap_notebook_runtime(" in code
 
 
@@ -64,10 +67,11 @@ def _markdown(path: Path) -> str:
 @pytest.mark.parametrize("path", ALL_NOTEBOOKS.values())
 def test_notebook_clears_cache_and_validates_package_origin(path: Path) -> None:
     code = _code(path)
-    assert 'module_name == "vaaet"' in code
-    assert 'module_name.startswith("vaaet.")' in code
-    assert "from vaaet.runtime import bootstrap_notebook_runtime" in code
+    assert 'module_name in {"vaaet", "vaaet_ml"}' in code
+    assert 'module_name.startswith(("vaaet.", "vaaet_ml."))' in code
+    assert "from vaaet_ml.runtime import bootstrap_notebook_runtime" in code
     assert "VAAET_PACKAGE_FILE = RUNTIME.package_file" in code
+    assert "VAAET_ML_PACKAGE_FILE = RUNTIME.ml_package_file" in code
 
 
 @pytest.mark.parametrize("path", ALL_NOTEBOOKS.values())
@@ -104,7 +108,7 @@ def test_collection_uses_shared_analysis_and_data_contracts() -> None:
 def test_notebooks_handle_clips_without_complete_minutes() -> None:
     collection = _code(NOTEBOOKS["collection"])
     inference = _code(NOTEBOOKS["inference"])
-    review_module = (REPO_ROOT / "src/vaaet/data/review.py").read_text(encoding="utf-8")
+    review_module = (ML_ROOT / "src/vaaet_ml/data/review.py").read_text(encoding="utf-8")
 
     assert "mínimo: 60.0s" in collection
     assert "mínimo: 60.0s" in inference
@@ -122,18 +126,18 @@ def test_notebooks_handle_clips_without_complete_minutes() -> None:
 
 def test_training_uses_shared_feature_contracts() -> None:
     code = _code(NOTEBOOKS["training"])
-    selection_module = (REPO_ROOT / "src/vaaet/training/selection.py").read_text(encoding="utf-8")
+    selection_module = (ML_ROOT / "src/vaaet_ml/training/selection.py").read_text(encoding="utf-8")
     assert "FEATURE_COLS" in code
     assert "from vaaet.features.engineering import engineer_features" in code
     assert "from vaaet.features.labeling import assign_stable_traffic_state" in code
-    assert "from vaaet.data.database import" in code
+    assert "from vaaet_ml.data.database import" in code
     assert "def engineer_features(" not in code
     assert "def assign_traffic_state(" not in code
-    assert "from vaaet.training.partitions import build_training_partitions" in code
+    assert "from vaaet_ml.training.partitions import build_training_partitions" in code
     assert "build_training_partitions(" in code
     assert "validation_data=(x_validation, y_validation)" in selection_module
     assert "validation_split" not in code
-    assert "from vaaet.training.modeling import build_traffic_state_mlp" in code
+    assert "from vaaet_ml.training.modeling import build_traffic_state_mlp" in code
     assert "build_traffic_state_mlp(" in code
     assert "N_MODEL_STATES" in code
     assert "fit_temperature" in code
@@ -169,7 +173,7 @@ def test_training_uses_shared_feature_contracts() -> None:
 def test_training_prepares_postgres_backup_reader_in_colab() -> None:
     code = _code(NOTEBOOKS["training"])
     assert "ENABLE_DATA_UPLOAD = True" in code
-    restore_module = (REPO_ROOT / "src/vaaet/data/postgres_restore.py").read_text(encoding="utf-8")
+    restore_module = (ML_ROOT / "src/vaaet_ml/data/postgres_restore.py").read_text(encoding="utf-8")
     assert "resolve_pg_restore_for_backup" in code
     assert 'Path("/usr/lib/postgresql/17/bin/pg_restore")' in restore_module
     assert '["apt-get", "update", "-qq"]' in restore_module
@@ -200,7 +204,7 @@ def test_inference_finalizes_immutable_hitl_review_sessions() -> None:
 def test_inference_centralizes_and_documents_supported_workflow_configuration() -> None:
     notebook = json.loads(NOTEBOOKS["inference"].read_text(encoding="utf-8"))
     code = _code(NOTEBOOKS["inference"])
-    bundle_module = (REPO_ROOT / "src/vaaet/inference/bundle.py").read_text(encoding="utf-8")
+    bundle_module = (CORE_ROOT / "src/vaaet/inference/bundle.py").read_text(encoding="utf-8")
     markdown = "\n".join(
         "".join(cell.get("source", []))
         for cell in notebook["cells"]
@@ -396,7 +400,7 @@ def test_training_augmentation_handles_raw_and_feedback_inputs() -> None:
     assert guard in code
     assert code.index(guard) < code.index("_n_before = len(df_raw)")
     assert "Datos sintéticos omitidos: sólo se agregan durante el inicio semilla" in code
-    assert "from vaaet.data.timestamps import normalize_timestamp_series" in code
+    assert "from vaaet.timestamps import normalize_timestamp_series" in code
     assert "Zona horaria canónica" in code
 
 
@@ -408,7 +412,7 @@ def test_training_documents_actual_synthetic_record_count() -> None:
 
 def test_training_compares_conservative_balance_candidates() -> None:
     code = _code(NOTEBOOKS["training"])
-    selection_module = (REPO_ROOT / "src/vaaet/training/selection.py").read_text(encoding="utf-8")
+    selection_module = (ML_ROOT / "src/vaaet_ml/training/selection.py").read_text(encoding="utf-8")
     assert "build_balance_candidates(" in code
     assert "select_balance_candidate(" in code
     assert "BalanceStrategy.CLASS_WEIGHTS" not in code
@@ -432,9 +436,11 @@ def test_training_applies_same_legacy_policy_as_inference() -> None:
 
 def test_inference_uses_shared_analysis_and_validates_bundle() -> None:
     code = _code(NOTEBOOKS["inference"])
-    bundle_module = (REPO_ROOT / "src/vaaet/inference/bundle.py").read_text(encoding="utf-8")
-    assert "from vaaet.vision.analysis import TrafficStatePrediction, analyze_video" in code
+    bundle_module = (CORE_ROOT / "src/vaaet/inference/bundle.py").read_text(encoding="utf-8")
+    assert "from vaaet.vision.analysis import analyze_video" in code
+    assert "TrafficStateEngine" in code
     assert "load_traffic_bundle(" in code
+    assert "prediction_provider=traffic_engine.predict_latest" in code
     assert "manifest = validate_manifest(directory)" in bundle_module
     assert "from sqlalchemy import text as sa_text" not in code
     assert "load_review_queue" in code
@@ -464,7 +470,9 @@ def test_annotated_video_workflows_default_to_public_shared_hud() -> None:
         assert code.count("HUD_DEBUG = False") == 1
         assert "from vaaet.vision.hud import HudConfig" in code
         assert "hud_config=HudConfig(debug=HUD_DEBUG)" in code
-    assert 'incident_candidate=bool(latest.get("accident_rule_triggered", False))' in inference
+    engine = (CORE_ROOT / "src/vaaet/inference/engine.py").read_text(encoding="utf-8")
+    assert "prediction_provider=traffic_engine.predict_latest" in inference
+    assert 'incident_candidate=bool(latest.get("accident_rule_triggered", False))' in engine
 
 
 def test_notebooks_use_profile_specific_database_api() -> None:

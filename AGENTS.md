@@ -10,6 +10,9 @@
   detalladas están en [`vaaet-ml/AGENTS.md`](vaaet-ml/AGENTS.md).
 - `vaaet-app/` está reservado: no agregar API, frontend, framework ni
   dependencias sin un alcance aprobado y un contrato HTTP versionado.
+- No desplegar una API o Web App que ejecute `vaaet-core[vision]` hasta que el
+  responsable haya verificado una licencia Ultralytics Enterprise válida fuera
+  de Git; el registro público sólo puede declarar el estado del gate.
 - `docs/`, `.dvc/` y `.github/` pertenecen a la raíz compartida.
 
 ## Invariantes

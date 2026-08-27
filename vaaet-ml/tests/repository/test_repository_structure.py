@@ -23,6 +23,7 @@ ALLOWED_SCRIPT_FILES = {
     "convert-postgres-backup.py",
     "evaluate-telemetry-exports.py",
     "export-training-dataset.py",
+    "notebook_bootstrap.py",
     "setup-dvc.sh",
 }
 
@@ -127,7 +128,7 @@ def test_active_notebooks_use_canonical_feature_count_and_repository_root() -> N
         assert 'WORKSPACE_DIR = Path("/content/vaaet")' in code
         assert 'ML_ROOT = WORKSPACE_DIR / "vaaet-ml"' in code
         assert "REPO_ROOT" in code
-        assert code.count('"-e"') == 2
+        assert code.count("runpy.run_path") == 1
     diagram = (
         WORKSPACE_ROOT / "docs" / "architecture" / "diagrams" / "intelligence-pipeline.md"
     ).read_text(encoding="utf-8")
@@ -176,15 +177,29 @@ def test_removed_directories_are_absent() -> None:
 
 def test_notebook_extras_match_workflows() -> None:
     expected = {
-        "collect_traffic_telemetry.ipynb": ("vision", "database"),
-        "train_traffic_state_classifier.ipynb": ("inference", "training,visualization,database"),
-        "analyze_traffic_video.ipynb": ("vision,inference", "visualization,database"),
+        "collect_traffic_telemetry.ipynb": (("vision",), ("database",)),
+        "train_traffic_state_classifier.ipynb": (
+            ("inference",),
+            ("training", "visualization", "database"),
+        ),
+        "analyze_traffic_video.ipynb": (
+            ("vision", "inference"),
+            ("visualization", "database"),
+        ),
     }
     for notebook in ACTIVE_NOTEBOOKS:
         code = _concatenate_code_cells(notebook)
         core_extras, ml_extras = expected[notebook.name]
-        assert f'CORE_REQUIREMENT = f"{{CORE_ROOT}}[{core_extras}]"' in code
-        assert f'ML_REQUIREMENT = f"{{ML_ROOT}}[{ml_extras}]"' in code
+        assert f"core_extras={core_extras!r}" in code
+        assert f"ml_extras={ml_extras!r}" in code
+
+
+def test_dvc_ci_installs_the_declared_extra_from_the_workspace() -> None:
+    workflow = (WORKSPACE_ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
+
+    assert 'python -m pip install "./vaaet-core"' in workflow
+    assert 'python -m pip install "./vaaet-ml[dvc]"' in workflow
+    assert 'pip install "dvc[gdrive]>=3.50.0"' not in workflow
 
 
 def test_python_313_is_declared_and_exercised_by_ci() -> None:

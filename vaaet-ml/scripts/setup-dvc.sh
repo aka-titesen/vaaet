@@ -25,10 +25,12 @@ fi
 
 cd "$WORKSPACE_ROOT"
 
-# 2. Verificar/instalar DVC
+# 2. Verificar DVC, que se declara exclusivamente en vaaet-ml[dvc].
 if ! command -v dvc &> /dev/null; then
-    echo "📦 DVC no encontrado. Instalando..."
-    pip install -q "dvc[gdrive]>=3.50.0"
+    echo "❌ DVC no está instalado. Desde la raíz ejecutá:"
+    echo "   python -m pip install -e './vaaet-core'"
+    echo "   python -m pip install -e './vaaet-ml[dvc]'"
+    exit 1
 else
     echo "✅ DVC encontrado: $(dvc version | head -1)"
 fi

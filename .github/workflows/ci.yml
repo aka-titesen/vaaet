@@ -218,8 +218,8 @@ jobs:
 
       - name: Instalar dependencias de base de datos
         run: |
-          pip install -e "../vaaet-core[inference]"
-          pip install -e ".[database,dev]"
+          python -m pip install -e "../vaaet-core[inference]"
+          python -m pip install -e ".[database,dev]"
 
       - name: Instalar cliente PostgreSQL 17
         run: |
@@ -273,8 +273,12 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Instalar DVC
-        run: pip install "dvc[gdrive]>=3.50.0"
+      - name: Instalar componentes y extra DVC declarado
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install "./vaaet-core"
+          python -m pip install "./vaaet-ml[dvc]"
+          python -m pip check
 
       - name: Verificar configuración de DVC
         run: |

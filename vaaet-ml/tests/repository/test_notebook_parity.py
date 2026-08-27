@@ -30,29 +30,30 @@ def _code(path: Path) -> str:
 
 
 @pytest.mark.parametrize("path", ALL_NOTEBOOKS.values())
-def test_notebook_has_one_editable_install_and_no_import_hacks(path: Path) -> None:
+def test_notebook_has_one_shared_bootstrap_and_no_import_hacks(path: Path) -> None:
     code = _code(path)
-    assert code.count('"-e"') == 2
+    assert code.count("# Environment setup — run once per Colab runtime") == 1
+    assert code.count("runpy.run_path") == 1
     assert "sys.path.insert" not in code
     assert "install_if_missing" not in code
+    assert '"pip", "install"' not in code
 
 
 @pytest.mark.parametrize("path", ALL_NOTEBOOKS.values())
-def test_colab_uses_wheel_and_local_uses_editable_install(path: Path) -> None:
+def test_colab_uses_the_shared_bootstrap_with_explicit_extras(path: Path) -> None:
     code = _code(path)
-    assert "install_command.extend([CORE_REQUIREMENT, ML_REQUIREMENT])" in code
-    assert "install_command.extend" in code
-    assert code.count('"-e"') == 2
-    assert code.index("if IN_COLAB:") < code.index("install_command.extend([CORE_REQUIREMENT, ML_REQUIREMENT])")
+    assert 'BOOTSTRAP["bootstrap_notebook"](' in code
+    assert "in_colab=IN_COLAB" in code
+    assert "core_extras=" in code
+    assert "ml_extras=" in code
 
 
 @pytest.mark.parametrize("path", ALL_NOTEBOOKS.values())
-def test_notebook_install_is_captured_strict_and_single(path: Path) -> None:
+def test_notebook_setup_delegates_installation_and_preflight(path: Path) -> None:
     code = _code(path)
-    assert "subprocess.check_call(install_command)" not in code
-    assert code.count("subprocess.run(install_command, capture_output=True, text=True, check=False)") == 1
-    assert "La instalación local de VAAET Core y ML falló." in code
-    assert "bootstrap_notebook_runtime(" in code
+    assert "notebook_bootstrap.py" in code
+    assert "bootstrap_notebook_runtime(" not in code
+    assert "--force-reinstall" not in code
 
 
 def _markdown(path: Path) -> str:
@@ -67,9 +68,6 @@ def _markdown(path: Path) -> str:
 @pytest.mark.parametrize("path", ALL_NOTEBOOKS.values())
 def test_notebook_clears_cache_and_validates_package_origin(path: Path) -> None:
     code = _code(path)
-    assert 'module_name in {"vaaet", "vaaet_ml"}' in code
-    assert 'module_name.startswith(("vaaet.", "vaaet_ml."))' in code
-    assert "from vaaet_ml.runtime import bootstrap_notebook_runtime" in code
     assert "VAAET_PACKAGE_FILE = RUNTIME.package_file" in code
     assert "VAAET_ML_PACKAGE_FILE = RUNTIME.ml_package_file" in code
 
@@ -77,7 +75,7 @@ def test_notebook_clears_cache_and_validates_package_origin(path: Path) -> None:
 @pytest.mark.parametrize("path", ALL_NOTEBOOKS.values())
 def test_notebook_pip_check_is_visible_but_non_blocking(path: Path) -> None:
     code = _code(path)
-    assert "bootstrap_notebook_runtime(" in code
+    assert 'BOOTSTRAP["bootstrap_notebook"](' in code
     assert 'check_call([sys.executable, "-m", "pip", "check"])' not in code
 
 

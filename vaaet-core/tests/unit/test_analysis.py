@@ -9,6 +9,7 @@ from pathlib import Path
 import cv2
 import numpy as np
 import pandas as pd
+import pytest
 
 from vaaet.features.engineering import engineer_features
 from vaaet.telemetry import CANONICAL_RAW_TELEMETRY_COLUMNS
@@ -39,6 +40,55 @@ class _FakeFlow:
         return np.zeros(2, dtype=float)
 
 
+class _FailingDetector:
+    def __init__(self, **_: object) -> None:
+        pass
+
+    def load(self) -> None:
+        return None
+
+    def detect(self, _frame: object) -> list[Detection]:
+        raise RuntimeError("detector failure")
+
+
+class _ReleasableCapture:
+    def __init__(self) -> None:
+        self.released = False
+        self._read_once = False
+
+    def get(self, property_id: int) -> float:
+        if property_id == cv2.CAP_PROP_FPS:
+            return 1.0
+        if property_id == cv2.CAP_PROP_FRAME_WIDTH:
+            return 96.0
+        if property_id == cv2.CAP_PROP_FRAME_HEIGHT:
+            return 64.0
+        return 0.0
+
+    def read(self) -> tuple[bool, np.ndarray]:
+        if self._read_once:
+            return False, np.empty((0, 0, 3), dtype=np.uint8)
+        self._read_once = True
+        return True, np.zeros((64, 96, 3), dtype=np.uint8)
+
+    def release(self) -> None:
+        self.released = True
+
+
+class _ReleasableWriter:
+    def __init__(self) -> None:
+        self.released = False
+
+    def isOpened(self) -> bool:
+        return True
+
+    def write(self, _frame: np.ndarray) -> None:
+        return None
+
+    def release(self) -> None:
+        self.released = True
+
+
 def _make_video(path: Path, *, frames: int = 60) -> None:
     writer = cv2.VideoWriter(str(path), cv2.VideoWriter_fourcc(*"mp4v"), 1.0, (96, 64))
     for _ in range(frames):
@@ -58,6 +108,16 @@ def test_analyze_video_with_and_without_prediction_provider(tmp_path, monkeypatc
     assert collection.classifications is None
     assert collection.complete_minutes == 1
     assert collection.discarded_partial_seconds == 0.0
+    assert collection.metrics.frames_processed == 60
+    assert set(collection.metrics.stage_seconds) == {
+        "read",
+        "perception",
+        "tracking",
+        "motion_telemetry",
+        "render_encode",
+        "minute_policy",
+    }
+    assert collection.metrics.frames_per_second >= 0.0
 
     provider_calls = 0
 
@@ -154,6 +214,7 @@ def test_analyze_video_returns_canonical_empty_frames_for_short_clip(
     assert result.complete_minutes == 0
     assert result.processed_duration_seconds == 16.0
     assert result.discarded_partial_seconds == 16.0
+    assert result.metrics.frames_processed == 16
     assert provider_calls == 0
 
 
@@ -184,3 +245,19 @@ def test_analyze_video_discards_only_the_partial_tail(tmp_path, monkeypatch) -> 
     )
     engineered = engineer_features(result.telemetry)
     assert engineered.iloc[0]["hour_of_day"] == 8
+
+
+def test_analyze_video_releases_capture_and_writer_after_filter_error(monkeypatch) -> None:
+    capture = _ReleasableCapture()
+    writer = _ReleasableWriter()
+    monkeypatch.setattr(analysis, "YOLODetector", _FailingDetector)
+    monkeypatch.setattr(analysis, "OpticalFlowEstimator", _FakeFlow)
+    monkeypatch.setattr(analysis, "extract_duration", lambda _path: 60.0)
+    monkeypatch.setattr(analysis, "open_video", lambda _path: capture)
+    monkeypatch.setattr(cv2, "VideoWriter", lambda *_args: writer)
+
+    with pytest.raises(RuntimeError, match="detector failure"):
+        analyze_video("bridge_2025-05-01_08-00-00_to_08-01-00.mp4")
+
+    assert capture.released
+    assert writer.released

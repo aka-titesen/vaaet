@@ -40,6 +40,14 @@ bundle ya validado; no implementa I/O remoto, colas ni persistencia. Sin
 proveedor de predicción muestra “Telemetry Collection”; con proveedor incorpora
 estado y confianza. El módulo no importa TensorFlow.
 
+Internamente, visión ejecuta filtros síncronos y ordenados:
+`FramePacket → PerceptionPacket → TrackingPacket → MotionPacket → RenderedFramePacket`.
+Una sesión por clip conserva el estado de flujo óptico, SORT, velocidad,
+estacionario y telemetría; no hay colas ni workers entre filtros. Una cola local
+acotada entre lectura y YOLO sólo será candidata tras comparar estas métricas
+base con el mismo clip, GPU, modelo y resolución, sin alterar el orden ni la
+telemetría.
+
 El notebook de entrenamiento expone dos entradas explícitas que convergen antes
 del split: `SEED_BOOTSTRAP` calcula features desde raw y produce un piloto;
 `HITL_RETRAINING` consume el snapshot semilla vigente y todos los paquetes activos

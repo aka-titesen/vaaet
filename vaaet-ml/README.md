@@ -31,6 +31,11 @@ predictions -> explicit HITL review -> vaaet_feedback.human_validations
 
 VAAET ML admite Python 3.10–3.13.
 
+VAAET se distribuye bajo AGPL-3.0-only. Los notebooks siguen siendo uso de
+laboratorio; una futura demo web con YOLO debe respetar la vía pública AGPL o
+la licencia Enterprise indicada en el
+[registro de licencias de terceros](../docs/governance/third-party-licenses.md).
+
 Desde la raíz del monorepo, creá y activá una `.venv` aislada. Instalá primero
 el core y luego el laboratorio, siempre con `python -m pip`:
 

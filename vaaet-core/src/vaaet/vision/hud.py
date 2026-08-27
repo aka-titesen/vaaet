@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 VAAET Contributors
+# SPDX-License-Identifier: AGPL-3.0-only
 """Responsive public-facing HUD for annotated traffic videos."""
 
 from __future__ import annotations

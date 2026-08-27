@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 VAAET Contributors
+# SPDX-License-Identifier: AGPL-3.0-only
 """Feature engineering for the VAAET traffic-state classifier.
 
 Transforms raw telemetry into features that capture inter-record dynamics,

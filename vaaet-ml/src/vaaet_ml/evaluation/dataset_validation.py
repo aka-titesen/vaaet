@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 VAAET Contributors
+# SPDX-License-Identifier: AGPL-3.0-only
 """Contractual dataset audit performed before any VAAET model training."""
 
 from __future__ import annotations

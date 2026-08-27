@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 VAAET Contributors
+# SPDX-License-Identifier: AGPL-3.0-only
 """Optical-flow camera-motion estimation for the VAAET production pipeline.
 
 Uses Lucas-Kanade sparse optical flow on a regular feature-point grid to

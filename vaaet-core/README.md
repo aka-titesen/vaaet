@@ -19,7 +19,8 @@ python -m pip install -e "./vaaet-core[vision,inference,dev]"
 python -m pip check
 ```
 
-`vision` incorpora YOLO para detección. El repositorio conserva licencia MIT,
-pero una API o Web App que use ese extra no puede desplegarse hasta verificar
-una licencia Ultralytics Enterprise fuera de Git. Consultá el
+`vision` incorpora YOLO para detección. VAAET se distribuye bajo AGPL-3.0-only:
+una demo web pública que use este extra debe publicar su código correspondiente
+y cumplir el gate de activos; una aplicación privada o comercial requiere una
+licencia Ultralytics Enterprise fuera de Git. Consultá el
 [registro de licencias de terceros](../docs/governance/third-party-licenses.md).

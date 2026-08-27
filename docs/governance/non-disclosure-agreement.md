@@ -44,7 +44,7 @@ El presente acuerdo establece las obligaciones de confidencialidad para las part
 
 | Tipo | Ejemplos |
 |---|---|
-| **Código fuente** | Todo el contenido del repositorio público (licencia MIT) |
+| **Código fuente** | Todo el contenido del repositorio público (licencia AGPL-3.0-only) |
 | **Documentación** | Todos los archivos `.md` del repositorio |
 | **Arquitectura** | Diagramas, ADRs, plantillas |
 | **Datos sintéticos** | Generados por `vaaet-ml/src/vaaet_ml/features/synthetic.py` |

@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 VAAET Contributors
+# SPDX-License-Identifier: AGPL-3.0-only
 """Canonical timestamp handling shared by every VAAET workflow."""
 
 from __future__ import annotations

@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 VAAET Contributors
+# SPDX-License-Identifier: AGPL-3.0-only
 """Append-only human review for stable traffic states and incidents."""
 
 from __future__ import annotations

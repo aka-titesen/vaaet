@@ -102,14 +102,17 @@ Complementa PRD.md y RISK_MATRIX.md. -->
 
 | Aspecto | Estado |
 |---|---|
-| Licencia del software | MIT (permisiva) |
+| Licencia del software | AGPL-3.0-only |
 | Datos de video | Propiedad de SISE/Vialidad Nacional — no distribuidos |
 | Privacidad | No se procesan datos personales (patentes, identidades) |
-| Dependencias | Todas open source con licencias compatibles |
+| Dependencias | YOLO exige la vía pública AGPL o una licencia Enterprise para uso privado/comercial |
 
 ### 4.2 Conclusión Legal
 
-**FACTIBLE.** El software es MIT, los datos no contienen información personal identificable, y las dependencias tienen licencias compatibles.
+**FACTIBLE CON GATE.** La demo académica pública puede usar AGPL-3.0; los datos
+restringidos no se distribuyen y los activos de cada demo requieren revisión de
+procedencia y permiso de redistribución. Una aplicación privada o comercial que
+ejecute YOLO requiere licencia Enterprise.
 
 ---
 

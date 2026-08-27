@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 VAAET Contributors
+# SPDX-License-Identifier: AGPL-3.0-only
 """Minute-level telemetry accumulation for VAAET video workflows."""
 
 from __future__ import annotations

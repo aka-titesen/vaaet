@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 VAAET Contributors
+# SPDX-License-Identifier: AGPL-3.0-only
 """Tests for src/classification.py — shared inference helpers."""
 
 from __future__ import annotations

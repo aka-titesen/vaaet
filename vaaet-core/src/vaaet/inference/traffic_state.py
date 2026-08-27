@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 VAAET Contributors
+# SPDX-License-Identifier: AGPL-3.0-only
 """Hierarchical, leakage-free traffic-state decisions shared by train and serve."""
 
 from __future__ import annotations

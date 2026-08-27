@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 VAAET Contributors
+# SPDX-License-Identifier: AGPL-3.0-only
 """Alembic environment for administrator-only VAAET schema migrations."""
 
 from __future__ import annotations

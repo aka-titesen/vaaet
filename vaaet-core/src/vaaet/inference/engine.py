@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 VAAET Contributors
+# SPDX-License-Identifier: AGPL-3.0-only
 """Adaptador tipado entre bundle validado y análisis de video sin I/O externo."""
 
 from __future__ import annotations

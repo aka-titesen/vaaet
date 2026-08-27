@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 VAAET Contributors
+# SPDX-License-Identifier: AGPL-3.0-only
 """Harden PostgreSQL contracts and add auditable pipeline runs.
 
 Revision ID: 20260806_0002

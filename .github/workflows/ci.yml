@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 VAAET Contributors
+# SPDX-License-Identifier: AGPL-3.0-only
 # ─────────────────────────────────────────────────────────────
 # VAAET — Pipeline de Integración Continua
 # Se activa en cada push y pull request a main.

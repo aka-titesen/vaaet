@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 VAAET Contributors
+# SPDX-License-Identifier: AGPL-3.0-only
 """Contrato portable de telemetría cruda producido por la visión."""
 
 BASE_RAW_TELEMETRY_COLUMNS: tuple[str, ...] = (

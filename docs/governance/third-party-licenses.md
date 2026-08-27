@@ -4,20 +4,25 @@ Este registro describe gates de uso y no reemplaza asesoramiento legal ni
 contratos privados. No se registran en Git números de licencia, contratos,
 credenciales ni información comercial.
 
-| Componente | Uso VAAET | Licencia upstream | Gate de despliegue |
+| Componente | Uso VAAET | Licencia upstream | Vías de despliegue |
 | --- | --- | --- | --- |
-| `ultralytics-opencv-headless` | Extra `vaaet-core[vision]` para YOLO | AGPL-3.0 o Enterprise | Una API o Web App que ejecute visión requiere licencia Enterprise válida. |
+| `ultralytics-opencv-headless` | Extra `vaaet-core[vision]` para YOLO | AGPL-3.0 o Enterprise | Demo pública AGPL-3.0 con checklist completo, o Enterprise para aplicación privada/comercial. |
 
-## Gate Ultralytics Enterprise
+## Gate de serving Ultralytics
 
-VAAET conserva su licencia MIT, pero el uso y la redistribución del extra
-`vision` también quedan sujetos a la licencia upstream. Antes de desplegar un
-worker de API que ejecute `vaaet.vision`, el responsable autorizado debe
-verificar en el registro privado de compras o legal que existe una licencia
-Ultralytics Enterprise vigente y aplicable al entorno. El release checklist
-público sólo puede indicar `Enterprise license verified: yes/no`, sin adjuntar
-evidencia privada.
+VAAET se distribuye bajo AGPL-3.0-only. Antes de desplegar un worker de API que
+ejecute `vaaet.vision`, el responsable elige y registra una de estas vías:
 
-Sin esa verificación, `vaaet-app/` permanece reservado y no se habilita serving
+1. **Demo pública AGPL-3.0:** el código fuente correspondiente es público,
+   reproducible y atribuye a Ultralytics; los modelos, bundles y datos usados
+   tienen procedencia y permiso de redistribución verificados.
+2. **Aplicación privada o comercial:** existe una licencia Ultralytics
+   Enterprise vigente y aplicable, verificada en el registro privado de compras
+   o legal.
+
+El registro público puede declarar la vía elegida y el estado del gate, pero
+nunca contratos, números de licencia, credenciales ni evidencia comercial.
+Sin una vía completa, `vaaet-app/` permanece reservado y no se habilita serving
 web con el extra `vision`. Esta política sigue las opciones de licencia
-publicadas por [Ultralytics](https://docs.ultralytics.com/).
+publicadas por [Ultralytics](https://docs.ultralytics.com/). La vía AGPL se
+verifica con el [checklist de demo pública](agpl-demo-release-checklist.md).

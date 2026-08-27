@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 VAAET Contributors
+# SPDX-License-Identifier: AGPL-3.0-only
 """Tests for vaaet.vision detector, tracker, and speed modules.
 
 These tests exercise pure logic only. YOLO model loading is NOT tested

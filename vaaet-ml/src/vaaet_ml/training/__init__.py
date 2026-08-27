@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 VAAET Contributors
+# SPDX-License-Identifier: AGPL-3.0-only
 """Shared lifecycle helpers for seed bootstrap and HITL retraining."""
 
 from vaaet_ml.training.balancing import (

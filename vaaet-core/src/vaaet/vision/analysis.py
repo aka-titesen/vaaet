@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 VAAET Contributors
+# SPDX-License-Identifier: AGPL-3.0-only
 """Shared annotated-video workflow for telemetry collection and inference."""
 
 from __future__ import annotations

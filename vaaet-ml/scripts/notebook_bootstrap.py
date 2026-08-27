@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 VAAET Contributors
+# SPDX-License-Identifier: AGPL-3.0-only
 """Idempotent package installation for VAAET notebook environment cells.
 
 This module intentionally uses only the standard library: it must run from a

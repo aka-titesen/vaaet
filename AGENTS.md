@@ -10,9 +10,12 @@
   detalladas están en [`vaaet-ml/AGENTS.md`](vaaet-ml/AGENTS.md).
 - `vaaet-app/` está reservado: no agregar API, frontend, framework ni
   dependencias sin un alcance aprobado y un contrato HTTP versionado.
-- No desplegar una API o Web App que ejecute `vaaet-core[vision]` hasta que el
-  responsable haya verificado una licencia Ultralytics Enterprise válida fuera
-  de Git; el registro público sólo puede declarar el estado del gate.
+- Una API o Web App que ejecute `vaaet-core[vision]` sólo puede desplegarse por
+  una vía explícita: demo pública AGPL-3.0 con código y activos aprobados, o
+  aplicación privada/comercial con licencia Ultralytics Enterprise verificada
+  fuera de Git. La vía AGPL exige completar el
+  [`checklist de demo`](docs/governance/agpl-demo-release-checklist.md). El
+  registro público no contiene contratos ni evidencia privada.
 - `docs/`, `.dvc/` y `.github/` pertenecen a la raíz compartida.
 
 ## Invariantes

@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 VAAET Contributors
+# SPDX-License-Identifier: AGPL-3.0-only
 """Centralized configuration for the VAAET intelligence layer.
 
 This module is the single source of truth for paths, constants, and database

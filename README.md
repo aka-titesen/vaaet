@@ -17,3 +17,10 @@ La arquitectura está gobernada por
 La raíz conserva el único repositorio Git, la configuración DVC y la
 automatización CI. Para trabajar sobre ML, instalá primero `vaaet-core/` y luego
 `vaaet-ml/` desde sus `pyproject.toml` locales.
+
+## Licencia
+
+VAAET se distribuye bajo [AGPL-3.0-only](LICENSE). El extra
+`vaaet-core[vision]` incorpora YOLO: una demo web pública requiere cumplir la
+vía AGPL y una aplicación privada o comercial requiere licencia Ultralytics
+Enterprise. Consultá [ADR-0022](docs/architecture/decisions/0022-agpl-public-demo-path.md).

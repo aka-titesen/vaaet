@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 VAAET Contributors
+# SPDX-License-Identifier: AGPL-3.0-only
 """Canonical UTC and bridge-local timestamp contract tests."""
 
 from __future__ import annotations

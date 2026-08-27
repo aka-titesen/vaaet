@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 VAAET Contributors
+# SPDX-License-Identifier: AGPL-3.0-only
 """Contrato de ciclo de vida que comparten entrenamiento y serving."""
 
 from __future__ import annotations

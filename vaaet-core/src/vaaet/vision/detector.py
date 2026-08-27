@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 VAAET Contributors
+# SPDX-License-Identifier: AGPL-3.0-only
 """YOLO detection wrapper for the VAAET production pipeline.
 
 Provides a thin, testable interface around Ultralytics YOLO for vehicle

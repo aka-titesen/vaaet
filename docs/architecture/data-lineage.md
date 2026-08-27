@@ -34,7 +34,7 @@ instante persistido.
 
 Desde 4.2.0 el UUID referencia `vaaet_ops.pipeline_runs`, que registra workflow,
 estado, commit, contratos y conteos sin secretos. Cuando PostgreSQL es opcional,
-el mismo contrato se conserva como JSON bajo `data/processed/pipeline-runs/`.
+el mismo contrato se conserva como JSON bajo `vaaet-ml/data/processed/pipeline-runs/`.
 
 ## Adquisición
 

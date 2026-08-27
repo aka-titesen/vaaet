@@ -1,6 +1,6 @@
 # Arquitectura de software — VAAET ML 4.5.3
 
-VAAET ML es un pipeline MLOps batch con adquisición bajo demanda, entrenamiento, inferencia y feedback. Colab orquesta ejecuciones manuales; el paquete `vaaet` concentra lógica comprobable y `pyproject.toml` es la única fuente de dependencias.
+VAAET ML es un pipeline MLOps batch con adquisición bajo demanda, entrenamiento, inferencia y feedback. Colab orquesta ejecuciones manuales; el paquete `vaaet` concentra lógica comprobable y `vaaet-ml/pyproject.toml` es la única fuente de dependencias.
 
 ```mermaid
 flowchart LR
@@ -25,14 +25,14 @@ flowchart LR
 
 | Capa | Ruta | Responsabilidad |
 |---|---|---|
-| Orquestación | `notebooks/` | UI Colab, selección de entradas y descargas |
-| Visión | `src/vaaet/vision/` | YOLO, tracking, flujo óptico, velocidad, HUD y telemetría |
-| Features | `src/vaaet/features/` | 19 features, etiquetas y datos sintéticos trazables |
-| Inferencia | `src/vaaet/inference/` | MLP de tres estados, histéresis y candidato conservador de incidente |
-| Datos | `src/vaaet/data/` | CSV, PostgreSQL, snapshots, catálogo HITL e input locks |
+| Orquestación | `vaaet-ml/notebooks/` | UI Colab, selección de entradas y descargas |
+| Visión | `vaaet-ml/src/vaaet/vision/` | YOLO, tracking, flujo óptico, velocidad, HUD y telemetría |
+| Features | `vaaet-ml/src/vaaet/features/` | 19 features, etiquetas y datos sintéticos trazables |
+| Inferencia | `vaaet-ml/src/vaaet/inference/` | MLP de tres estados, histéresis y candidato conservador de incidente |
+| Datos | `vaaet-ml/src/vaaet/data/` | CSV, PostgreSQL, snapshots, catálogo HITL e input locks |
 | Contratos | `contracts.py`, `artifacts.py` | Esquemas y bundle portable |
-| Evaluación | `src/vaaet/evaluation/` | Calibración y reporting |
-| Entrenamiento | `src/vaaet/training/` | Modos seed/HITL, memoria proxy, holdout versionado y balanceo conservador |
+| Evaluación | `vaaet-ml/src/vaaet/evaluation/` | Calibración y reporting |
+| Entrenamiento | `vaaet-ml/src/vaaet/training/` | Modos seed/HITL, memoria proxy, holdout versionado y balanceo conservador |
 
 `vaaet.vision.analysis.analyze_video()` es el límite común entre adquisición e inferencia. Sin proveedor de predicción muestra “Telemetry Collection”; con proveedor incorpora estado y confianza. El módulo no importa TensorFlow.
 
@@ -46,9 +46,10 @@ exacta en un input lock. El mismo `input_policy` del manifiesto se usa en servin
 
 - PostgreSQL es opcional y portable entre proveedores. `vaaet_raw`, `vaaet_ml` y `vaaet_feedback` separan adquisición, inferencia y ground truth; `vaaet_ops` registra ejecuciones redactadas y cuatro perfiles aplican mínimo privilegio.
 - Google Drive transporta el bundle y conserva semilla, sesiones HITL, input locks y holdouts humanos entre sesiones Colab.
-- DVC versiona el directorio `artifacts/traffic-state` como una unidad.
+- DVC versiona el directorio `vaaet-ml/artifacts/traffic-state` como una unidad.
 - Los pesos YOLO se descargan en runtime y no pertenecen al repositorio.
-- La futura Web App vive en otro repositorio y sólo acepta bundles que validan el manifiesto.
+- La futura Web App vivirá en `vaaet-app/`, consumirá únicamente una API versionada
+  y nunca accederá directamente a bundles, DVC, Drive, PostgreSQL ni `vaaet-ml`.
 
 ## Calidad
 

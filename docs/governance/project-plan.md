@@ -135,10 +135,10 @@ gantt
 | Prioridad | Tarea | Estimación | Dependencias |
 |---|---|---|---|
 | P0 | Validación E2E completa en Colab | 1 semana | Módulos 1 y 2 estables |
-| P1 | Implementar Model Registry con DVC | 2 semanas | `pyproject.toml` listo |
+| P1 | Implementar Model Registry con DVC | 2 semanas | `vaaet-ml/pyproject.toml` listo |
 | P1 | Publicación académica | 4 semanas | Datos suficientes |
-| P2 | Web App MVP (dashboard) | 8 semanas | Modelo estable |
-| P2 | API REST para integración | 4 semanas | Web App MVP |
+| P2 | Contrato HTTP y API de serving | 4 semanas | Modelo estable |
+| P2 | Web App MVP (dashboard) | 8 semanas | API versionada |
 | P3 | Expansión a otros puentes | 12 semanas | Web App + API |
 
 ---

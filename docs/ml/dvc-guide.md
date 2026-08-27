@@ -11,7 +11,7 @@ como experimento, aunque no debe promoverse al canal consumido por la Web App.
 ## Bundle requerido
 
 ```text
-artifacts/traffic-state/
+vaaet-ml/artifacts/traffic-state/
 ├── traffic_classifier.keras
 ├── feature_scaler.joblib
 ├── label_mapping.joblib
@@ -20,14 +20,14 @@ artifacts/traffic-state/
 
 Mientras todavía no exista un entrenamiento materializado, `.gitkeep` conserva
 el directorio. Después del primer entrenamiento debe eliminarse y ser reemplazado
-por `artifacts/traffic-state.dvc`.
+por `vaaet-ml/artifacts/traffic-state.dvc`.
 
 ## Registrar y publicar
 
 ```bash
-rm artifacts/traffic-state/.gitkeep
-dvc add artifacts/traffic-state
-git add artifacts/traffic-state.dvc .gitignore
+rm vaaet-ml/artifacts/traffic-state/.gitkeep
+dvc add vaaet-ml/artifacts/traffic-state
+git add vaaet-ml/artifacts/traffic-state.dvc .gitignore
 git commit -m "feat(models): registrar bundle de tráfico"
 dvc push
 ```
@@ -38,7 +38,7 @@ El manifiesto debe validarse antes de registrar el directorio.
 ## Descargar y verificar
 
 ```bash
-dvc pull artifacts/traffic-state.dvc
+dvc pull vaaet-ml/artifacts/traffic-state.dvc
 dvc status
 dvc doctor
 ```
@@ -46,7 +46,7 @@ dvc doctor
 ```python
 from vaaet.artifacts import validate_manifest
 
-manifest = validate_manifest("artifacts/traffic-state")
+manifest = validate_manifest("vaaet-ml/artifacts/traffic-state")
 print(manifest["model_version"])
 ```
 
@@ -56,13 +56,13 @@ Los notebooks copian siempre los cuatro archivos. Si se usa DVC directamente:
 
 ```python
 !pip install -q "dvc[gdrive]>=3.50.0"
-!dvc pull artifacts/traffic-state.dvc
+!dvc pull vaaet-ml/artifacts/traffic-state.dvc
 ```
 
 Google Drive es el remote predeterminado; S3 y local son alternativas declaradas
 en `.dvc/config`. Credenciales y opciones privadas pertenecen a
 `.dvc/config.local`, nunca a Git. Para inicializar una máquina ejecutá
-`bash scripts/setup-dvc.sh` desde la raíz.
+`bash vaaet-ml/scripts/setup-dvc.sh` desde la raíz.
 
 ## Diagnóstico
 

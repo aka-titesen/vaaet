@@ -12,7 +12,7 @@ Con una identidad administrativa local o de CI:
 export VAAET_DATABASE_ADMIN_URL='postgresql+psycopg2://admin:...@host:5432/vaaet'
 alembic upgrade head
 psql 'postgresql://admin:...@host:5432/vaaet' \
-  -v ON_ERROR_STOP=1 -f migrations/provision-roles.sql
+  -v ON_ERROR_STOP=1 -f vaaet-ml/migrations/provision-roles.sql
 ```
 
 Creá cuatro usuarios LOGIN en el panel del proveedor o con SQL administrativo y
@@ -65,7 +65,7 @@ Exportá las tablas autorizadas a CSV mediante herramientas administrativas y
 construí el paquete:
 
 ```bash
-python scripts/export-training-dataset.py \
+python vaaet-ml/scripts/export-training-dataset.py \
   --features telemetry-features.csv \
   --predictions traffic-predictions.csv \
   --validations human-validations.csv \
@@ -80,7 +80,7 @@ contener además `--raw raw-telemetry.csv`; permanece fuera de Git.
 Ejecutá la auditoría read-only con el perfil training:
 
 ```bash
-python scripts/audit-postgres-database.py --output postgres-audit.json
+python vaaet-ml/scripts/audit-postgres-database.py --output postgres-audit.json
 ```
 
 El informe contiene revisión Alembic, TLS, owners, comentarios, constraints no

@@ -13,8 +13,8 @@ Si descubrís una vulnerabilidad de seguridad en VAAET, por favor **no** la repo
 
 ### Dentro del alcance
 - Exposición de credenciales de base de datos en outputs de notebooks
-- Vulnerabilidades en dependencias declaradas en `pyproject.toml`
-- Inyección SQL en `src/vaaet/data/persistence.py` o `src/vaaet/data/database.py`
+- Vulnerabilidades en dependencias declaradas en `vaaet-ml/pyproject.toml`
+- Inyección SQL en `vaaet-ml/src/vaaet/data/persistence.py` o `vaaet-ml/src/vaaet/data/database.py`
 - Acceso no autorizado a cualquier instancia PostgreSQL configurada para VAAET
 
 ### Fuera del alcance

@@ -138,7 +138,7 @@ en los notebooks.
 
 Las etiquetas de entrenamiento NO son ground truth humano. Se generan con reglas de ingeniería (umbrales de velocidad, volumen, persistencia). Esto introduce sesgo circular: el modelo aprende los umbrales que lo etiquetaron, no necesariamente el estado real del tráfico.
 
-**Mitigación actual**: Los umbrales están calibrados a percentiles de la distribución de datos del Puente Belgrano (recalibrados el 2026-03-11, reemplazando valores genéricos de libro). Ver `src/vaaet/settings.py` `LABELING_THRESHOLDS`.
+**Mitigación actual**: Los umbrales están calibrados a percentiles de la distribución de datos del Puente Belgrano (recalibrados el 2026-03-11, reemplazando valores genéricos de libro). Ver `vaaet-ml/src/vaaet/settings.py` `LABELING_THRESHOLDS`.
 
 **Mitigación vigente**: HITL append-only en `vaaet_feedback.human_validations` permite refinar etiquetas sin modificar predicciones. Sólo la vista `effective_human_labels` ingresa al entrenamiento supervisado.
 
@@ -162,7 +162,7 @@ El dataset del Puente Belgrano (abril-julio 2025, ~2.000 registros) no contiene 
 | Accidente | 0 confirmado | ~100 de estrés | Fuera del MLP | No respalda recall operacional |
 
 **Mitigaciones**:
-1. **Secuencias sintéticas** (`src/vaaet/features/synthetic.py`): Telemetría plausible de casos extremos inyectada antes del feature engineering. IDs ≥ 50.001 para trazabilidad.
+1. **Secuencias sintéticas** (`vaaet-ml/src/vaaet/features/synthetic.py`): Telemetría plausible de casos extremos inyectada antes del feature engineering. IDs ≥ 50.001 para trazabilidad.
 2. **Balanceo conservador**: El baseline v2 usa class weights limitados; no aplica SMOTE 1:1.
 3. **Separación jerárquica**: Accident no es una salida aprendida y exige confirmación humana.
 

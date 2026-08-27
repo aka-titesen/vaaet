@@ -2,8 +2,8 @@
 
 VAAET ML 4.5.3 usa PostgreSQL 14+ y Alembic como única autoridad DDL. Los
 notebooks nunca crean ni alteran tablas. La revisión vigente encadena la
-[migración base](../../migrations/versions/20260804_0001_postgres_schemas_hitl.py)
-y el [hardening 4.2](../../migrations/versions/20260806_0002_postgres_hardening_pipeline_runs.py).
+[migración base](../../vaaet-ml/migrations/versions/20260804_0001_postgres_schemas_hitl.py)
+y el [hardening 4.2](../../vaaet-ml/migrations/versions/20260806_0002_postgres_hardening_pipeline_runs.py).
 
 ## Relaciones
 
@@ -95,7 +95,7 @@ Las vistas `public` no son el contrato para código nuevo y se eliminarán en
 | `vaaet_reviewer_role` | SELECT de cola/predicciones e INSERT de validaciones |
 
 El administrador aplica `alembic upgrade head` y
-[`provision-roles.sql`](../../migrations/provision-roles.sql), luego crea usuarios
+[`provision-roles.sql`](../../vaaet-ml/migrations/provision-roles.sql), luego crea usuarios
 LOGIN específicos del proveedor y les concede un solo rol de grupo.
 
 Las funciones `vaaet_ops.start_pipeline_run` y

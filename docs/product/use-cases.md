@@ -113,7 +113,7 @@ graph LR
 |---|---|
 | **Actor principal** | Investigador |
 | **Precondición** | Datos raw disponibles en `vaaet_raw.traffic_data`, CSV o backup |
-| **Postcondición** | Artefactos `.keras`, `.joblib` exportados a `artifacts/traffic-state/` |
+| **Postcondición** | Artefactos `.keras`, `.joblib` exportados a `vaaet-ml/artifacts/traffic-state/` |
 | **Prioridad** | P0 — Crítico (ejecución única) |
 
 | Paso | Acción del Actor | Respuesta del Sistema |

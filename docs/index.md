@@ -3,6 +3,7 @@
 ## Puntos de entrada
 
 - [Arquitectura de software](architecture/software-architecture.md)
+- [ADR-0020: monorepo ML y frontera de aplicación](architecture/decisions/0020-single-git-monorepo-and-application-boundary.md)
 - [Contrato del bundle](ml/model-artifact-contract.md)
 - [ADR de inicio semilla y HITL](architecture/decisions/0017-seed-bootstrap-and-hitl-retraining.md)
 - [ADR de holdout humano congelado](architecture/decisions/0018-versioned-frozen-human-holdouts.md)
@@ -11,7 +12,7 @@
 - [Protocolo de anotación humana](ml/human-annotation-protocol.md)
 - [Guía de usuario](operations/user-guide.md)
 - [Guía de Google Colab](operations/colab-guide.md)
-- [Notebook de evaluación Champion--Challenger](../notebooks/evaluation/evaluate_models_and_eda.ipynb)
+- [Notebook de evaluación Champion--Challenger](../vaaet-ml/notebooks/evaluation/evaluate_models_and_eda.ipynb)
 - [Operación PostgreSQL](operations/postgresql-guide.md)
 - [Requisitos de producto](product/product-requirements.md)
 - [Plan de pruebas](quality/test-plan.md)

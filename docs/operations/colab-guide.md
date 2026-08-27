@@ -4,7 +4,7 @@
 
 Seleccioná **Runtime > Change runtime type > GPU**. VAAET soporta Python
 3.10–3.13. Los runtimes administrados actuales pueden exponer Python 3.13; la
-celda de setup valida la versión antes de instalar y usa TensorFlow 2.20 como
+celda de setup valida la versión tras instalar los extras seleccionados y usa TensorFlow 2.20 como
 mínimo en ese intérprete. La primera celda muestra versiones, GPU y commit para
 que cada ejecución sea auditable.
 
@@ -19,14 +19,16 @@ Referencias oficiales: [versiones del runtime de Colab](https://research.google.
 
 1. Ejecutá adquisición sólo cuando necesites ampliar la telemetría inicial.
 2. Ejecutá entrenamiento cuando cambie el dataset y revisá el informe de elegibilidad antes de conservar el bundle.
-3. Ejecutá `notebooks/evaluation/evaluate_models_and_eda.ipynb` para comparar un
+3. Ejecutá `vaaet-ml/notebooks/evaluation/evaluate_models_and_eda.ipynb` para comparar un
    Champion y un Challenger con el ZIP exacto del holdout humano congelado; sus
    métricas son read-only y la promoción sigue siendo manual.
 4. Ejecutá inferencia con un clip y un bundle v2 validado. Un piloto requiere
    `ALLOW_PILOT_BUNDLE=True`; un candidato no aprobado requiere una autorización
    experimental independiente.
 
-Cada notebook clona o actualiza el repositorio en `/content/vaaet`, define un único `REPO_ROOT` e instala una vez un wheel local con sus extras. La instalación no es editable en Colab porque el nombre `/content/vaaet` puede interpretarse como un paquete namespace y ocultar `src/vaaet`; después de instalar se limpia el caché de módulos y se valida el origen real del paquete. El desarrollo local sí conserva `pip install -e`.
+Cada notebook clona o actualiza el repositorio en `/content/vaaet`, define `ML_ROOT=/content/vaaet/vaaet-ml` y hace una instalación no editable desde ese componente. La instalación no es editable en Colab porque el checkout puede ocultar `vaaet-ml/src/vaaet`; después de instalar se limpia el caché de módulos y se valida el origen real del paquete. El desarrollo local sí conserva `pip install -e`.
+
+Antes de tareas costosas, la misma celda informa commit, versión de Python, origen instalado, RAM, disco libre en `/content`, GPU del framework y `nvidia-smi` si existe. Colección, entrenamiento e inferencia se detienen si Colab no tiene GPU; evaluación continúa read-only sin exigirla.
 
 La instalación captura la salida de `pip`. Si falla, la celda muestra stdout y
 stderr completos, la versión de Python y los extras solicitados antes de
@@ -70,18 +72,18 @@ Colab:
 
 ```bash
 alembic upgrade head
-psql 'postgresql://admin:...@host:5432/vaaet' -f migrations/provision-roles.sql
+psql 'postgresql://admin:...@host:5432/vaaet' -f vaaet-ml/migrations/provision-roles.sql
 ```
 
 ## Artefactos y Drive
 
-El entrenamiento genera cuatro archivos bajo `artifacts/traffic-state/` y puede copiarlos juntos a `MyDrive/vaaet-ml/artifacts/traffic-state`. Inferencia intenta, en orden: bundle local, Drive y upload manual. El manifiesto se valida antes de cargar Keras o joblib. `ALLOW_PILOT_BUNDLE=True` permite ejecutar conscientemente el bootstrap; `ALLOW_EXPERIMENTAL_BUNDLE=True` queda reservado para candidatos HITL no aprobados. Ninguno promociona el artefacto.
+El entrenamiento genera cuatro archivos bajo `vaaet-ml/artifacts/traffic-state/` y puede copiarlos juntos a `MyDrive/vaaet-ml/artifacts/traffic-state`. Inferencia intenta, en orden: bundle local, Drive y upload manual. El manifiesto se valida antes de cargar Keras o joblib. `ALLOW_PILOT_BUNDLE=True` permite ejecutar conscientemente el bootstrap; `ALLOW_EXPERIMENTAL_BUNDLE=True` queda reservado para candidatos HITL no aprobados. Ninguno promociona el artefacto.
 
-Después de aprobar un modelo, ejecutá localmente `dvc add artifacts/traffic-state` y `dvc push`. Los pesos YOLO se descargan desde Ultralytics en runtime y nunca se versionan.
+Después de aprobar un modelo, ejecutá localmente `dvc add vaaet-ml/artifacts/traffic-state` y `dvc push`. Los pesos YOLO se descargan desde Ultralytics en runtime y nunca se versionan.
 
 ## Entradas y salidas
 
-- Adquisición: MP4 → MP4 anotado + `data/raw/traffic_data_raw.csv` + `vaaet_raw.traffic_data` opcional.
+- Adquisición: MP4 → MP4 anotado + `vaaet-ml/data/raw/traffic_data_raw.csv` + `vaaet_raw.traffic_data` opcional.
 - Entrenamiento semilla: raw explícito → 19 features → paquete semilla + bundle piloto.
 - Reentrenamiento HITL: paquete semilla + features validadas → bundle candidato.
 - Evaluación: Champion + Challenger + holdout humano exacto → evidencia comparativa manual.
@@ -161,7 +163,7 @@ Descargá los outputs antes de cerrar la sesión. El backup canónico usa el for
 
 Cada workflow registra un `pipeline_run_id`. Con PostgreSQL usa el schema
 `vaaet_ops`; sin conexión genera un manifiesto JSON redactado en
-`data/processed/pipeline-runs/`. Estos manifiestos no contienen rutas privadas,
+`vaaet-ml/data/processed/pipeline-runs/`. Estos manifiestos no contienen rutas privadas,
 credenciales, DSN, certificados ni mensajes de excepción.
 
 El notebook de evaluación no es un workflow operacional ni registra
@@ -170,7 +172,7 @@ CSV/ZIP con `traffic-features-v2` o consulta `vaaet_raw.traffic_data` con el
 perfil `training`, intervalo UTC `[inicio, fin)` y filtros explícitos de clips o
 ejecuciones. Nunca acepta `current.json` como sustituto del ZIP de holdout exacto.
 
-El cliente es una dependencia del sistema operativo y por eso no forma parte de `pyproject.toml`. Si PGDG no está disponible o la instalación falla, cargá `traffic_data_raw.csv`; el notebook conserva el diagnóstico original y no continúa con datos vacíos.
+El cliente es una dependencia del sistema operativo y por eso no forma parte de `vaaet-ml/pyproject.toml`. Si PGDG no está disponible o la instalación falla, cargá `traffic_data_raw.csv`; el notebook conserva el diagnóstico original y no continúa con datos vacíos.
 
 ## Checklist manual
 

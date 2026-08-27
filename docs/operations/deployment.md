@@ -51,7 +51,7 @@ flowchart LR
 
 | Entorno | Plataforma | Propósito | Datos |
 |---|---|---|---|
-| **Desarrollo local** | Python 3.10–3.13 | Desarrollo y testing de `src/vaaet/` | Datos sintéticos, sin GPU |
+| **Desarrollo local** | Python 3.10–3.13 | Desarrollo y testing de `vaaet-ml/src/vaaet/` | Datos sintéticos, sin GPU |
 | **Google Colab** | Colab Free/Pro | Ejecución de notebooks (entorno principal) | Videos reales, GPU disponible |
 | **CI** | GitHub Actions + PostgreSQL 17 | Validación automática | Tests puros y migración/grants reales, sin GPU |
 
@@ -88,7 +88,7 @@ Ver la [guía de Colab](colab-guide.md) para Secrets, Drive y recuperación ante
 ### Primera celda — Setup del entorno
 
 Ejecutá la primera celda del notebook sin añadir comandos manuales. Esta clona o
-actualiza `/content/vaaet`, instala un wheel local con los extras del workflow,
+actualiza `/content/vaaet`, resuelve `/content/vaaet/vaaet-ml`, instala un wheel local con los extras del workflow,
 limpia imports anteriores y valida que `vaaet` provenga del paquete instalado.
 El modo editable se reserva para desarrollo local.
 
@@ -120,13 +120,13 @@ grants fuera de Colab.
 ### Migraciones
 
 Alembic es la única autoridad DDL. Ejecutá `alembic upgrade head` con el perfil
-administrador y después `migrations/provision-roles.sql`. Los notebooks sólo
+administrador y después `vaaet-ml/migrations/provision-roles.sql`. Los notebooks sólo
 comprueban el contrato y fallan con un mensaje claro si la migración falta.
 
 ### Backups
 
 - Backup administrativo de `vaaet_raw`, `vaaet_ml`, `vaaet_feedback` y `vaaet_ops`
-- Script de conversión: `scripts/convert-postgres-backup.py`
+- Script de conversión: `vaaet-ml/scripts/convert-postgres-backup.py`
 - Configurar backups automáticos, retención y restauraciones probadas en el proveedor
 
 ---

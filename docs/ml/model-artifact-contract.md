@@ -1,7 +1,7 @@
 # Contrato del bundle de modelo
 
 El límite entre VAAET ML y el futuro repositorio web es un directorio portable
-versionado como unidad con DVC: `artifacts/traffic-state/`.
+versionado como unidad con DVC: `vaaet-ml/artifacts/traffic-state/`.
 
 ## Contenido obligatorio
 
@@ -60,8 +60,8 @@ Después del primer entrenamiento se elimina `.gitkeep` y se registra el
 directorio completo:
 
 ```bash
-dvc add artifacts/traffic-state
-git add artifacts/traffic-state.dvc .gitignore
+dvc add vaaet-ml/artifacts/traffic-state
+git add vaaet-ml/artifacts/traffic-state.dvc .gitignore
 dvc push
 ```
 

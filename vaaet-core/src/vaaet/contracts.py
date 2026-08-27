@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 VAAET Contributors
+# SPDX-License-Identifier: AGPL-3.0-only
 """Typed internal contracts for VAAET shared modules.
 
 The project still uses notebooks as entrypoints, but these dataclasses make

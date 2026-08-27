@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 VAAET Contributors
+# SPDX-License-Identifier: AGPL-3.0-only
 """Manual offline evaluator for baseline vs candidate results on real clips.
 
 This utility is not imported by the active notebooks. It is intended for

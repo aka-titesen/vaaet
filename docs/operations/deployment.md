@@ -89,6 +89,12 @@ VAAET no tiene despliegue automatizado porque el runtime es Google Colab. El "de
 
 Ver la [guía de Colab](colab-guide.md) para Secrets, Drive y recuperación ante reinicios.
 
+Una futura demo web que ejecute YOLO sólo podrá habilitarse por la vía pública
+AGPL-3.0 con código reproducible y activos aprobados, o con una licencia
+Ultralytics Enterprise para uso privado/comercial. Antes de cualquier
+despliegue, completar el [checklist AGPL](../governance/agpl-demo-release-checklist.md)
+y el [runbook temporal de AWS](aws-temporary-demo-runbook.md).
+
 ---
 
 ## 4. Procedimiento de Setup en Google Colab

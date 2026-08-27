@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 VAAET Contributors
+# SPDX-License-Identifier: AGPL-3.0-only
 """Video I/O utilities for the VAAET production pipeline.
 
 Handles strict filename validation (bridge camera naming convention),

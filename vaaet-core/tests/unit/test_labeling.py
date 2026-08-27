@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 VAAET Contributors
+# SPDX-License-Identifier: AGPL-3.0-only
 """Tests for src/labeling.py — auto-labeling traffic states."""
 
 from __future__ import annotations

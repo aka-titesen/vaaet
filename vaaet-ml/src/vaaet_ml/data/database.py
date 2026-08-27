@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 VAAET Contributors
+# SPDX-License-Identifier: AGPL-3.0-only
 """Secure PostgreSQL configuration, connectivity, and portable backup readers."""
 
 from __future__ import annotations

@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 VAAET Contributors
+# SPDX-License-Identifier: AGPL-3.0-only
 """Tests for vaaet_ml.settings — single source of truth validation."""
 
 from __future__ import annotations

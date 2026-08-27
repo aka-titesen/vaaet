@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 VAAET Contributors
+# SPDX-License-Identifier: AGPL-3.0-only
 """Read-only PostgreSQL contract and operations audit for VAAET."""
 
 from __future__ import annotations

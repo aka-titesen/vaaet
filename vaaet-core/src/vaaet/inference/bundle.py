@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 VAAET Contributors
+# SPDX-License-Identifier: AGPL-3.0-only
 """Manifest-first loading for the VAAET traffic-state bundle v2."""
 
 from __future__ import annotations

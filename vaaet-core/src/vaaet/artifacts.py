@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 VAAET Contributors
+# SPDX-License-Identifier: AGPL-3.0-only
 """Portable model-bundle contract shared with downstream serving systems."""
 
 from __future__ import annotations

@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 VAAET Contributors
+# SPDX-License-Identifier: AGPL-3.0-only
 """PostgreSQL 17 integration checks for vaaet-db-v2."""
 
 from __future__ import annotations

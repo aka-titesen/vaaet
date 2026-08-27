@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 VAAET Contributors
+# SPDX-License-Identifier: AGPL-3.0-only
 """Auto-labeling rules for the VAAET traffic-state classifier.
 
 Assigns traffic states (0–3) to telemetry records using domain-driven

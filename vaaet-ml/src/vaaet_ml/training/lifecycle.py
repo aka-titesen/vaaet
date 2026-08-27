@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 VAAET Contributors
+# SPDX-License-Identifier: AGPL-3.0-only
 """Contracts shared by the one-time seed bootstrap and recurrent HITL training."""
 
 from __future__ import annotations

@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 VAAET Contributors
+# SPDX-License-Identifier: AGPL-3.0-only
 """Synthetic edge-case sequences for the VAAET traffic-state classifier.
 
 The historical Belgrano Bridge dataset has no human-confirmed Accident and

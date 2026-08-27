@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 VAAET Contributors
+# SPDX-License-Identifier: AGPL-3.0-only
 #!/usr/bin/env python3
 """Manual utility to convert traffic_data.backup into traffic_data_raw.csv.
 

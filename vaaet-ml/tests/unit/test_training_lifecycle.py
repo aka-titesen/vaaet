@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 VAAET Contributors
+# SPDX-License-Identifier: AGPL-3.0-only
 """Tests for seed bootstrap and recurrent HITL lifecycle policy."""
 
 from __future__ import annotations

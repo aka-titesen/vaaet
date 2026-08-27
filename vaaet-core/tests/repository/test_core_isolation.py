@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 VAAET Contributors
+# SPDX-License-Identifier: AGPL-3.0-only
 """Architectural boundary checks for the portable VAAET core."""
 
 from __future__ import annotations

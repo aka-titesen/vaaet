@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 VAAET Contributors
+# SPDX-License-Identifier: AGPL-3.0-only
 """Shared fixtures for the VAAET test suite.
 
 All fixtures produce synthetic data that does NOT require a database

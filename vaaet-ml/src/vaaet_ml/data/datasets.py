@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 VAAET Contributors
+# SPDX-License-Identifier: AGPL-3.0-only
 """Dataset grouping and split helpers for the academic training pipeline."""
 
 from __future__ import annotations

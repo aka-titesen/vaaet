@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 VAAET Contributors
+# SPDX-License-Identifier: AGPL-3.0-only
 """Create namespaced PostgreSQL storage and append-only HITL.
 
 Revision ID: 20260804_0001

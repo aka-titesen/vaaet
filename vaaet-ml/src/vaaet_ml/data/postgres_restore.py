@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 VAAET Contributors
+# SPDX-License-Identifier: AGPL-3.0-only
 """Colab-safe PostgreSQL backup reader preparation for training ingestion."""
 
 from __future__ import annotations

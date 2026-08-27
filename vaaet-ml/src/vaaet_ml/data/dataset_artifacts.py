@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 VAAET Contributors
+# SPDX-License-Identifier: AGPL-3.0-only
 """Immutable dataset snapshots, HITL catalogs, and reproducible training input locks."""
 
 from __future__ import annotations

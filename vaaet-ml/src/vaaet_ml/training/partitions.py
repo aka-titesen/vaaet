@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 VAAET Contributors
+# SPDX-License-Identifier: AGPL-3.0-only
 """Leakage-safe partitions for seed bootstrap and HITL retraining."""
 
 from __future__ import annotations

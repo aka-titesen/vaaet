@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 VAAET Contributors
+# SPDX-License-Identifier: AGPL-3.0-only
 """Explicit, composable training inputs for PostgreSQL, backups, and CSV bundles."""
 
 from __future__ import annotations

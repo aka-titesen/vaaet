@@ -4,7 +4,11 @@ PostgreSQL se organiza en `vaaet_raw`, `vaaet_ml`, `vaaet_feedback` y
 `vaaet_ops`. Este último registra el ciclo de cada workflow sin almacenar
 credenciales ni mensajes sensibles; Alembic es la única autoridad DDL.
 
-VAAET ML es el repositorio de machine learning para analizar el tránsito del Puente General Manuel Belgrano. Implementa adquisición de telemetría bajo demanda, entrenamiento batch e inferencia batch con feedback. La ejecución y promoción del modelo siguen siendo manuales en Google Colab; por eso es una base de MLOps Nivel 1, no un sistema de Continuous Training autónomo.
+VAAET ML es el componente de laboratorio del monorepo para analizar el tránsito
+del Puente General Manuel Belgrano. Implementa adquisición de telemetría bajo
+demanda, entrenamiento batch e inferencia batch con feedback. La ejecución y
+promoción del modelo siguen siendo manuales en Google Colab; por eso es una base
+de MLOps Nivel 1, no un sistema de Continuous Training autónomo.
 
 ## Workflows
 

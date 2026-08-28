@@ -10,10 +10,11 @@
 > La persistencia y HITL vigentes se definen en
 > [ADR-0015](0015-postgresql-namespaces-security-and-hitl.md).
 
-> **Current applicability (2026-08-01):** this ADR preserves the original
-> three-stage rationale. Active paths use `src/vaaet/`, `notebooks/training/`
-> and `notebooks/inference/`; ADR-0010 and ADR-0012 govern the 19-feature
-> contract, multi-repo boundary and portable bundle.
+> **Estado de vigencia (2026-08-27):** esta ADR conserva la razón histórica de
+> extraer lógica de notebooks. Las rutas y límites activos son
+> `vaaet-core/src/vaaet/` y `vaaet-ml/src/vaaet_ml/`; ADR-0021 gobierna el
+> monorepo y ADR-0022 el serving con YOLO. El cuerpo siguiente no describe el
+> layout actual.
 
 ## Context
 

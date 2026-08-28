@@ -1,7 +1,9 @@
 # Contrato del bundle de modelo
 
-El límite entre VAAET ML y el futuro repositorio web es un directorio portable
-versionado como unidad con DVC: `vaaet-ml/artifacts/traffic-state/`.
+El límite entre el laboratorio y cualquier consumidor de serving es un
+directorio local portable, versionado como unidad con DVC en
+`vaaet-ml/artifacts/traffic-state/`. El core no conoce DVC, Drive ni su
+procedencia; el consumidor le entrega un directorio local ya aprobado.
 
 ## Contenido obligatorio
 
@@ -43,8 +45,9 @@ legacy neutraliza las tres evidencias de calidad desconocidas tanto durante el
 entrenamiento como durante la inferencia, evitando una divergencia train/serve.
 
 Todo consumidor debe ejecutar `vaaet.artifacts.validate_manifest()` después de
-obtener el bundle —sea local, Drive, upload o registry— y antes de cargar Keras
-o joblib. Un campo ausente, JSON inválido, versión no soportada, schema/mapping
+obtener el bundle y antes de cargar Keras o joblib. En la futura API, el worker
+es responsable de esa validación y de storage; la Web App sólo recibe referencias
+por HTTP. Un campo ausente, JSON inválido, versión no soportada, schema/mapping
 incompatible, archivo faltante o checksum alterado rechaza el bundle con un
 error de dominio explícito.
 
@@ -65,8 +68,10 @@ git add vaaet-ml/artifacts/traffic-state.dvc .gitignore
 dvc push
 ```
 
-La infraestructura de publicación y descarga para la Web App queda fuera de
-este repositorio. Véase [ADR-0012](../architecture/decisions/0012-ml-web-boundary-and-artifact-contract.md).
+La infraestructura de publicación y descarga queda fuera de alcance. La futura
+API y Web App pertenecerán al mismo monorepo, con los límites de
+[ADR-0021](../architecture/decisions/0021-portable-core-and-ml-laboratory-boundary.md);
+ADR-0012 conserva el antecedente histórico del contrato.
 La semántica jerárquica está gobernada por [ADR-0014](../architecture/decisions/0014-hierarchical-traffic-state-and-incident-policy.md).
 El ciclo semilla/HITL está gobernado por [ADR-0017](../architecture/decisions/0017-seed-bootstrap-and-hitl-retraining.md).
 El benchmark humano congelado está gobernado por [ADR-0018](../architecture/decisions/0018-versioned-frozen-human-holdouts.md).

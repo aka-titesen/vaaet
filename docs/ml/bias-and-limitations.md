@@ -3,6 +3,9 @@ Complementa KPIs/KPIs.md (métricas) y DATA_LINEAGE.md (linaje). -->
 
 # Sesgos y Limitaciones — VAAET
 
+**Estado documental: normativo y vigente.** Las metas de calidad son hipótesis
+hasta contar con ground truth y holdouts humanos compatibles.
+
 Este documento describe los sesgos conocidos, las limitaciones técnicas, y las restricciones operativas del sistema VAAET. Su propósito es proveer transparencia sobre las condiciones bajo las cuales el sistema puede no operar correctamente.
 
 ---
@@ -85,8 +88,8 @@ El sistema NO ha sido evaluado sistemáticamente bajo:
 
 | Limitación | Impacto |
 |---|---|
-| Sesiones máximas ~12h (Free) | Videos muy largos pueden no completarse |
-| GPU no garantizada en horas pico | Puede recurrir a CPU (10x más lento) |
+| Límites de sesión y cuota variables | Videos largos pueden no completarse |
+| GPU no garantizada | Colección, entrenamiento e inferencia fallan temprano; no hay fallback CPU largo |
 | Desconexiones aleatorias | Progreso perdido — no hay checkpointing |
 | Almacenamiento efímero | Videos de salida se pierden al cerrar la sesión |
 | Sin ejecución programática | No se puede automatizar vía API o cron |
@@ -95,10 +98,10 @@ El sistema NO ha sido evaluado sistemáticamente bajo:
 
 | Limitación | Impacto |
 |---|---|
-| Requiere instancia provisionada externamente | Costo recurrente de AWS |
-| Sin connection pooling | Cada escritura abre/cierra conexión |
-| Sin reintento automático | Si falla la conexión, se pierde el registro del minuto |
-| Sin SSL por defecto | Conexión en texto plano (riesgo en redes no confiables) |
+| Requiere instancia provisionada externamente | La disponibilidad y el costo dependen del proveedor elegido |
+| Pool limitado | El engine usa un pool pequeño; no existe una cola durable de persistencia |
+| Sin replay automático | Un fallo preserva outputs locales, pero exige una acción explícita para reintentar |
+| TLS operativo | `verify-full` requiere CA; `require` no verifica identidad y `disable` sólo sirve en localhost |
 | Migración manual | La migración SQL v2 es retrocompatible, pero su aplicación y permisos siguen siendo operativos |
 
 ---
@@ -116,8 +119,8 @@ estas limitaciones técnicas del enfoque visual:
 | Runtime efímero | Google Colab | Videos y outputs deben descargarse o copiarse antes del reinicio |
 | Persistencia opt-in | PostgreSQL | Sin credenciales configuradas, los resultados quedan sólo en memoria/CSV |
 
-El código compartido permite probar y mejorar estos componentes sin duplicarlos
-en los notebooks.
+El core portable y el laboratorio permiten probar y mejorar estos componentes
+sin duplicarlos en los notebooks.
 
 ---
 
@@ -125,14 +128,14 @@ en los notebooks.
 
 1. **Evaluar con video real** — medir KPIs con ground truth
 2. **Fine-tune de YOLO** con datos de tráfico argentino — mejorar detección de bicicletas
-3. **Agregar SSL** a la conexión PostgreSQL — seguridad
+3. **Mantener y probar TLS** `verify-full`, rotación de CA y perfiles mínimos
 4. **Implementar checkpointing** — resiliencia ante desconexiones de Colab
 5. **Reemplazar proxy de clima** con API meteorológica real
 6. **Evolucionar MLP a LSTM** — capturar patrones temporales en clasificación
 
 ---
 
-## 6. Sesgos y Limitaciones del Clasificador (Módulos 1 y 2)
+## 6. Sesgos y limitaciones del clasificador
 
 ### 6.1 Sesgo de Auto-etiquetado
 

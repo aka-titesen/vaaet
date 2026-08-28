@@ -18,6 +18,16 @@ La raíz conserva el único repositorio Git, la configuración DVC y la
 automatización CI. Para trabajar sobre ML, instalá primero `vaaet-core/` y luego
 `vaaet-ml/` desde sus `pyproject.toml` locales.
 
+## Contexto para agentes de código
+
+Las instrucciones portables están en [AGENTS.md](AGENTS.md) y el resumen denso
+en [llms.txt](llms.txt). Antes de un cambio, consultá el
+[índice de documentación](docs/index.md), [ADR-0021](docs/architecture/decisions/0021-portable-core-and-ml-laboratory-boundary.md)
+y, si involucra serving con YOLO, [ADR-0022](docs/architecture/decisions/0022-agpl-public-demo-path.md).
+Las reglas detalladas por componente viven en
+[`vaaet-core/AGENTS.md`](vaaet-core/AGENTS.md) y
+[`vaaet-ml/AGENTS.md`](vaaet-ml/AGENTS.md).
+
 ## Licencia
 
 VAAET se distribuye bajo [AGPL-3.0-only](LICENSE). El extra

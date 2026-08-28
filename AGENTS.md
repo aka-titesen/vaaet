@@ -25,6 +25,10 @@ leer PostgreSQL, DVC, Drive, artefactos binarios ni módulos Python. La API
 deberá validar el manifiesto v2 antes de deserializarlo y sus workers usarán
 `vaaet-core`, nunca `vaaet-ml` para serving.
 
-Leer [ADR-0021](docs/architecture/decisions/0021-portable-core-and-ml-laboratory-boundary.md)
-antes de alterar la estructura y la documentación de `vaaet-ml/AGENTS.md`
-antes de cambiar el componente ML.
+Antes de editar, leer el resumen portable en [`llms.txt`](llms.txt), el índice
+de [`docs/`](docs/index.md) y
+[ADR-0021](docs/architecture/decisions/0021-portable-core-and-ml-laboratory-boundary.md).
+Para cambios de componente, leer también
+[`vaaet-core/AGENTS.md`](vaaet-core/AGENTS.md) o
+[`vaaet-ml/AGENTS.md`](vaaet-ml/AGENTS.md); ADR-0022 gobierna cualquier
+serving futuro con YOLO.

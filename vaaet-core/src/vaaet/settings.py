@@ -1,10 +1,10 @@
 # SPDX-FileCopyrightText: 2026 VAAET Contributors
 # SPDX-License-Identifier: AGPL-3.0-only
-"""Centralized configuration for the VAAET intelligence layer.
+"""Portable algorithmic contracts for VAAET core.
 
-This module is the single source of truth for paths, constants, and database
-connection parameters used by both the data-preparation notebook and the
-production traffic-analyzer notebook.
+The core owns constants for time, telemetry, features, labels and bundle
+compatibility. Laboratory paths, databases, DVC, Drive and notebook settings
+belong to the separate laboratory component.
 """
 
 from __future__ import annotations

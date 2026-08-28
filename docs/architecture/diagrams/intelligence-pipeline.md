@@ -5,7 +5,7 @@ flowchart TD
     A[(vaaet_raw.traffic_data v1/v2)] --> B[Auditoría contractual]
     B --> C[19 features v2 por clip y segmento continuo]
     C --> D[Etiquetas proxy o humanas<br/>Normal / Reduced / Congested]
-    D --> E[Test temporal congelado]
+    D --> E[Holdout humano congelado por grupos]
     D --> F[Validation por grupos]
     D --> G[Train por grupos<br/>sintéticos opcionales con peso reducido]
     G --> H[StandardScaler fit sólo en train]

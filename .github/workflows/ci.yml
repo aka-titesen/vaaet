@@ -19,7 +19,12 @@ on:
       - ".dvcignore"
       - ".gitignore"
       - "AGENTS.md"
+      - "llms.txt"
       - "README.md"
+      - "CONTRIBUTING.md"
+      - "SECURITY.md"
+      - "SUPPORT.md"
+      - "LICENSE"
   pull_request:
     branches: [main]
     paths:
@@ -32,7 +37,12 @@ on:
       - ".dvcignore"
       - ".gitignore"
       - "AGENTS.md"
+      - "llms.txt"
       - "README.md"
+      - "CONTRIBUTING.md"
+      - "SECURITY.md"
+      - "SUPPORT.md"
+      - "LICENSE"
 
 jobs:
   core:

@@ -18,6 +18,7 @@ ACTIVE_NOTEBOOKS = [
     NOTEBOOKS_DIR / "data-collection" / "collect_traffic_telemetry.ipynb",
     NOTEBOOKS_DIR / "training" / "train_traffic_state_classifier.ipynb",
     NOTEBOOKS_DIR / "inference" / "analyze_traffic_video.ipynb",
+    NOTEBOOKS_DIR / "evaluation" / "evaluate_models_and_eda.ipynb",
 ]
 ALLOWED_SCRIPT_FILES = {
     "README.md",
@@ -99,6 +100,7 @@ def test_active_sources_do_not_use_legacy_paths_or_import_hacks() -> None:
         ML_ROOT / "README.md",
         ML_ROOT / "llms.txt",
         WORKSPACE_ROOT / "AGENTS.md",
+        WORKSPACE_ROOT / "llms.txt",
         WORKSPACE_ROOT / "CONTRIBUTING.md",
         WORKSPACE_ROOT / "README.md",
         WORKSPACE_ROOT / "SECURITY.md",
@@ -117,7 +119,9 @@ def test_active_sources_do_not_use_legacy_paths_or_import_hacks() -> None:
         content = path.read_text(encoding="utf-8")
         for value in forbidden:
             assert value not in content, f"{path.relative_to(REPO_ROOT)} contains {value!r}"
-    inference = ACTIVE_NOTEBOOKS[-1].read_text(encoding="utf-8")
+    inference = (
+        NOTEBOOKS_DIR / "inference" / "analyze_traffic_video.ipynb"
+    ).read_text(encoding="utf-8")
     assert "os.path.join(_root" not in inference
 
 
@@ -188,6 +192,10 @@ def test_notebook_extras_match_workflows() -> None:
             ("vision", "inference"),
             ("visualization", "database"),
         ),
+        "evaluate_models_and_eda.ipynb": (
+            ("inference",),
+            ("visualization", "database"),
+        ),
     }
     for notebook in ACTIVE_NOTEBOOKS:
         code = _concatenate_code_cells(notebook)
@@ -232,9 +240,100 @@ def test_monorepo_keeps_single_shared_workspace_roots() -> None:
     assert (WORKSPACE_ROOT / ".git").is_dir()
     assert (WORKSPACE_ROOT / ".dvc").is_dir()
     assert (WORKSPACE_ROOT / "docs").is_dir()
+    assert (WORKSPACE_ROOT / "AGENTS.md").is_file()
+    assert (WORKSPACE_ROOT / "llms.txt").is_file()
     assert (WORKSPACE_ROOT / "vaaet-app" / "README.md").is_file()
     assert (WORKSPACE_ROOT / "vaaet-core" / "pyproject.toml").is_file()
+    assert (WORKSPACE_ROOT / "vaaet-core" / "AGENTS.md").is_file()
     assert (WORKSPACE_ROOT / "vaaet-core" / "src" / "vaaet").is_dir()
     assert (ML_ROOT / "pyproject.toml").is_file()
     assert (ML_ROOT / "src" / "vaaet_ml").is_dir()
     assert (ML_ROOT / "artifacts" / "traffic-state").is_dir()
+
+
+def test_portable_agent_context_describes_the_active_monorepo() -> None:
+    root_context = (WORKSPACE_ROOT / "llms.txt").read_text(encoding="utf-8")
+    core_rules = (WORKSPACE_ROOT / "vaaet-core" / "AGENTS.md").read_text(encoding="utf-8")
+    ml_context = (ML_ROOT / "llms.txt").read_text(encoding="utf-8")
+    normalized_core_rules = " ".join(core_rules.split())
+
+    assert "vaaet-core==0.1.0" in root_context
+    assert "vaaet-ml==4.5.3" in root_context
+    assert "import `vaaet_ml`" in root_context
+    assert "cuatro notebooks" in root_context
+    assert "No puede importar `vaaet_ml`, PostgreSQL, DVC, Google Drive" in normalized_core_rules
+    assert "Pipe-and-Filter síncrono" in core_rules
+    assert "con import `vaaet_ml`" in ml_context
+    assert "`src/vaaet_ml/`" in ml_context
+    assert "Los cuatro notebooks" in ml_context
+    assert "Tres workflows Colab" not in ml_context
+    assert "paquete: `vaaet`" not in ml_context
+
+
+def test_normative_documentation_matches_the_active_monorepo() -> None:
+    """Keep high-risk operational claims out of active, non-historical guides."""
+    active_documents = {
+        "docs/index.md",
+        "docs/architecture/software-architecture.md",
+        "docs/architecture/data-lineage.md",
+        "docs/architecture/diagrams/colab-postgresql-architecture.md",
+        "docs/ml/model-artifact-contract.md",
+        "docs/ml/bias-and-limitations.md",
+        "docs/operations/colab-guide.md",
+        "docs/operations/deployment.md",
+        "docs/operations/user-guide.md",
+        "docs/product/product-requirements.md",
+        "docs/product/software-requirements.md",
+        "docs/product/use-cases.md",
+        "docs/quality/risk-matrix.md",
+        "SECURITY.md",
+        "SUPPORT.md",
+    }
+    documents = {
+        relative: (WORKSPACE_ROOT / relative).read_text(encoding="utf-8")
+        for relative in active_documents
+    }
+    combined = "\n".join(documents.values())
+
+    for stale_claim in (
+        "T4/V100",
+        "Fallback a CPU",
+        "CPU (~10x",
+        "requirements-lock.txt",
+        "getpass(",
+        "9 campos crudos",
+        "9 → 19",
+        "futuro repositorio web",
+        "Three Colab notebooks",
+        "tres notebooks",
+        "Python 3.8+",
+        "Sin SSL por defecto",
+        "Sin connection pooling",
+        "Degradación silenciosa",
+    ):
+        assert stale_claim not in combined
+
+    assert "Normativo y vigente" in documents["docs/product/product-requirements.md"]
+    assert "`vaaet-core==0.1.0`" in documents["docs/product/software-requirements.md"]
+    assert "fuera de alcance" in documents["docs/product/software-requirements.md"]
+    assert "Cuatro notebooks" in documents["docs/product/product-requirements.md"]
+    assert "cuarto\nnotebook" in documents["docs/operations/user-guide.md"]
+    assert "no se garantiza un modelo de acelerador concreto" in documents[
+        "docs/operations/colab-guide.md"
+    ]
+    assert "mismo monorepo" in documents["docs/ml/model-artifact-contract.md"]
+    assert "GitHub Private Vulnerability Reporting" in documents["SECURITY.md"]
+    assert "No se promete un SLA" in documents["SUPPORT.md"]
+
+
+def test_future_product_documents_are_explicitly_non_normative() -> None:
+    future_documents = {
+        "docs/product/business-model-canvas.md": "Hipótesis de producto futura",
+        "docs/governance/statement-of-work.md": "no es una oferta ni un contrato",
+        "docs/product/user-personas.md": "Hipótesis de producto futura",
+    }
+    for relative, status in future_documents.items():
+        content = (WORKSPACE_ROOT / relative).read_text(encoding="utf-8")
+        assert status in content
+        assert "$" not in content
+        assert "GPU T4/V100" not in content

@@ -1,7 +1,10 @@
 # Guía de contribución — VAAET ML 4.5.3
 
-Antes de modificar el proyecto, leé [AGENTS.md](AGENTS.md) y el ADR aplicable en
-[`../docs/architecture/decisions/`](../docs/architecture/decisions/).
+Antes de modificar el proyecto, leé el [contexto raíz](../AGENTS.md), el
+[resumen portable](../llms.txt), [AGENTS.md](AGENTS.md) y el ADR aplicable en
+[`../docs/architecture/decisions/`](../docs/architecture/decisions/). ADR-0021
+define los límites core--ML--app; ADR-0022 gobierna cualquier serving futuro
+con YOLO.
 
 ## Reglas fundamentales
 
@@ -42,6 +45,8 @@ remoto se valida manualmente en Google Colab.
   [ADR-0009](../docs/architecture/decisions/0009-modular-three-stage-architecture.md).
 - Bundle y límite core/API: [ADR-0021](../docs/architecture/decisions/0021-portable-core-and-ml-laboratory-boundary.md).
 - DVC: [guía DVC](../docs/ml/dvc-guide.md).
+- Evaluación: `notebooks/evaluation/evaluate_models_and_eda.ipynb` es el cuarto
+  notebook activo y sólo audita bundles y cohortes declaradas.
 
 Actualizá [CHANGELOG.md](CHANGELOG.md) y la documentación cuando cambie un
 comportamiento observable. Nunca incluyas secretos ni datos sensibles.

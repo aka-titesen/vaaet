@@ -57,7 +57,7 @@ Este documento describe los Indicadores Clave de Rendimiento (KPIs) que definen 
 
 ### Paso 2: Ejecutar VAAET
 
-1. Procesar el mismo video de test con el notebook de producción
+1. Procesar el mismo video de test con el notebook de inferencia
 2. Exportar detecciones por frame: número de frame, bbox [x1,y1,x2,y2], clase, track ID, confianza
 
 ### Paso 3: Comparar y Calcular
@@ -102,7 +102,7 @@ Ver [sesgos y limitaciones](../ml/bias-and-limitations.md) para el análisis com
 
 ---
 
-## 4. KPIs de Clasificación de Estados del Tráfico (Módulos 1 y 2)
+## 4. KPIs de Clasificación de Estados del Tráfico
 
 Estos KPIs evalúan la calidad del clasificador MLP.
 
@@ -127,7 +127,7 @@ Estos KPIs evalúan la calidad del clasificador MLP.
   - Congestionado ↔ Reducido: frontera difusa a ~5 km/h
   - Normal ↔ Congested debe permanecer ≤1%; no se permite un salto automático directo
 
-### 4.4 Estado Actual de Medición (Módulos 1 y 2)
+### 4.4 Estado actual de medición
 
 | KPI | Objetivo | Estado |
 |---|---|---|

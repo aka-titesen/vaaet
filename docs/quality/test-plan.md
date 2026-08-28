@@ -1,132 +1,75 @@
-<!-- context: VAAET/docs/quality/test-plan.md — Plan de Pruebas.
-Complementa SRS.md (requisitos) y SAD.md (arquitectura). -->
+# Plan de pruebas — VAAET
 
-# Plan de Pruebas (Test Plan) — VAAET
+## Contexto
 
-## Identificación del Proyecto
+VAAET es un monorepo con `vaaet-core==0.1.0` (import `vaaet`) y
+`vaaet-ml==4.5.3` (import `vaaet_ml`). [ADR-0021](../architecture/decisions/0021-portable-core-and-ml-laboratory-boundary.md)
+define los límites; las reglas para agentes están en
+[AGENTS.md](../../AGENTS.md) y [llms.txt](../../llms.txt). Este plan cubre
+validación automática y evidencia manual; no reemplaza contratos de datos,
+bundles o licencias.
 
-| Campo | Detalles |
-|---|---|
-| **Nombre del Proyecto** | VAAET — Video Advanced Analysis of Traffic |
-| **Versión** | 4.5.3 |
-| **Estado** | Aprobado |
-| **Responsable Técnico** | Facundo Nicolás González |
-| **Responsable de QA** | Facundo Nicolás González |
-| **Última Revisión** | 2026-07-23 |
+## Objetivos
 
----
+- Preservar los contratos del core: visión, telemetría, 19 features, estados,
+  bundle v2 e inferencia manifest-first.
+- Mantener aislado el laboratorio: datos, entrenamiento, evaluación, Colab,
+  PostgreSQL, DVC y utilidades bajo `vaaet_ml`.
+- Comprobar que los cuatro notebooks sean orquestadores delgados y sintácticamente
+  válidos.
+- Detectar regresiones de estructura, documentación, licencias y límites de
+  componentes antes de integrar cambios.
 
-## 1. Objetivos Principales
+## Estrategia
 
-- Verificar la corrección de los módulos compartidos en `src/` mediante tests unitarios y de integración
-- Garantizar la paridad entre los notebooks y el código compartido
-- Validar la compilación de todas las celdas de código de los notebooks activos
-- Establecer una red de seguridad automática integrada en el pipeline CI de GitHub Actions
+| Nivel | Propiedad | Ubicación principal |
+| --- | --- | --- |
+| Unitario y contractual | Core portable, paquetes del pipeline, bundle e inferencia | `vaaet-core/tests/` |
+| Unitario y de integración local | Datos, entrenamiento, evaluación, runtime y persistencia de laboratorio | `vaaet-ml/tests/` |
+| PostgreSQL | Migraciones, roles, grants y contratos reales | `vaaet-ml/tests/integration/` con PostgreSQL 17 en CI |
+| Repositorio | Imports separados, contexto de agentes, notebooks, enlaces, licencias y layout | `vaaet-ml/tests/repository/` |
+| Sintaxis | Código Python y celdas de los cuatro notebooks | `compileall` y `ast.parse()` |
 
----
+Los notebooks activos son adquisición, entrenamiento, inferencia y evaluación
+Champion--Challenger. Sólo los tres primeros son workflows operacionales;
+evaluación es read-only y no crea `pipeline_run` ni persiste datos.
 
-## 2. Niveles y Estrategia de Pruebas
+## Ejecución local
 
-Se adopta el modelo del "Testing Trophy", con énfasis en tests de integración para validar la interacción entre los módulos `src/`.
-
-| Nivel de Prueba | Esfuerzo Estimado | Enfoque Principal |
-|---|---|---|
-| **Unitarias** | 40% | Lógica pura de cada módulo en `src/` |
-| **Integración** | 40% | Interacción entre módulos (features → labeling → classification) |
-| **Paridad** | 10% | Sincronía notebooks ↔ `src/` |
-| **Compilación** | 10% | Validación sintáctica de celdas de notebooks |
-
-### 2.1 Pruebas Unitarias
-
-Verifican el funcionamiento aislado de cada módulo en `src/`.
-
-- **Herramienta:** pytest 7.4+
-- **Ubicación:** `tests/test_*.py` (junto al módulo que testean)
-- **Cobertura actual:** 20 archivos Python de soporte y pruebas
-
-| Archivo de Test | Módulo Testeado | Cobertura |
-|---|---|---|
-| `vaaet-core/tests/contracts/test_contracts.py` | `vaaet-core/src/vaaet/contracts.py` | Validación de contratos de datos |
-| `vaaet-core/tests/unit/test_engine.py` | `vaaet-core/src/vaaet/inference/engine.py` | Clasificación tipada sin closures de notebook |
-| `vaaet-core/tests/unit/test_traffic_state.py` | `vaaet-core/src/vaaet/inference/traffic_state.py` | Tres salidas, histéresis y candidato conservador |
-| `vaaet-core/tests/unit/test_vision.py` | `vaaet-core/src/vaaet/vision/` | Pipeline de percepción completo |
-| `vaaet-core/tests/unit/test_analysis.py` | `vaaet-core/src/vaaet/vision/analysis.py` | Video anotado con/sin clasificación |
-| `vaaet-ml/tests/unit/test_settings.py` | `vaaet-ml/src/vaaet_ml/settings.py` | Rutas de laboratorio y DB |
-| `vaaet-ml/tests/unit/test_database.py` | `vaaet-ml/src/vaaet_ml/data/database.py` | Factory de engine y credenciales |
-| `vaaet-ml/tests/unit/test_persistence.py` | `vaaet-ml/src/vaaet_ml/data/persistence.py` | Persistencia de laboratorio |
-| `vaaet-ml/tests/unit/test_datasets.py` | `vaaet-ml/src/vaaet_ml/data/datasets.py` | Carga y validación de datos |
-| `vaaet-ml/tests/unit/test_synthetic.py` | `vaaet-ml/src/vaaet_ml/features/synthetic.py` | Generación de datos de entrenamiento |
-| `vaaet-ml/tests/unit/test_reporting.py` | `vaaet-ml/src/vaaet_ml/evaluation/reporting.py` | Reportes y visualizaciones |
-| `vaaet-ml/tests/unit/test_human_holdout.py` | `vaaet-ml/src/vaaet_ml/training/holdout.py` | Snapshot, checksums, versiones, idempotencia y leakage |
-| `tests/repository/test_notebook_parity.py` | Notebooks ↔ paquete | Paridad de código |
-| `tests/repository/test_repository_structure.py` | Repositorio | Higiene, rutas y enlaces |
-
-### 2.2 Pruebas de Integración
-
-Validan la interacción entre módulos sin mocks.
-
-- **Herramienta:** pytest con fixtures compartidos en `conftest.py`
-- **Entorno:** DataFrames sintéticos generados por `vaaet-ml/src/vaaet_ml/features/synthetic.py`
-- **Mocks:** para unidades puras; schemas, migración, vistas y grants se prueban con PostgreSQL 17 real en CI
-
-### 2.3 Pruebas de Paridad
-
-`test_parity.py` verifica que las funciones importadas en los notebooks coincidan con las implementaciones en `src/`.
-
-### 2.4 Validación Manual (Smoke Test)
-
-- **Entorno:** Google Colab Free con GPU T4
-- **Frecuencia:** Antes de cada release mayor
-- **Alcance:** Ejecución end-to-end de ambos notebooks activos
-
----
-
-## 3. Stack Tecnológico y Herramientas
-
-| Ámbito | Herramienta | Propósito |
-|---|---|---|
-| **Runner** | pytest 7.4+ | Ejecutor de tests |
-| **Cobertura** | pytest-cov 4.1+ | Reportes de cobertura |
-| **Fixtures** | conftest.py | Datos de prueba compartidos |
-| **CI** | GitHub Actions | Ejecución automática en PRs |
-| **Notebooks** | ast.parse() | Validación sintáctica de celdas |
-
----
-
-## 4. Criterios de Éxito y Calidad
-
-- **Tests unitarios:** Todos deben pasar (`pytest tests/ -v`)
-- **Notebooks:** Todas las celdas de código deben compilar sin errores de sintaxis
-- **CI/CD:** Ningún merge a `main` si los tests fallan en GitHub Actions
-- **Métrica del modelo:** F1-macro ≥ 0.85 en el clasificador MLP
-
----
-
-## 5. Ejecución de Tests
+Desde la raíz, instalar el core antes del laboratorio y elegir los extras del
+workflow. No existe un paquete instalable raíz.
 
 ```bash
-# Ejecutar todos los tests
-pytest tests/ -v --tb=short
-
-# Con cobertura
-pytest tests/ --cov=src --cov-report=html
-
-# Solo un módulo específico
-pytest tests/test_features.py -v
+python -m pip install -e "./vaaet-core[vision,inference,dev]"
+python -m pip install -e "./vaaet-ml[training,visualization,database,dev]"
+python -m pip check
 ```
 
----
+Luego, desde cada componente:
 
-## 6. Gestión de Riesgos en Pruebas
+```bash
+# vaaet-core/
+ruff check src tests
+pytest tests -v --tb=short
+python -m compileall -q src tests
 
-| Riesgo | Mitigación |
-|---|---|
-| Tests que dependen de GPU | Todos los tests de `src/` pueden ejecutarse en CPU |
-| Tests que dependen de BD PostgreSQL | Mocks en `test_db.py` y `test_persistence.py` |
-| Videos reales no disponibles | DataFrames sintéticos y generador en `vaaet-ml/src/vaaet_ml/features/synthetic.py` |
-| Notebooks no ejecutables en CI | Validación sintáctica con `ast.parse()` como proxy |
+# vaaet-ml/
+ruff check src tests scripts migrations
+pytest tests -v --tb=short
+python -m compileall -q src tests scripts migrations
+```
 
----
+También se deben compilar con `ast.parse()` las celdas de los cuatro notebooks,
+resolver enlaces Markdown y ejecutar `git diff --check`.
 
-Responsable del documento: Facundo Nicolás González
-Fecha de revisión: 2026-07-23
+## CI y evidencia manual
+
+GitHub Actions ejecuta jobs separados de core, ML, integración del workspace,
+PostgreSQL, enlaces y DVC. DVC se invoca desde la raíz y obtiene sus dependencias
+exclusivamente del extra `vaaet-ml[dvc]`.
+
+La evidencia local no sustituye las comprobaciones manuales en Colab: GPU,
+Google Drive, DVC remoto, descarga/ejecución YOLO y PostgreSQL con Secrets.
+Una futura demo web debe completar además los requisitos de
+[ADR-0022](../architecture/decisions/0022-agpl-public-demo-path.md) y el
+[checklist AGPL](../governance/agpl-demo-release-checklist.md).

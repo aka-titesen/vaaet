@@ -1,151 +1,77 @@
-<!-- context: VAAET/docs/product/software-requirements.md — Especificación de Requisitos de Software.
-Sigue el estándar IEEE Std 830-1998. Complementa PRD.md (requisitos de producto)
-y SAD.md (arquitectura). -->
+<!-- context: VAAET/docs/product/software-requirements.md — Requisitos de software vigentes. -->
 
 # Especificación de Requisitos de Software (SRS) — VAAET
 
-## Identificación del Proyecto
+## Estado documental
 
-| Campo | Detalles |
+**Normativo y vigente.** Complementa el [PRD](product-requirements.md); los
+contratos y ADRs vigentes prevalecen ante cualquier resumen.
+
+| Campo | Detalle |
 |---|---|
-| **Nombre del Proyecto** | VAAET — Video Advanced Analysis of Traffic |
-| **Versión** | 4.5.3 |
-| **Fecha de Creación** | 2025-03-06 |
-| **Estado** | Aprobado |
-| **Responsable Técnico** | Facundo Nicolás González |
-| **Última Revisión** | 2026-07-23 |
+| Versión del laboratorio | 4.5.3 |
+| Última revisión | 2026-08-27 |
+| Responsable técnico | Facundo Nicolás González |
 
-## Ficha del Documento
+## Arquitectura y restricciones
 
-| Fecha | Revisión | Autor | Verificado |
-|---|---|---|---|
-| 2025-03-06 | 1.0 | Facundo Nicolás González | — |
-| 2025-07-14 | 2.0 | Facundo Nicolás González | — |
-| 2026-07-23 | 3.0 | Facundo Nicolás González | — |
+VAAET es un monorepo con dos distribuciones internas: `vaaet-core==0.1.0`
+(import `vaaet`) y `vaaet-ml==4.5.3` (import `vaaet_ml`). El core procesa
+videos finitos con Pipe-and-Filter síncrono y ordenado; el laboratorio conserva
+entrenamiento, evaluación, Colab, DVC y PostgreSQL. La aplicación futura no
+tiene código y sólo podrá usar una API HTTP versionada.
 
----
+- Python 3.10–3.13.
+- Google Colab Free/Pro aporta una GPU gestionada y no garantizada; colección,
+  entrenamiento e inferencia fallan temprano si no está disponible.
+- Evaluación Champion--Challenger es read-only y no exige GPU.
+- Los videos son MP4; la procedencia recomendada sigue el patrón
+  `bridge_YYYY-MM-DD_HH-MM-SS_to_HH-MM-SS.mp4`.
+- PostgreSQL 14+ es opcional y se configura fuera de los notebooks mediante
+  variables locales o Colab Secrets por perfil.
 
-## 1. Introducción
+## Requisitos funcionales
 
-### 1.1 Propósito
-
-Este documento define los requisitos funcionales y no funcionales del sistema VAAET de forma técnica y unívoca, dirigido a desarrolladores, arquitectos y sistemas de IA que interactúen con el repositorio.
-
-### 1.2 Alcance
-
-VAAET es un sistema de análisis vehicular que procesa video de vigilancia del Puente Gral. Manuel Belgrano para detectar vehículos, estimar velocidades, y clasificar el estado del tráfico. El sistema opera como un pipeline CT/CI de MLOps ejecutado en Google Colab.
-
-### 1.3 Personal Involucrado
-
-| Nombre | Rol | Responsabilidades |
+| ID | Requisito | Prioridad |
 |---|---|---|
-| Facundo Nicolás González | Desarrollador principal y arquitecto | Diseño, implementación, testing y documentación |
+| RF-001 | Obtener procedencia temporal del nombre canónico y advertir trazabilidad menor para nombres libres. | P0 |
+| RF-002 | Seleccionar una variante YOLO 11 permitida según la duración del clip. | P0 |
+| RF-003 | Detectar `car`, `truck`, `bus`, `motorcycle` y `bicycle` bajo los umbrales centrales del core. | P0 |
+| RF-004 | Mantener tracking SORT con IDs por clip y poda de tracks. | P0 |
+| RF-005 | Estimar velocidad con flujo óptico, compensación de cámara, perspectiva, plausibilidad y agregación robusta. | P0 |
+| RF-006 | Confirmar estacionario con la política conservadora e histéresis vigente. | P1 |
+| RF-007 | Generar telemetría v2 y las 19 features de `vaaet.settings.FEATURE_COLS`. | P0 |
+| RF-008 | Clasificar sólo Normal/Reduced/Congested; `Accident` requiere validación humana. | P0 |
+| RF-009 | Persistir opt-in mediante el laboratorio con upserts idempotentes y estado visible de persistencia. | P1 |
+| RF-010 | Generar video anotado con HUD, tracks, tipos y velocidad cuando corresponda. | P1 |
+| RF-011 | Registrar datos sintéticos y entrenamiento HITL conforme a los contratos de procedencia y holdout. | P1 |
 
----
+El soporte multi-cámara, los ROI múltiples y el procesamiento de streaming no
+están implementados y quedan fuera de alcance.
 
-## 2. Descripción General
+## Requisitos no funcionales
 
-### 2.1 Perspectiva del Producto
+### Fiabilidad y rendimiento
 
-VAAET es un sistema independiente que se integra con infraestructura SISE (Sistema Inteligente de Seguridad) existente. No reemplaza sistemas de vigilancia sino que agrega una capa de inteligencia analítica sobre el video capturado.
+- La sesión de visión preserva orden de frames, telemetría por minutos completos
+  y descarte del tramo final parcial.
+- Ante ausencia de detecciones se registran únicamente las observaciones del
+  minuto; no se fabrican promedios históricos.
+- Un error de decodificación no promete recuperación frame a frame: el runtime
+  termina el procesamiento de manera segura y conserva sólo resultados ya
+  materializados.
+- Los fallos de PostgreSQL no bloquean los frames: la persistencia se realiza
+  como adaptador de laboratorio y se informa al usuario.
 
-### 2.2 Funcionalidad del Producto
+### Seguridad y mantenibilidad
 
-El sistema realiza cuatro funciones principales:
-1. **Detección y clasificación** de vehículos en 5 categorías
-2. **Estimación de velocidad** individual con compensación de movimiento de cámara
-3. **Clasificación del estado del tráfico** en 4 estados
-4. **Persistencia** de telemetría y clasificaciones en base de datos relacional
+- Los secretos se leen desde Colab Secrets o variables de entorno locales; no se
+  usa `getpass` ni se imprimen valores sensibles.
+- El core no depende de PostgreSQL, DVC, Drive, notebooks ni `vaaet_ml`.
+- El laboratorio importa el core; ambos se instalan desde sus `pyproject.toml`,
+  sin `requirements.txt` ni lockfiles.
+- Los cuatro notebooks sólo orquestan módulos testeados. La evaluación no crea
+  `pipeline_run` ni persiste datos.
 
-### 2.3 Restricciones, Suposiciones y Dependencias
-
-- **Runtime**: Google Colab Free/Pro (GPU T4/V100 cuando disponible)
-- **Red**: Conexión a internet para descarga de modelos YOLO y PostgreSQL remoto opcional
-- **Video**: Formato MP4, nomenclatura estricta `bridge_YYYY-MM-DD_HH-MM-SS_to_HH-MM-SS.mp4`
-- **BD**: PostgreSQL 14+ compatible (AWS RDS, Neon, Supabase o servidor propio)
-
----
-
-## 3. Requisitos Específicos
-
-### 3.1 Requisitos Funcionales
-
-| ID | Requisito Funcional | Descripción Detallada | Prioridad |
-|---|---|---|---|
-| RF-001 | Procedencia temporal | El sistema debe extraer captura de `bridge_YYYY-MM-DD_HH-MM-SS_to_HH-MM-SS.mp4`; para nombres libres usa hora de procesamiento y advierte menor trazabilidad. | P0 |
-| RF-002 | Selección adaptativa de modelo | El sistema debe seleccionar automáticamente la variante YOLO 11 (n/s/m/l/x) según la duración del video extraída del nombre de archivo. | P0 |
-| RF-003 | Detección de vehículos | El sistema debe detectar vehículos en cada frame usando YOLO 11 con umbral de confianza ≥ 0.5 y NMS IoU ≤ 0.4, clasificándolos en: auto, camión, colectivo, motocicleta, bicicleta. | P0 |
-| RF-004 | Tracking persistente | El sistema debe mantener IDs únicos por vehículo usando SORT con distancia euclidiana máxima de 100px y mismo tipo de vehículo. | P0 |
-| RF-005 | Estimación de velocidad | El sistema debe estimar velocidad individual por vehículo usando: compensación de flujo óptico, corrección de perspectiva por zona Y, filtros de plausibilidad por tipo de vehículo, y agregación robusta por minuto. | P0 |
-| RF-006 | Detección de estacionarios | El sistema debe clasificar vehículos como estacionarios mediante conjunción AND de 6 criterios estadísticos con histéresis de entrada/salida. | P1 |
-| RF-007 | Feature engineering | El sistema debe transformar la telemetría cruda en 19 features según `vaaet-core/src/vaaet/settings.py:FEATURE_COLS`. | P0 |
-| RF-008 | Clasificación jerárquica | El MLP debe emitir Normal/Reduced/Congested; Accident sólo puede resultar de un override humano validado. | P0 |
-| RF-009 | Persistencia en BD | El laboratorio debe persistir mediante `vaaet-ml/src/vaaet_ml/data/persistence.py` con upsert idempotente y degradación limpia sin BD. | P1 |
-| RF-010 | Video anotado | El sistema debe generar un video de salida con bounding boxes, tipo + ID, velocidad, y HUD informativo. | P1 |
-| RF-011 | Soporte multi-cámara | El sistema debe detectar automáticamente layouts de 1, 2 o 4 cámaras y procesar cada ROI independientemente. | P1 |
-| RF-012 | Auto-etiquetado | El sistema debe asignar etiquetas usando reglas calibradas (ver `vaaet-core/src/vaaet/settings.py:LABELING_THRESHOLDS`). | P0 |
-| RF-013 | Datos sintéticos trazables | Congested sintético sólo puede entrar en train con peso reducido; Accident sintético sólo prueba el detector. | P1 |
-| RF-014 | HITL | Revisión agrega validaciones append-only y entrenamiento consume sólo `effective_human_labels`. | P0 |
-
-**Detalle técnico del requisito RF-005 (Estimación de velocidad):**
-
-- **Entradas:** Historial de centroides del track, FPS del video, altura del frame, vector de movimiento global (flujo óptico), tipo de vehículo
-- **Secuencia de operaciones:** Acumulación de desplazamiento → compensación de movimiento de cámara → corrección de perspectiva por zona → conversión píxeles/metro → filtro de plausibilidad por tipo → agregación robusta (trim 15%, outlier 3.5σ)
-- **Salidas:** Velocidad suavizada en km/h o `None` si la medición no es confiable
-
-### 3.2 Requisitos No Funcionales (RNF)
-
-#### 3.2.1 Rendimiento y Eficiencia
-
-- El sistema debe procesar video en tiempo razonable en Google Colab Free (GPU T4)
-- Frame skipping y memory cleanup deben estar implementados para videos largos
-- La persistencia en BD no debe bloquear el procesamiento de frames
-
-#### 3.2.2 Seguridad y Privacidad
-
-- Las credenciales de BD deben obtenerse exclusivamente por variables de entorno o `getpass`
-- Ningún secreto debe ser impreso en outputs de celdas
-- El sistema no debe extraer, almacenar ni procesar patentes individuales
-- Solo datos agregados por minuto se persisten en BD
-
-#### 3.2.3 Fiabilidad y Disponibilidad
-
-- El sistema debe continuar procesando ante fallo de BD (degradación silenciosa)
-- El sistema debe continuar ante frames corruptos (skip al siguiente)
-- El sistema debe continuar ante ausencia de detecciones (usar promedios históricos)
-- El sistema debe continuar ante fallo de flujo óptico (usar velocidad sin compensación)
-
-#### 3.2.4 Mantenibilidad y Portabilidad
-
-- Todo código compartido debe residir en `src/` con type hints y docstrings
-- Los notebooks deben ser orquestadores que importan funciones de `src/`
-- El sistema debe ser compatible con Python 3.10–3.13 y Google Colab Free/Pro
-- `vaaet-core/src/vaaet/settings.py` es la fuente de verdad para constantes y umbrales algorítmicos
-
----
-
-## 4. Apéndices
-
-### 4.1 Glosario
-
-| Término | Definición |
-|---|---|
-| **CT/CI** | Continuous Training / Continuous Inference — patrón MLOps |
-| **HITL** | Human-in-the-Loop — validación humana de clasificaciones |
-| **SORT** | Simple Online and Realtime Tracking — algoritmo de tracking |
-| **NMS** | Non-Maximum Suppression — eliminación de detecciones duplicadas |
-| **Candidato de incidente** | Alerta deduplicada que mantiene Congested hasta confirmación humana |
-| **Feature engineering** | Transformación de campos crudos en variables predictivas de calidad |
-| **Class weights** | Ponderación limitada de clases calculada exclusivamente sobre train |
-
-### 4.2 Referencias
-
-- [Requisitos de producto](product-requirements.md)
-- [Arquitectura](../architecture/software-architecture.md)
-- [Modelo de datos](../architecture/data-model.md)
-- [ADRs](../architecture/decisions/)
-
----
-
-Responsable del documento: Facundo Nicolás González
-Fecha de revisión: 2026-07-23
+Consultá la [arquitectura](../architecture/software-architecture.md), el
+[modelo de datos](../architecture/data-model.md) y los [ADRs](../architecture/decisions/).

@@ -13,7 +13,11 @@ temporalmente **Runtime Version 2026.07**, que ofrece Python 3.12.13, NumPy 2.0.
 y TensorFlow 2.20. No intentes reemplazar Python mediante `apt` o `pip` dentro
 del notebook.
 
-Referencias oficiales: [versiones del runtime de Colab](https://research.google.com/colaboratory/runtime-version-faq.html) e [instalación headless de Ultralytics](https://docs.ultralytics.com/quickstart/).
+Las versiones, tipo de GPU, disponibilidad y límites de Colab cambian según el
+runtime y el uso; no se garantiza un modelo de acelerador concreto. Consultá las
+[versiones del runtime](https://research.google.com/colaboratory/runtime-version-faq.html),
+la [FAQ de disponibilidad](https://research.google.com/colaboratory/faq.html) y
+la [instalación headless de Ultralytics](https://docs.ultralytics.com/quickstart/).
 
 ## Orden recomendado
 
@@ -102,7 +106,8 @@ cinco segundos finales del último ejemplo se conservan en el video anotado pero
 no se persisten como telemetría. Las features de diferencias usan el primer
 minuto como línea base, por lo que 60–119 segundos todavía producen cero filas
 clasificables; 120 segundos producen la primera. Estos casos finalizan
-correctamente, descargan el video anotado y omiten PostgreSQL, HITL y dashboard
+correctamente, descargan el video anotado y omiten PostgreSQL, HITL y
+visualizaciones de clasificación
 cuando no existe clasificación. Usá clips superiores a dos minutos para observar
 el estado dentro del video y comprobar transiciones, persistencia e histéresis.
 

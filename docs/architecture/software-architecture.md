@@ -1,4 +1,4 @@
-# Arquitectura de software — VAAET ML 4.5.3
+# Arquitectura de software — VAAET
 
 VAAET separa un core operativo portable de un laboratorio MLOps batch. Colab
 orquesta ejecuciones manuales; `vaaet-core` expone `vaaet` y `vaaet-ml` expone
@@ -48,6 +48,11 @@ acotada entre lectura y YOLO sólo será candidata tras comparar estas métricas
 base con el mismo clip, GPU, modelo y resolución, sin alterar el orden ni la
 telemetría.
 
+`VideoAnalysisResult.metrics` expone `PipelineMetrics` inmutable: frames
+procesados, tiempo total, FPS end-to-end y acumulados por etapa con reloj
+monotónico. El core no mide RAM ni VRAM; cualquier benchmark de Colab debe
+registrarlas fuera del contrato portable.
+
 El notebook de entrenamiento expone dos entradas explícitas que convergen antes
 del split: `SEED_BOOTSTRAP` calcula features desde raw y produce un piloto;
 `HITL_RETRAINING` consume el snapshot semilla vigente y todos los paquetes activos
@@ -67,7 +72,10 @@ exacta en un input lock. El mismo `input_policy` del manifiesto se usa en servin
 
 ## Calidad
 
-GitHub Actions cubre Python 3.10–3.13, instalación de todos los extras, `pip check`, smoke imports, Ruff, pytest, compilación de tres notebooks, enlaces, DVC y ausencia de binarios ML en Git. GPU, Drive, videos reales y PostgreSQL se validan manualmente en Colab.
+GitHub Actions cubre Python 3.10–3.13, instalación de los extras declarados,
+`pip check`, smoke imports, Ruff, pytest, compilación de los cuatro notebooks,
+enlaces, DVC y ausencia de binarios ML en Git. GPU, Drive, videos reales y
+PostgreSQL se validan manualmente en Colab.
 
 Decisiones principales: [ADR-0009](decisions/0009-modular-three-stage-architecture.md), [ADR-0010](decisions/0010-mlops-pipeline-19-features.md), [ADR-0013](decisions/0013-on-demand-data-collection-workflow.md), [ADR-0014](decisions/0014-hierarchical-traffic-state-and-incident-policy.md), [ADR-0015](decisions/0015-postgresql-namespaces-security-and-hitl.md), [ADR-0016](decisions/0016-postgresql-hardening-and-pipeline-runs.md), [ADR-0017](decisions/0017-seed-bootstrap-and-hitl-retraining.md), [ADR-0018](decisions/0018-versioned-frozen-human-holdouts.md), [ADR-0019](decisions/0019-immutable-seed-and-hitl-datasets.md) y [ADR-0021](decisions/0021-portable-core-and-ml-laboratory-boundary.md).
 

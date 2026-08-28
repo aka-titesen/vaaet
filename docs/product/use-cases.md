@@ -1,168 +1,88 @@
-<!-- context: VAAET/docs/product/use-cases.md — Casos de uso del negocio.
-Complementa PRD.md, SRS.md y USER_PERSONAS.md. -->
+<!-- context: VAAET/docs/product/use-cases.md — Casos de uso vigentes de laboratorio. -->
 
-# Casos de Uso del Negocio (CUN) — VAAET
+# Casos de Uso del Negocio — VAAET
 
-## Identificación del Proyecto
+## Estado documental
 
-| Campo | Detalles |
-|---|---|
-| **Nombre del Proyecto** | VAAET — Video Advanced Analysis of Traffic |
-| **Versión** | 4.5.3 |
-| **Estado** | Aprobado |
-| **Responsable Técnico** | Facundo Nicolás González |
-| **Última Revisión** | 2026-07-23 |
-
----
-
-## Diagrama General de Casos de Uso
-
-```mermaid
-graph LR
-    subgraph Actores
-        OP[Operador SISE]
-        INV[Investigador]
-        ING[Ingeniero Municipal]
-        IA[Agente de IA]
-    end
-
-    subgraph Sistema VAAET
-        CU1[CU-001: Procesar Video]
-        CU2[CU-002: Clasificar Tráfico]
-        CU3[CU-003: Persistir Telemetría]
-        CU4[CU-004: Entrenar Clasificador]
-        CU5[CU-005: Validar Clasificación HITL]
-        CU6[CU-006: Generar Reporte]
-        CU7[CU-007: Re-entrenar Modelo]
-    end
-
-    OP --> CU1
-    OP --> CU2
-    OP --> CU5
-    OP --> CU6
-    INV --> CU1
-    INV --> CU4
-    INV --> CU6
-    ING --> CU6
-    IA --> CU7
-```
-
----
-
-## Caso de Uso CU-001: Procesar Video de Tráfico
+**Normativo y vigente para el laboratorio.** La futura Web App no es un actor
+implementado; su frontera está definida por ADR-0021.
 
 | Campo | Detalle |
 |---|---|
-| **Actor principal** | Operador SISE / Investigador |
-| **Precondición** | Video en formato `bridge_YYYY-MM-DD_HH-MM-SS_to_HH-MM-SS.mp4` disponible |
-| **Postcondición** | DataFrame de telemetría con 9 campos crudos por minuto + video anotado (opcional) |
-| **Prioridad** | P0 — Crítico |
+| Versión del laboratorio | 4.5.3 |
+| Última revisión | 2026-08-27 |
 
-| Paso | Acción del Actor | Respuesta del Sistema |
-|---|---|---|
-| 1 | Sube archivo .mp4 a Colab | Extrae duración y procedencia temporal disponible |
-| 2 | — | Selecciona variante YOLO según duración |
-| 3 | — | Procesa frame por frame: detección → tracking → velocidad |
-| 4 | — | Agrega telemetría por minuto (conteos, velocidad promedio, señales de calidad) |
-| 5 | Descarga video anotado (opcional) | Genera video con bounding boxes, tipos, velocidades y HUD |
-
-**Flujo alternativo:**
-- **1a.** Nombre libre → continúa con hora de procesamiento y advertencia de trazabilidad
-- **3a.** Frame corrupto → Skip al siguiente frame
-- **3b.** Sin detecciones → Usar promedios históricos
-
----
-
-## CU-002: Clasificar Estado del Tráfico
+## CU-001 — Procesar video
 
 | Campo | Detalle |
 |---|---|
-| **Actor principal** | Operador SISE |
-| **Precondición** | Telemetría procesada (CU-001) + modelo MLP cargado |
-| **Postcondición** | Cada minuto completo obtiene un estado estable; Accident requiere confirmación humana |
-| **Prioridad** | P0 — Crítico |
+| Actor | Operador o investigador |
+| Precondición | Video MP4 y GPU disponible para el workflow de visión |
+| Resultado | Telemetría v2 de minutos completos y video anotado opcional |
 
-| Paso | Acción del Actor | Respuesta del Sistema |
-|---|---|---|
-| 1 | Ejecuta celda de clasificación | Aplica feature engineering (9 → 19 features) |
-| 2 | — | Escala features con StandardScaler cargado |
-| 3 | — | Predice tres estados con MLP y calibración |
-| 4 | — | Aplica umbrales, histéresis y candidato conservador de incidente |
-| 5 | Revisa resultados | Muestra tabla con estado, confianza, y señales de evidencia |
+El notebook de adquisición o inferencia procesa en orden detección, tracking,
+velocidad, telemetría y render. Con nombre libre conserva la hora de ejecución
+como procedencia con advertencia. Sin detecciones, el minuto conserva sólo
+valores observados y señales de calidad; no usa promedios históricos. Si la
+captura no puede continuar, el clip finaliza de forma segura y no se inventan
+filas posteriores.
 
----
-
-## CU-003: Persistir Telemetría en Base de Datos
+## CU-002 — Clasificar estado de tráfico
 
 | Campo | Detalle |
 |---|---|
-| **Actor principal** | Sistema (automático) |
-| **Precondición** | Telemetría clasificada + credenciales de BD disponibles |
-| **Postcondición** | Registros en `vaaet_ml.telemetry_features` y `vaaet_ml.traffic_predictions` |
-| **Prioridad** | P1 — Alto |
+| Actor | Operador o investigador |
+| Precondición | Telemetría v2 y bundle v2 validado manifest-first |
+| Resultado | Estado estable por minuto completo, confianza y evidencia |
 
-**Flujo alternativo:**
-- Sin credenciales de BD → Degradación silenciosa, continúa sin persistencia
-- Error de conexión → Log de advertencia, continúa procesamiento
+La cadena construye las 19 features, escala con el bundle y predice tres
+estados. La política temporal puede abrir un candidato de incidente, pero el
+estado automático permanece `Congested`; `Accident` requiere revisión humana.
 
----
-
-## CU-004: Entrenar Clasificador de Tráfico
+## CU-003 — Persistir resultados de laboratorio
 
 | Campo | Detalle |
 |---|---|
-| **Actor principal** | Investigador |
-| **Precondición** | Datos raw disponibles en `vaaet_raw.traffic_data`, CSV o backup |
-| **Postcondición** | Artefactos `.keras`, `.joblib` exportados a `vaaet-ml/artifacts/traffic-state/` |
-| **Prioridad** | P0 — Crítico (ejecución única) |
+| Actor | Investigador que habilita el adaptador PostgreSQL |
+| Precondición | Perfil de mínimo privilegio en Colab Secrets o variables locales |
+| Resultado | Upserts idempotentes de raw, features, predicciones o feedback autorizados |
 
-| Paso | Acción del Actor | Respuesta del Sistema |
-|---|---|---|
-| 1 | Abre el notebook de entrenamiento en Colab | Ejecuta el plan de ingestión tipado |
-| 2 | — | Audita telemetría v2 y conserva procedencia real/sintética |
-| 3 | — | Aplica feature engineering (9 → 19 features) |
-| 4 | — | Usa ground truth humano o etiquetas proxy de tres estados |
-| 5 | — | Calcula class weights limitados sólo con train; sintéticos con peso reducido |
-| 6 | — | Entrena MLP con EarlyStopping |
-| 7 | Verifica gates de producción | Muestra coste, F1, calibración, soporte e intervalos |
-| 8 | — | Exporta bundle v2 con elegibilidad y bloqueos |
+Sin credenciales o ante una conexión fallida, el notebook informa que no hubo
+persistencia y mantiene los outputs locales disponibles. Alembic, roles y
+credenciales administrativas nunca se ejecutan desde Colab.
 
----
-
-## CU-005: Validar Clasificación (HITL)
+## CU-004 — Entrenar clasificador
 
 | Campo | Detalle |
 |---|---|
-| **Actor principal** | Operador SISE |
-| **Precondición** | Clasificación realizada (CU-002), scaffold HITL habilitado |
-| **Postcondición** | Nueva fila append-only en `vaaet_feedback.human_validations` |
-| **Prioridad** | P2 — Medio (experimental) |
-| **Estado** | Scaffold experimental, no flujo productivo validado |
+| Actor | Investigador |
+| Precondición | Plan `SEED_BOOTSTRAP` o `HITL_RETRAINING` válido y GPU disponible |
+| Resultado | Bundle v2 candidato con procedencia, checksums y gates |
 
----
+El entrenamiento audita telemetría v2, usa las 19 features, conserva la
+proveniencia de datos reales/sintéticos y separa los tres estados aprendidos de
+la política humana de `Accident`.
 
-## CU-006: Generar Reporte de Tráfico
-
-| Campo | Detalle |
-|---|---|
-| **Actor principal** | Operador SISE / Investigador / Ingeniero Municipal |
-| **Precondición** | Telemetría clasificada disponible |
-| **Postcondición** | Dashboard visual con gráficos de tendencias, conteos por tipo, estados del tráfico |
-| **Prioridad** | P1 — Alto |
-
----
-
-## CU-007: Re-entrenar Modelo (Bucle CT)
+## CU-005 — Revisar HITL
 
 | Campo | Detalle |
 |---|---|
-| **Actor principal** | Sistema / Investigador |
-| **Precondición** | Suficientes registros HITL validados acumulados |
-| **Postcondición** | Nuevo artefacto `.keras` con F1-macro mejorado |
-| **Prioridad** | P2 — Medio |
-| **Estado** | Scaffold experimental en el workflow de inferencia |
+| Actor | Revisor autorizado |
+| Precondición | Predicción persistida y perfil `reviewer` configurado |
+| Resultado | Validación append-only en `vaaet_feedback.human_validations` |
 
----
+La revisión no modifica predicciones históricas. El entrenamiento consume sólo
+la última validación humana efectiva y los conflictos detienen la promoción.
 
-Responsable del documento: Facundo Nicolás González
-Fecha de revisión: 2026-07-23
+## CU-006 — Evaluar candidatos
+
+| Campo | Detalle |
+|---|---|
+| Actor | Investigador |
+| Precondición | Dos bundles y holdout humano compatible |
+| Resultado | Comparación Champion--Challenger y EDA de drift read-only |
+
+El cuarto notebook valida ambos manifiestos y no crea `pipeline_run`, no cambia
+DVC ni PostgreSQL y no promociona modelos.
+
+Para operaciones, configuración y recuperación consultá la [guía de usuario](../operations/user-guide.md).

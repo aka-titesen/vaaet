@@ -8,21 +8,26 @@
 | Versión | 4.5.3 |
 | Runtime objetivo | Python 3.10–3.13; Google Colab |
 | Responsable | Facundo Nicolás González |
-| Última revisión | 2026-08-22 |
+| Última revisión | 2026-08-27 |
 
 ## Mandato
 
-Actuá como Senior ML Engineer con foco en visión artificial, MLOps y pipelines de datos. Conservá la compatibilidad con Colab Free, los contratos y las decisiones en `../docs/architecture/decisions/`.
+Actuá como Senior ML Engineer con foco en visión artificial, MLOps y pipelines de datos. Antes de editar, leé `../AGENTS.md`, `../llms.txt`, este archivo y las decisiones aplicables en `../docs/architecture/decisions/`. Conservá la compatibilidad con Colab Free y los contratos vigentes.
 
-VAAET tiene tres workflows de primer nivel:
+VAAET tiene tres workflows operacionales y un cuarto notebook activo de
+evaluación:
 
 ```text
 notebooks/data-collection/  adquisición opcional de telemetría y video anotado
 notebooks/training/         preparación de 19 features y entrenamiento batch
 notebooks/inference/        inferencia de video, estado y feedback
+notebooks/evaluation/       auditoría Champion--Challenger read-only
 src/vaaet_ml/               laboratorio instalable: datos, entrenamiento y evaluación
 tests/                      pruebas unitarias, contractuales y de repositorio
 ```
+
+Adquisición, entrenamiento e inferencia son workflows operacionales. Evaluación
+no crea `pipeline_run` ni persiste datos.
 
 La lógica operativa reutilizable vive en `../vaaet-core/src/vaaet/`; este
 componente la consume como `vaaet`. La Web App futura sólo consumirá una API
@@ -57,7 +62,7 @@ Los notebooks instalan primero `vaaet-core` y luego `vaaet-ml`: importan
 2. `ruff check src tests scripts`
 3. `pytest tests/ -v --tb=short`
 4. `python -m compileall -q src tests scripts`
-4. Compilar las celdas de los tres notebooks con `ast.parse()`.
+4. Compilar las celdas de los cuatro notebooks con `ast.parse()`.
 5. Comprobar enlaces Markdown.
 6. Ejecutar `git diff --check`.
 

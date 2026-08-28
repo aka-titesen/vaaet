@@ -1,7 +1,12 @@
 # Guía de contribución — Monorepo VAAET
 
-Leé [AGENTS.md](AGENTS.md) y el ADR aplicable antes de modificar el repositorio.
+Leé [AGENTS.md](AGENTS.md), [llms.txt](llms.txt), el
+[índice documental](docs/index.md) y el ADR aplicable antes de modificar el
+repositorio. ADR-0021 define los límites core--ML--app; ADR-0022 aplica a
+cualquier serving futuro con YOLO.
 
+- Los cambios core se realizan desde `vaaet-core/`; sus reglas y comandos están
+  en [`vaaet-core/AGENTS.md`](vaaet-core/AGENTS.md).
 - Los cambios ML se realizan desde `vaaet-ml/`; sus reglas y comandos están en
   [`vaaet-ml/CONTRIBUTING.md`](vaaet-ml/CONTRIBUTING.md).
 - La documentación y configuración compartida se mantienen en la raíz.

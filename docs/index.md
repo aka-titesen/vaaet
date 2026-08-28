@@ -1,4 +1,27 @@
-# Documentación de VAAET ML 4.5.3
+# Documentación de VAAET
+
+VAAET es un monorepo con `vaaet-core` (`vaaet`, versión interna 0.1.0),
+`vaaet-ml` (`vaaet_ml`, versión 4.5.3) y `vaaet-app` reservado. La topología y
+los límites vigentes están definidos por [ADR-0021](architecture/decisions/0021-portable-core-and-ml-laboratory-boundary.md).
+
+## Estado y precedencia documental
+
+- **Normativo y vigente**: contratos, arquitectura, operaciones, requisitos,
+  calidad y seguridad describen el estado implementado.
+- **Hipótesis futura**: Canvas, SOW y personas conservan ideas de producto sin
+  prometer API, Web App, costos, plazos ni servicios disponibles.
+- **Histórico**: changelog y planes fechados registran su momento; los ADRs
+  conservan sus decisiones originales. ADR-0021 y ADR-0022 prevalecen para la
+  topología actual y el serving con YOLO.
+
+## Inicio para agentes de código
+
+Antes de editar, leer las [instrucciones de raíz](../AGENTS.md), el
+[resumen portable](../llms.txt), las reglas específicas de
+[`vaaet-core`](../vaaet-core/AGENTS.md) o
+[`vaaet-ml`](../vaaet-ml/AGENTS.md), y el ADR aplicable. Para una futura demo
+web con YOLO, leer además [ADR-0022](architecture/decisions/0022-agpl-public-demo-path.md)
+y el [checklist AGPL](governance/agpl-demo-release-checklist.md).
 
 ## Puntos de entrada
 
@@ -36,7 +59,8 @@
 - `quality/`: pruebas, KPIs y riesgos.
 - `governance/`: planificación, seguridad y registros legales.
 
-Los agentes de IA deben leer `AGENTS.md` y `llms.txt` antes de editar. Los tres
-workflows operacionales son adquisición, entrenamiento e inferencia; el notebook
-de evaluación es un auditor read-only posterior al entrenamiento y no crea un
-`pipeline_run` ni persiste datos.
+Los cuatro notebooks son adquisición, entrenamiento, inferencia y evaluación.
+Los tres primeros son workflows operacionales; evaluación es un auditor
+read-only posterior al entrenamiento y no crea un `pipeline_run` ni persiste
+datos. Los ADRs y contratos prevalecen sobre resúmenes, README y guías
+operacionales.

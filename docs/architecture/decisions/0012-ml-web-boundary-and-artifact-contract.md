@@ -3,6 +3,11 @@
 **Estado:** Aceptado  
 **Fecha:** 2026-08-01
 
+> **Estado de vigencia (2026-08-27):** la decisión multi-repo, el import
+> `vaaet-ml` como `vaaet` y las rutas de este documento están sustituidos por
+> ADR-0020 y ADR-0021. El antecedente del bundle manifest-first permanece
+> vigente; este texto conserva el contexto histórico.
+
 ## Contexto
 
 VAAET evolucionará hacia una Web App con inferencia en tiempo real. El código de

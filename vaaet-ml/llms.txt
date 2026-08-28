@@ -1,9 +1,31 @@
-# VAAET ML 4.5.3
+# VAAET ML 4.5.3 — contexto de laboratorio
 
-Repositorio ML para análisis vehicular del Puente General Manuel Belgrano. Distribución: `vaaet-ml`; paquete: `vaaet`; URL: https://github.com/zgfnicolas/vaaet.
+Leé primero `../AGENTS.md`, `../llms.txt`, `AGENTS.md`, ADR-0021 y los ADRs de
+datos/HITL aplicables. Este componente es la distribución `vaaet-ml==4.5.3`,
+con import `vaaet_ml`; depende de `vaaet-core==0.1.0`, cuyo import operativo es
+`vaaet`. No existe un paquete instalable en la raíz.
 
-Tres workflows Colab: adquisición opcional en `notebooks/data-collection/collect_traffic_telemetry.ipynb`, entrenamiento en `notebooks/training/train_traffic_state_classifier.ipynb` e inferencia en `notebooks/inference/analyze_traffic_video.ipynb`. La lógica vive en `src/vaaet/`; `vision/analysis.py` comparte el procesamiento anotado.
+`src/vaaet_ml/` contiene rutas y configuración de laboratorio, datos,
+PostgreSQL, entrenamiento, evaluación y utilidades Colab. `../vaaet-core/src/vaaet/`
+contiene percepción, telemetría, features, política de estados y bundle. ML no
+traslada esa lógica al notebook ni al paquete de laboratorio.
 
-Invariantes: 19 `FEATURE_COLS` v2 en orden exacto; cuatro estados públicos; MLP con tres salidas estables; Accident sólo mediante validación humana append-only. PostgreSQL usa `vaaet_raw`, `vaaet_ml` y `vaaet_feedback`, cuatro perfiles de mínimo privilegio y Alembic fuera de Colab. El entrenamiento separa `SEED_BOOTSTRAP` raw de `HITL_RETRAINING` con features validadas, sólo acepta fuentes explícitas y jamás usa predicciones no validadas como etiquetas. La memoria proxy decrece por clase. La semilla y las sesiones HITL son ZIP inmutables catalogados en Drive; cada entrenamiento registra un `vaaet-training-input-lock-v1`. Validation y test humanos pueden congelarse mediante `vaaet-human-holdout-v1`; sus grupos nunca entran en train y cada actualización crea una generación. El bundle DVC v2 tiene modelo Keras, scaler, mapping y manifiesto jerárquico con lifecycle, input policy, holdout e input lock; validar antes de deserializar.
+Los cuatro notebooks son: adquisición opcional
+`notebooks/data-collection/collect_traffic_telemetry.ipynb`, entrenamiento
+`notebooks/training/train_traffic_state_classifier.ipynb`, inferencia
+`notebooks/inference/analyze_traffic_video.ipynb` y evaluación read-only
+`notebooks/evaluation/evaluate_models_and_eda.ipynb`. Instalan core antes que
+ML, importan `vaaet` para operaciones y `vaaet_ml` para laboratorio, y nunca
+modifican `sys.path`.
 
-Validación: Ruff, pytest, integración PostgreSQL 17, compileall, `ast.parse()` de los tres notebooks, enlaces y `git diff --check`. GPU, Drive, YOLO y DVC remoto son manuales en Colab. Leer `AGENTS.md`, `docs/index.md`, ADR-0014, ADR-0015, ADR-0016, ADR-0017, ADR-0018 y ADR-0019.
+Invariantes: 19 `FEATURE_COLS` v2 en orden exacto; tres salidas aprendidas y
+cuatro estados públicos; `Accident` sólo mediante validación humana append-only.
+`SEED_BOOTSTRAP` y `HITL_RETRAINING` aceptan fuentes explícitas; predicciones no
+validadas nunca son etiquetas. Seed, HITL, input locks y holdouts son inmutables.
+El bundle DVC v2 contiene Keras, scaler, mapping y manifiesto; validar el
+manifiesto antes de deserializar.
+
+Desde el workspace, instalar primero core y luego los extras ML del workflow.
+Validar con Ruff, pytest, compileall, AST de los cuatro notebooks, enlaces y
+`git diff --check`. GPU, Drive, DVC remoto, YOLO y PostgreSQL se verifican
+manualmente en Colab. DVC se administra desde la raíz con `vaaet-ml[dvc]`.

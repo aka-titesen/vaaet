@@ -51,10 +51,10 @@ expondrán DVC, Drive, PostgreSQL, binarios ni secretos.
 
 ## Consecuencias
 
-La fase posterior reemplazará la licencia MIT y los metadatos de paquetes,
-eliminará las referencias operativas a un gate Enterprise exclusivo y añadirá
-un checklist de demo pública. Las afirmaciones históricas se preservan como
-evidencia de su fecha, pero la documentación activa reflejará la nueva vía.
+La licencia AGPL-3.0-only, los metadatos de paquetes, el checklist público y el
+runbook temporal ya fueron incorporados al monorepo. Las afirmaciones históricas
+se preservan como evidencia de su fecha, pero la documentación activa refleja
+las dos vías de serving.
 
 La demostración no tiene costo de licencia Ultralytics bajo AGPL, aunque AWS
 puede generar cargos y requerirá límites, revisión de facturación y limpieza

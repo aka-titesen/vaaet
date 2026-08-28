@@ -24,7 +24,9 @@ flowchart LR
     L --> B["Bundle v2 candidate"]
 ```
 
-Cada ejecución de adquisición o inferencia genera un `pipeline_run_id`. Los
+Cada ejecución operacional de adquisición, entrenamiento o inferencia genera un
+`pipeline_run_id`. La evaluación Champion--Challenger es read-only y no crea
+ejecuciones ni persiste datos. Los
 timestamps se persisten como `TIMESTAMPTZ` UTC; valores históricos sin zona se
 interpretan como `America/Argentina/Buenos_Aires` durante la migración.
 El mismo contrato se aplica en memoria, CSV, backups, paquetes y sintéticos:
@@ -79,6 +81,12 @@ etiquetas exactas, mientras `current.json` selecciona la generación activa. Sus
 grupos se excluyen de train; actualizar el benchmark crea una nueva generación
 sin sobrescribir la anterior. PostgreSQL continúa siendo la autoridad del
 feedback y el ZIP sólo representa la fotografía reproducible de evaluación.
+
+## Evaluación read-only
+
+`evaluate_models_and_eda.ipynb` valida los dos manifiestos y compara bundles
+sólo con el ZIP del holdout compatible. No crea `pipeline_run`, no modifica DVC,
+PostgreSQL, catálogos ni decisiones humanas de promoción.
 
 ## Artefactos de dataset e input lock
 

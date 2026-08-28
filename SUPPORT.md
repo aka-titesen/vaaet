@@ -1,37 +1,26 @@
 # Soporte — VAAET
 
-## Canales de Soporte
+VAAET es un proyecto académico mantenido con disponibilidad de mejor esfuerzo.
 
-| Canal | Uso | Tiempo de Respuesta |
-|---|---|---|
-| **GitHub Issues** | Reportes de bugs, solicitudes de funcionalidades | 72 horas hábiles |
-| **GitHub Discussions** | Preguntas generales, ideas, discusión técnica | Mejor esfuerzo |
-| **Documentación** | Consultas de uso y configuración | Autoservicio |
+## Canales disponibles
 
-## Antes de Crear un Issue
+- [GitHub Issues](https://github.com/zgfnicolas/vaaet/issues): bugs
+  reproducibles y propuestas que no incluyan información sensible.
+- [Documentación](docs/index.md): instalación, Colab, PostgreSQL, contratos y
+  limitaciones conocidas.
+- [Reporte privado de seguridad](SECURITY.md): sólo cuando el formulario privado
+  de GitHub esté habilitado y verificado por el responsable.
 
-1. **Revisá la documentación**: [Guía de usuario](docs/operations/user-guide.md), [Sesgos y limitaciones](docs/ml/bias-and-limitations.md)
-2. **Buscá issues existentes**: Puede que tu problema ya haya sido reportado
-3. **Verificá la versión**: Asegurate de estar usando la última versión del proyecto
+No se promete un SLA ni se asume que GitHub Discussions esté habilitado.
 
-## Plantilla de Reporte de Bug
+## Antes de abrir un Issue
 
-```
-**Descripción**: [Qué está pasando]
-**Pasos para reproducir**: [1. 2. 3.]
-**Comportamiento esperado**: [Qué debería pasar]
-**Entorno**: [Colab Free/Pro, GPU disponible, versión Python]
-**Logs**: [Pegar outputs relevantes]
-```
+1. Revisá la [guía de usuario](docs/operations/user-guide.md) y los
+   [sesgos y limitaciones](docs/ml/bias-and-limitations.md).
+2. Confirmá el commit, Python, sistema operativo, extras instalados y si Colab
+   asignó GPU.
+3. Excluí secretos, DSN, certificados, videos privados y datos HITL de logs,
+   adjuntos y capturas.
 
-## Recursos de Autoayuda
-
-- [Guía de usuario](docs/operations/user-guide.md) — Uso completo
-- [Despliegue](docs/operations/deployment.md) — Operación y promoción
-- [Sesgos y limitaciones](docs/ml/bias-and-limitations.md) — Limitaciones conocidas
-- [KPIs](docs/quality/kpis.md) — Métricas y validación
-
----
-
-Responsable: Facundo Nicolás González
-Fecha de revisión: 2026-08-01
+Para un bug, describí el comportamiento, pasos mínimos de reproducción,
+resultado esperado y el entorno redactado.

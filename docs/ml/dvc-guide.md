@@ -76,4 +76,4 @@ en `.dvc/config`. Credenciales y opciones privadas pertenecen a
 | `dvc push` falla | Revisar autenticación y `dvc remote list` |
 | Cache grande | Usar `dvc gc --workspace` con precaución |
 
-Referencias: [contrato del bundle](model-artifact-contract.md), [ADR-0011](../architecture/decisions/0011-dvc-model-registry.md), [ADR-0012](../architecture/decisions/0012-ml-web-boundary-and-artifact-contract.md).
+Referencias: [contrato del bundle](model-artifact-contract.md), [ADR-0011](../architecture/decisions/0011-dvc-model-registry.md), [ADR-0012](../architecture/decisions/0012-ml-web-boundary-and-artifact-contract.md) como antecedente histórico y [ADR-0021](../architecture/decisions/0021-portable-core-and-ml-laboratory-boundary.md) para la frontera vigente.

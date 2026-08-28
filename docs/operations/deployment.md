@@ -11,7 +11,7 @@ Complementa USER_GUIDE.md y SAD.md. -->
 | **Versión** | 4.5.3 |
 | **Estado** | Aprobado |
 | **Responsable Técnico** | Facundo Nicolás González |
-| **Última Revisión** | 2026-07-23 |
+| **Última Revisión** | 2026-08-27 |
 
 ---
 
@@ -25,7 +25,7 @@ persistencia opcional y Google Drive transporta artefactos.
 
 | Componente | Tecnología | Responsabilidad |
 |---|---|---|
-| **Runtime** | Google Colab Free/Pro | Ejecución de notebooks con GPU T4/V100 |
+| **Runtime** | Google Colab Free/Pro | Ejecución de notebooks sobre GPU gestionada cuando está disponible |
 | **Código fuente** | GitHub | Versionado y CI/CD |
 | **Base de datos** | PostgreSQL 14+ compatible | Raw, features, predicciones y HITL (opcional) |
 | **Almacenamiento de modelos** | Google Drive / local | Artefactos `.keras` y `.joblib` |
@@ -36,7 +36,7 @@ persistencia opcional y Google Drive transporta artefactos.
 ```mermaid
 flowchart LR
     A[Usuario] -->|Sube .mp4| B[Google Colab]
-    B -->|Inferencia| C[GPU T4/V100]
+    B -->|Visión; GPU requerida| C[GPU gestionada]
     C -->|Detecciones| B
     B -->|Perfiles de mínimo privilegio| D[(PostgreSQL 14+)]
     B -->|Video anotado| A
@@ -52,7 +52,7 @@ flowchart LR
 | Entorno | Plataforma | Propósito | Datos |
 |---|---|---|---|
 | **Desarrollo local** | Python 3.10–3.13 | Desarrollo y testing de `vaaet-core/src/vaaet/` y `vaaet-ml/src/vaaet_ml/` | Datos sintéticos, sin GPU |
-| **Google Colab** | Colab Free/Pro | Ejecución de notebooks (entorno principal) | Videos reales, GPU disponible |
+| **Google Colab** | Colab Free/Pro | Ejecución manual de notebooks | Videos reales; GPU gestionada no garantizada |
 | **CI** | GitHub Actions + PostgreSQL 17 | Validación automática | Tests puros y migración/grants reales, sin GPU |
 
 ---
@@ -79,7 +79,8 @@ Pipeline definido en `.github/workflows/ci.yml`:
 
 ### 3.2 Despliegue (Manual)
 
-VAAET no tiene despliegue automatizado porque el runtime es Google Colab. El "despliegue" consiste en:
+VAAET no tiene despliegue automatizado ni infraestructura web. La operación de
+laboratorio consiste en:
 
 1. El usuario abre el notebook en Colab desde GitHub
 2. La primera celda clona o actualiza el repo, resuelve extras sólo cuando
@@ -171,7 +172,7 @@ comprueban el contrato y fallan con un mensaje claro si la migración falta.
 |---|---|---|
 | `speed_measurement_quality` | > 0.70 | Revisar calidad del video, verificar flujo óptico |
 | `rejected_speed_count` por minuto | < 30% del total | Verificar calibración de `pixels_per_meter` |
-| F1-macro del clasificador | ≥ 0.85 | Re-entrenar con datos nuevos |
+| F1-macro del clasificador | ≥ 0.88 sobre holdout humano apto | Revisar gates y reentrenar con evidencia nueva |
 
 ### Procedimiento de Rollback
 
@@ -184,14 +185,14 @@ En caso de error en los artefactos del modelo:
 
 ## 8. Checklist de Despliegue
 
-- [ ] Tests pasan en CI (`pytest tests/ -v`)
+- [ ] Core y ML pasan sus pruebas, Ruff y `pip check` desde instalaciones locales
 - [ ] Notebooks compilan sin errores de sintaxis
-- [ ] Artefactos del modelo están exportados a Google Drive
-- [ ] Variables de entorno de BD documentadas en `.env.example`
-- [ ] CHANGELOG actualizado con cambios de la versión
+- [ ] Bundle v2, si existe, fue validado manifest-first antes de cargarlo
+- [ ] Secretos PostgreSQL están configurados por perfil fuera de Git, si se habilita persistencia
+- [ ] Drive/DVC se usan sólo para activos aprobados; no se asumen como infraestructura de serving
 - [ ] Documentación actualizada si hay cambios en features o flujo
 
 ---
 
 Responsable del documento: Facundo Nicolás González
-Fecha de revisión: 2026-07-23
+Fecha de revisión: 2026-08-27

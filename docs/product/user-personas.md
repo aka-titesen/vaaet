@@ -1,94 +1,47 @@
-<!-- context: VAAET/docs/product/user-personas.md — Perfiles de usuario.
-Complementa PRD.md y USE_CASES.md. -->
+<!-- context: VAAET/docs/product/user-personas.md — Personas de referencia; no requisitos ni usuarios activos. -->
 
-# Perfiles de Usuario (User Personas) — VAAET
+# Perfiles de usuario — VAAET
 
-## Identificación del Proyecto
+## Estado documental
 
-| Campo | Detalles |
+**Hipótesis de producto futura.** Los perfiles orientan investigación y diseño;
+no describen una interfaz web existente, acuerdos con SISE ni métricas ya
+validadas. El único acceso implementado hoy son los notebooks de laboratorio.
+
+| Campo | Detalle |
 |---|---|
-| **Nombre del Proyecto** | VAAET — Video Advanced Analysis of Traffic |
-| **Versión** | 4.5.3 |
-| **Estado** | Aprobado |
-| **Responsable Técnico** | Facundo Nicolás González |
-| **Última Revisión** | 2026-07-23 |
+| Última revisión | 2026-08-27 |
+| Alcance actual | Adquisición, entrenamiento, inferencia y evaluación en notebooks |
 
----
+## Operador o analista de video
 
-## Persona 1: Operador SISE
+Necesita analizar un clip autorizado y revisar telemetría, estado y video
+anotado. En el laboratorio usa inferencia en Colab; una futura interfaz deberá
+validarse separadamente y nunca podrá confirmar `Accident` automáticamente.
 
-| Atributo | Detalle |
-|---|---|
-| **Nombre representativo** | Carlos, 35 años |
-| **Rol** | Operador del Sistema Inteligente de Seguridad (SISE) |
-| **Formación** | Técnico en sistemas / Fuerza de seguridad |
-| **Experiencia técnica** | Baja-Media. Usa aplicaciones de monitoreo, no programa. |
-| **Objetivo principal** | Monitorear el estado del tráfico en tiempo real y detectar incidentes |
-| **Frustraciones** | Videos largos sin poder ver rápidamente el estado del tráfico; faltas de alertas tempranas ante accidentes |
-| **Necesidades** | Dashboard claro, alertas visuales, clasificación automática de estados, video anotado descargable |
-| **Interacción con VAAET** | Usa inferencia en Colab: sube video → obtiene estado del tráfico + video anotado. En el futuro, usará la Web App. |
-| **Métrica de éxito** | Tiempo de detección de incidentes < 2 minutos de procesamiento |
+## Investigador de tránsito
 
----
+Necesita reproducibilidad, exportaciones acotadas y evidencia de calidad. Usa
+los workflows de adquisición, entrenamiento, inferencia y evaluación, con
+datasets, holdouts y bundles trazables.
 
-## Persona 2: Investigador de Tráfico
+## Responsable vial o institucional
 
-| Atributo | Detalle |
-|---|---|
-| **Nombre representativo** | Dra. Lucía, 42 años |
-| **Rol** | Investigadora en ingeniería de transporte |
-| **Formación** | Doctorado en ingeniería civil / transporte |
-| **Experiencia técnica** | Media. Usa Python, pandas, notebooks. No es experta en ML. |
-| **Objetivo principal** | Analizar patrones de tráfico históricos para publicaciones académicas |
-| **Frustraciones** | Falta de datos cuantitativos sobre el puente; conteo manual es lento y propenso a errores |
-| **Necesidades** | Datos tabulares exportables (CSV/BD), métricas por minuto, reproducibilidad de resultados |
-| **Interacción con VAAET** | Usa adquisición, entrenamiento e inferencia para estudiar el pipeline completo |
-| **Métrica de éxito** | Datos con granularidad por minuto y velocidades con MAE < 5 km/h |
+Es una persona hipotética que podría consumir informes preparados por un
+operador o investigador. Sus necesidades de acceso, reportes, retención y
+calibración deberán acordarse antes de crear una API o Web App.
 
----
+## Agente de código
 
-## Persona 3: Ingeniero de Tráfico Municipal
+Lee `AGENTS.md`, `llms.txt`, el índice documental y los ADRs antes de proponer
+cambios. Debe preservar los límites core--ML--app, los contratos de datos y la
+política humana de `Accident`.
 
-| Atributo | Detalle |
-|---|---|
-| **Nombre representativo** | Martín, 38 años |
-| **Rol** | Ingeniero de tráfico en la Municipalidad de Corrientes |
-| **Formación** | Ingeniería civil |
-| **Experiencia técnica** | Baja. Usa Excel, informes en PDF. |
-| **Objetivo principal** | Planificar mejoras viales basadas en datos de volumen y velocidad |
-| **Frustraciones** | Tomar decisiones de infraestructura sin datos objetivos sobre el flujo vehicular del puente |
-| **Necesidades** | Reportes resumidos, gráficos de tendencias, conteos por tipo de vehículo, alertas de congestión |
-| **Interacción con VAAET** | Recibe reportes generados por Persona 1 o 2. En el futuro, accede al dashboard de la Web App. |
-| **Métrica de éxito** | Informes mensuales con datos de volumen y velocidad por franja horaria |
+## Matriz orientativa
 
----
-
-## Persona 4: Agente de IA (Copilot / Asistente)
-
-| Atributo | Detalle |
-|---|---|
-| **Nombre representativo** | — (Agente de código) |
-| **Rol** | Asistente de desarrollo basado en IA |
-| **Formación** | Modelo de lenguaje entrenado en código |
-| **Experiencia técnica** | Alta, pero sin contexto específico del proyecto |
-| **Objetivo principal** | Asistir en la implementación, refactorización y documentación del código |
-| **Frustraciones** | Deuda de contexto: no entiende la arquitectura sin documentación clara |
-| **Necesidades** | `AGENTS.md`, `llms.txt`, ADRs actualizados, contratos de datos explícitos |
-| **Interacción con VAAET** | Lee archivos de contexto → propone cambios → ejecuta tests → solicita revisión humana |
-| **Métrica de éxito** | Cambios propuestos que pasan todos los tests y respetan los ADRs |
-
----
-
-## Matriz Persona × Módulo
-
-| Persona | Adquisición | Entrenamiento | Inferencia | Web App (futuro) |
-|---|---|---|---|---|
-| Operador SISE | ❌ | ❌ | ✅ (uso directo) | ✅ (uso directo) |
-| Investigador | 📖 (referencia) | ✅ (uso directo) | ✅ (uso directo) | 📊 (consulta datos) |
-| Ingeniero Municipal | ❌ | ❌ | 📊 (recibe reportes) | ✅ (uso directo) |
-| Agente de IA | 📖 (referencia) | 🔧 (desarrollo) | 🔧 (desarrollo) | 🔧 (desarrollo) |
-
----
-
-Responsable del documento: Facundo Nicolás González
-Fecha de revisión: 2026-07-23
+| Perfil | Acceso vigente | Futuro sujeto a aprobación |
+|---|---|---|
+| Operador o analista | Notebook de inferencia | API y Web App mediante HTTP |
+| Investigador | Cuatro notebooks de laboratorio | Informes o integración adicional |
+| Responsable institucional | Ninguno directo | Visualización y reportes acordados |
+| Agente de código | Contexto y pruebas del repositorio | Cambios dentro de un alcance aprobado |

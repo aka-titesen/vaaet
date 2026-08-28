@@ -1,43 +1,30 @@
-<!-- context: VAAET/docs/architecture/diagrams/speed-calculation.md -- Detailed speed calculation flow.
-        Referenced by SAD.md as the active physics-first speed path. -->
+<!-- context: VAAET/docs/architecture/diagrams/speed-calculation.md — Flujo vigente de velocidad physics-first. -->
 
-        # Physics-First Speed Calculation Flow
+# Flujo de cálculo de velocidad physics-first
 
-        Detail of the active `estimate_speed()` + `analyze_video()` pipeline in
-        `vaaet-core/src/vaaet/vision/speed.py` and `vaaet-core/src/vaaet/vision/analysis.py`.
+`vaaet-core/src/vaaet/vision/pipeline.py` coordina el análisis ordenado; la
+estimación vive en `vaaet-core/src/vaaet/vision/speed.py`. El resultado depende
+del historial de cada track y no ofrece un fallback de velocidad inventada.
 
-        ```mermaid
-        flowchart TD
-            A[Track history<br/>recent centroid deque] --> B[Estimate global motion<br/>Optical Flow]
-            B --> C[Compensate camera motion<br/>subtract global vector]
-            C --> D[Compute per-frame displacement norms]
-            D --> E[Apply noise floor<br/>clip abrupt anomalies]
-            E --> F[Perspective correction<br/>zone-based factor by Y position]
-            F --> G[Convert pixels to meters<br/>pixels_per_meter]
-            G --> H[Physics speed<br/>distance / dt -> km/h]
-            H --> I{Plausible speed<br/>for vehicle type?}
-            I -->|No| J[Reject sample]
-            I -->|Yes| K{Reliable track?
-flow ratio, gap recovery,
-recent anomaly checks}
-            K -->|No| L[Exclude from minute summary]
-            K -->|Yes| M[Track-level smoothing
-short moving average]
+```mermaid
+flowchart TD
+    A[Historial reciente de centroides] --> B[Flujo óptico global]
+    B --> C[Compensar movimiento de cámara]
+    C --> D[Desplazamientos por frame]
+    D --> E[Filtrar ruido y anomalías]
+    E --> F[Corrección de perspectiva por zona Y]
+    F --> G[Convertir píxeles a metros]
+    G --> H[Velocidad física km/h]
+    H --> I{¿Plausible y confiable?}
+    I -->|No| J[Excluir de la síntesis]
+    I -->|Sí| K[Suavizado por track]
+    A --> L[Analizar movimiento]
+    L --> M[Confirmación estacionaria con histéresis]
+    K --> N[Acumulador por minuto]
+    M --> N
+    J --> N
+    N --> O[Síntesis robusta y señales de calidad]
+    O --> P[Fila de telemetría apta para clasificación]
+```
 
-            A --> N[Motion state analysis
-near_zero vs stationary]
-            N --> O[Hysteresis-based stationary confirmation]
-
-            M --> P[Minute accumulator]
-            O --> P
-            J --> P
-            L --> P
-
-            P --> Q[Robust minute summary
-trimmed / outlier-aware mean]
-            Q --> R[Quality signals
-rejected, recovered, stationary, near-zero]
-            R --> S[Classifier-ready telemetry row]
-
-            T[Optional dormant path<br/>MLP speed fusion] -.only if explicitly wired.-> M
-        ```
+La fusión MLP de velocidad es un path dormido y no integra el runtime activo.

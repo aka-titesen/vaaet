@@ -11,16 +11,15 @@ Keep layers as VAAET's principal architecture:
 
 | Layer | Responsibility |
 | --- | --- |
-| `notebooks/` | Colab UI and workflow orchestration only |
-| `vision/` | Video, YOLO, tracking, motion, speed, HUD, telemetry |
-| `features/` | Governed 19-feature engineering and labels |
-| `inference/` | Three-state MLP decisions, hysteresis, incident candidate gate |
-| `data/` | Input sources, persistence, dataset artifacts, HITL, lineage |
-| `training/`, `evaluation/`, `artifacts.py` | Lifecycle, validation, bundle integrity |
+| `vaaet-ml/notebooks/` | Colab UI and workflow orchestration only |
+| `vaaet-core/src/vaaet/vision/` | Video, YOLO, tracking, motion, speed, HUD, telemetry |
+| `vaaet-core/src/vaaet/features/`, `inference/`, `artifacts.py` | 19 features, state policy, bundle validation and portable inference |
+| `vaaet-ml/src/vaaet_ml/data/` | Input sources, persistence, dataset artifacts, HITL, lineage |
+| `vaaet-ml/src/vaaet_ml/training/`, `evaluation/` | Lifecycle, training and laboratory validation |
 
-Preserve `vaaet.vision.analysis.analyze_video()` as the shared boundary for collection and inference. Keep notebooks thin and reusable behavior in `src/vaaet/`.
+Preserve `vaaet.vision.analyze_video()` as the portable shared boundary for collection and inference. Keep notebooks thin; core owns video behavior and ML owns laboratory workflows.
 
-Read ADR-0013 through ADR-0019 before architectural changes. Do not change the 19 `FEATURE_COLS`, state semantics, MLP, thresholds, schema, or bundle v2 without explicit authorization and an ADR.
+Read ADR-0021 and ADR-0013 through ADR-0019 before architectural changes. Read ADR-0022 for future serving with YOLO. Do not change the 19 `FEATURE_COLS`, state semantics, MLP, thresholds, schema, or bundle v2 without explicit authorization and an ADR.
 
 ## Current state: do not misrepresent it
 

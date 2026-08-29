@@ -11,7 +11,7 @@ Preserve the current, Colab-compatible perception path before proposing a more c
 
 ## Preserve the current boundary
 
-Treat `vaaet.vision.analysis.analyze_video()` as the common acquisition and inference boundary. Keep notebooks as orchestrators and implement shared vision behavior in `src/vaaet/vision/`.
+Treat `vaaet.vision.analyze_video()` as the common acquisition and inference boundary. Keep notebooks in `vaaet-ml/` as orchestrators and implement shared vision behavior in `vaaet-core/src/vaaet/vision/`.
 
 Maintain the established ordered chain for each clip:
 
@@ -22,7 +22,7 @@ Maintain the established ordered chain for each clip:
 5. Estimate, smooth, and qualify speed before updating motion state.
 6. Aggregate global flow and complete minute-level telemetry.
 
-Do not change public `Detection`, `SORTTracker`, `estimate_speed`, `OpticalFlowEstimator`, telemetry contracts, thresholds, model weights, or public APIs without explicit authorization. Respect ADR-0013, ADR-0014, and ADR-0017 through ADR-0019; use ADR-0002, ADR-0003, and ADR-0006 only as historical context.
+Do not change public `Detection`, `SORTTracker`, `estimate_speed`, `OpticalFlowEstimator`, telemetry contracts, thresholds, model weights, or public APIs without explicit authorization. Respect ADR-0021, ADR-0013, ADR-0014, and ADR-0017 through ADR-0019; read ADR-0022 before any serving proposal and use ADR-0002, ADR-0003, and ADR-0006 only as historical context.
 
 
 ## Detection and tracking
@@ -53,7 +53,7 @@ Do not change the tracker, speed or confidence thresholds, or sampling order wit
 
 Log the selected YOLO variant, optical-flow quality, discarded tracks, complete processed minutes, and rejection reasons. Redact secrets, connection details, and private local or Drive paths from logs and errors.
 
-For changes in scope, run the repository gates: Ruff, pytest, compilation, notebook-cell parsing, Markdown link checks, and `git diff --check`. Validate GPU assignment, runtime downloads, Drive, database connectivity, and real-video behavior manually in Colab.
+For changes in scope, run the core gates from `vaaet-core/AGENTS.md`; add ML notebook gates only when a laboratory workflow changes. Validate GPU assignment, runtime downloads, Drive, database connectivity, and real-video behavior manually in Colab.
 
 ---
 

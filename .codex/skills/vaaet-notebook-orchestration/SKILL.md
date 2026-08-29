@@ -11,8 +11,9 @@ package, runtime, and governance contracts.
 ## Keep the responsibility boundary explicit
 
 - Keep notebooks as user-facing orchestration and visualization entrypoints.
-- Put reusable data, vision, feature, inference, training, and persistence logic in
-  `src/vaaet/`; import it through `vaaet.*`.
+- Put portable vision, features, inference, and bundle behavior in
+  `vaaet-core/src/vaaet/` and laboratory data, training, evaluation, and persistence
+  behavior in `vaaet-ml/src/vaaet_ml/`; import them through `vaaet.*` and `vaaet_ml.*`.
 - Use `$vaaet-python-ml-engineering` when extracting or redesigning reusable Python.
 - Use `$vaaet-colab-operations` for runtime setup, GPU/RAM, Drive, Secrets, recovery,
   immutable artifacts, and Colab-specific operational behavior.
@@ -50,7 +51,7 @@ to satisfy the soft target; extract reusable behavior instead.
 - Validate enum values, paths, mutually exclusive options, required profiles, and artifact
   compatibility before processing begins.
 - Avoid mutable catch-all dictionaries and variables that change type across cells.
-- Move a growing or shared configuration contract to a typed immutable object in `src/vaaet/`.
+- Move a growing or shared configuration contract to a typed immutable object in the owning core or ML component.
 
 Treat `ipywidgets` as an optional frontend. Lazy-import it only when UI is authorized. Make the
 widgets produce the same validated typed configuration used by the non-interactive path. Keep a
@@ -74,7 +75,7 @@ callbacks become the only source of truth or business logic.
 Run the bundled auditor against every active notebook:
 
 ```bash
-python .codex/skills/vaaet-notebook-orchestration/scripts/audit_notebooks.py notebooks
+python .codex/skills/vaaet-notebook-orchestration/scripts/audit_notebooks.py vaaet-ml/notebooks
 ```
 
 The auditor returns nonzero for invalid JSON/Python, cells above 500 lines, forbidden import or
@@ -83,7 +84,7 @@ reassigned outside their owning cell. It reports cells above 50 lines as non-blo
 
 After changes, also run the repository-required Ruff, pytest, compileall, notebook AST, Markdown
 link, and `git diff --check` gates. Report which logic stayed in the notebook, which logic moved to
-`src/vaaet/`, configuration and failure behavior, tests, and any Colab-only validation pending.
+the owning `vaaet-core/` or `vaaet-ml/` module, configuration and failure behavior, tests, and any Colab-only validation pending.
 
 ## Reject common notebook antipatterns
 

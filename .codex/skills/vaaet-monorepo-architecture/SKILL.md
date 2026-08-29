@@ -1,26 +1,25 @@
 ---
 name: vaaet-monorepo-architecture
-description: Guide safe evolution of VAAET into a single Git monorepo. Use for repository layout, ML/API/web boundaries, DVC ownership, monorepo migration planning, workspace packaging, path-scoped CI, or replacing the current multi-repo decision without contract drift.
+description: Govern VAAET's single Git monorepo and its core, ML, and reserved app boundaries. Use for workspace packaging, DVC ownership, path-scoped validation, future API planning, or cross-component architecture decisions.
 ---
 
 # VAAET Monorepo Architecture
 
 ## Overview
 
-Use one repository root with independently deployable components, not a nested monorepo. Preserve VAAET's ML contracts while creating a clear future boundary between the Python package, API, and web interface.
+VAAET is already one repository with independently bounded components, not a nested monorepo. Preserve the portable core, ML laboratory, DVC boundary, and future API/web separation defined by ADR-0021.
 
 ## Use one Git and DVC root
 
 Keep a single `.git`, `.dvc`, remote configuration, top-level CI surface, and shared architecture documentation. Do not create nested Git repositories, autonomous DVC remotes, or an inner monorepo inside `vaaet-ml/` or `vaaet-app/`.
 
-Use this target layout for a future authorized migration:
+Preserve the current layout:
 
 ```text
 vaaet/
-├─ vaaet-ml/          # Python package, notebooks, tests, migrations, artifacts
-├─ vaaet-app/
-│  ├─ web/            # frontend
-│  └─ api/            # backend and serving
+├─ vaaet-core/        # portable Python distribution; import vaaet
+├─ vaaet-ml/          # ML laboratory distribution; import vaaet_ml
+├─ vaaet-app/         # reserved: no API or web scaffold yet
 ├─ docs/              # shared ADRs and architecture
 ├─ .dvc/              # one DVC configuration
 └─ .github/           # root CI
@@ -29,17 +28,17 @@ vaaet/
 
 ## Keep components independently bounded
 
-Keep all Python ML behavior in `vaaet-ml/`: the `vaaet-ml` package, notebooks as Colab orchestrators, tests, migrations, and governed artifacts. Do not move notebook behavior into web endpoints or duplicate its feature and inference logic.
+Keep portable perception, telemetry, canonical features, state policy, bundle validation, and inference in `vaaet-core/`. It must not import `vaaet_ml`, PostgreSQL, DVC, Drive, or notebook APIs.
 
-Let `vaaet-app/web/` consume only a versioned API. It must not access PostgreSQL, DVC, Google Drive, artifact binaries, or Python modules directly.
+Keep `vaaet-ml/` as the laboratory: datasets, training, evaluation, notebooks, PostgreSQL, migrations, and governed artifacts. Install core before ML; notebooks import `vaaet` for operations and `vaaet_ml` for laboratory behavior.
 
-Let `vaaet-app/api/` install `vaaet-ml` from the local workspace and use its public contracts to validate and load bundles. Do not reimplement feature engineering, model loading, state policy, or Accident handling. Version an HTTP contract before exposing it; keep framework selection open until explicitly authorized.
+Reserve `vaaet-app/` until an HTTP contract and component scope are approved. A future web consumes only that API. Its workers use `vaaet-core`, validate the v2 manifest before deserialization, and never import ML, DVC, Drive, PostgreSQL, or notebooks.
 
-## Govern a future migration
+## Govern changes to the current monorepo
 
-Do not move files until an ADR supersedes ADR-0012 while preserving its portable bundle boundary. Inventory paths, notebook setup cells, packaging, DVC metadata, CI, scripts, documentation, and links before the move.
+Treat ADR-0021 as the current boundary and ADR-0022 as the serving rule for YOLO. Do not move responsibilities between core and ML, introduce app code, or alter package boundaries without authorization and a governed ADR/plan.
 
-Use traceable `git mv` operations and stage the migration: establish the root layout, relocate the ML project, repair path-aware tooling and links, then introduce application components separately. Do not combine a structural move with feature, model, schema, remote, role, or dependency changes.
+For a future API or public demo, select one explicit serving route: an AGPL-3.0 public demo with the approved checklist, or a private/commercial deployment with a verified Ultralytics Enterprise license outside Git. Do not expose private artifacts, data, credentials, or review evidence through either route.
 
 Keep DVC at the root and track `vaaet-ml/artifacts/traffic-state/` as the existing atomic four-file bundle. Preserve checksums, manifests, input locks, immutable seed/HITL packages, holdouts, and the configured remotes.
 
@@ -55,7 +54,7 @@ Use the API as the sole web/ML boundary. Do not make the frontend a DVC client o
 
 Keep shared ADRs, security policy, DVC configuration, and root CI at the repository root. Scope CI by changed paths so ML and application checks can run independently while preserving full integration checks at boundary changes.
 
-Validate the relocated ML project with its existing Ruff, pytest, compilation, notebook parsing, Markdown-link, and diff gates. Add app-specific checks only with its future framework. Validate cross-boundary behavior with a verified bundle and a versioned API contract when the API exists.
+Run the core or ML gates from its `AGENTS.md` according to the component changed. Add app-specific checks only after its framework and HTTP contract are approved. Validate cross-boundary behavior with a verified bundle and versioned API contract when an API exists.
 
 Reject a migration if package installation, Colab setup, DVC pull, manifest validation, or existing ML tests regress. Keep GPU, Drive, DVC remote, and live PostgreSQL validation manual and explicit.
 
@@ -67,4 +66,4 @@ Reject these antipatterns:
 - Do not let web import Python, load a model, access DVC, or connect directly to the database.
 - Do not copy ML code into the API or bypass manifest validation to accelerate serving.
 - Do not move paths and change model behavior, schemas, dependencies, DVC remotes, or permissions in one migration.
-- Do not update ADR-0012 silently or add application scaffolding before the architecture decision and scope are approved.
+- Do not bypass ADR-0021/ADR-0022 or add application scaffolding before the HTTP contract and scope are approved.

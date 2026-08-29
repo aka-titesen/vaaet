@@ -9,11 +9,11 @@ description: Prepare, adapt, review, or troubleshoot VAAET ML workflows on Googl
 
 Treat Colab as an ephemeral compute worker. Keep source code and high-I/O data under `/content`; persist only governed datasets, locks, review packages, and completed artifacts to mounted Drive.
 
-Before altering a workflow, read ADRs `0013` through `0019` in `docs/architecture/decisions/`. Preserve the 19 `FEATURE_COLS`, public states, MLP, thresholds, PostgreSQL schema, bundle v2, and DVC remotes unless the user explicitly authorizes a governed change.
+Before altering a workflow, read ADR-0021 and the applicable ADRs `0013` through `0019` in `docs/architecture/decisions/`. Read ADR-0022 before any serving-related change. Preserve the 19 `FEATURE_COLS`, public states, MLP, thresholds, PostgreSQL schema, bundle v2, and DVC remotes unless the user explicitly authorizes a governed change.
 
-- Keep notebooks as thin orchestrators; put reusable logic in `src/vaaet/`.
+- Keep notebooks as thin orchestrators. Put portable operations in `vaaet-core/src/vaaet/` and laboratory behavior in `vaaet-ml/src/vaaet_ml/`.
 - Do not mutate `sys.path`.
-- In Colab, clone to `/content/vaaet` and install the package from that checkout. Validate that `vaaet` resolves to the installed package, not the checkout's `src/vaaet`.
+- In Colab, clone to `/content/vaaet`, install `vaaet-core` before `vaaet-ml`, and validate that both `vaaet` and `vaaet_ml` resolve to installed packages rather than checkout source paths.
 - Use editable installation only during local development.
 - The MLP produces Normal, Reduced, and Congested. Accident remains human-confirmed only.
 
@@ -27,7 +27,7 @@ For GPU-required training or visual processing, fail early if no GPU is assigned
 
 ### Environment
 
-Use the existing `# Environment setup — run once per Colab runtime` cell as the sole setup path. It must detect Colab, clone or fast-forward `/content/vaaet`, quietly install declared extras, clear stale `vaaet` modules, validate import origin, run `pip check` diagnostically, and print versions plus commit—never credentials.
+Use the existing `# Environment setup — run once per Colab runtime` cell as the sole setup path. It must detect Colab, clone or fast-forward `/content/vaaet`, quietly install declared core and ML extras in order, clear stale `vaaet` and `vaaet_ml` modules, validate both import origins, run `pip check` diagnostically, and print versions plus commit—never credentials.
 
 Do not install dependencies or repeatedly import heavyweight modules inside loops. Prefer `subprocess` argument lists to shell strings.
 
@@ -83,7 +83,7 @@ Do not resume from partial mutable Drive content. Keep failed local HITL output 
 
 - Verify GPU/RAM budget and local `/content` staging.
 - Confirm that no secrets occur in code, outputs, metadata, exceptions, or commits.
-- Record installed package origin, extras, commit, and redacted pipeline run metadata.
+- Record both installed package origins, extras, commit, and redacted pipeline run metadata.
 - Confirm that governed snapshots, catalog, holdout, and input lock are immutable and checksummed.
 - Confirm that the bundle has exactly four files and passes manifest validation.
 - Keep training free of operational database writes; make inference/review persistence explicit.

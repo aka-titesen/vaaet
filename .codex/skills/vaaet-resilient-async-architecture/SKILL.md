@@ -7,12 +7,12 @@ description: Design, review, or safely evolve resilient asynchronous VAAET workf
 
 ## Position and current state
 
-Read ADR-0013 through ADR-0019 before changing workflow behavior. Use
+Read ADR-0021 and ADR-0013 through ADR-0019 before changing workflow behavior. Read ADR-0022 for a future serving proposal. Use
 `vaaet-pipeline-architecture` for vision-stage boundaries and
 `vaaet-postgres-mlops` for database profiles, transactions, TLS, and schema
 governance.
 
-Describe the current implementation accurately: `vaaet.vision.analysis.analyze_video()`
+Describe the current implementation accurately: `vaaet.vision.analyze_video()`
 is an ordered, synchronous per-clip loop. It has no runtime queues, Redis,
 Celery, `asyncpg`, remote workers, or distributed cache. `pipeline_run` can
 emit a redacted local lifecycle manifest when PostgreSQL is unavailable; it is
@@ -56,7 +56,7 @@ telemetry equivalence, Colab memory limits, or explicit persistence semantics.
 
 ## Persist, spool, and replay safely
 
-Use the existing workflow-specific `DatabaseProfile`, settings loader,
+Use the existing ML-laboratory workflow-specific `DatabaseProfile`, settings loader,
 SQLAlchemy engine factory, TLS policy, `pipeline_run` lineage, qualified SQL,
 natural keys, and transactional idempotent persistence contracts. Do not add
 `asyncpg` or replace the synchronous engine merely because a worker exists.
@@ -86,8 +86,8 @@ Do not use administrative database credentials in a notebook or worker.
 ## Keep distributed services future and governed
 
 Redis, Celery, distributed caching, external schedulers, remote durable brokers,
-`asyncpg`, and workers under a future `vaaet-app/api` are proposals, not current
-VAAET components. Before selecting one, obtain explicit authorization and
+`asyncpg`, and workers under a future approved API in `vaaet-app/` are proposals, not current
+VAAET components. Those workers must use `vaaet-core`, not `vaaet-ml`. Before selecting one, obtain explicit authorization and
 document the dependency, deployment identity, encryption and authentication,
 retention, backpressure, failure recovery, monitoring, cost, and ADR impact.
 

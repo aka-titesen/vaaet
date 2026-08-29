@@ -8,8 +8,10 @@ description: Gestioná y revisá cambios Git de VAAET con commits atómicos, tra
 ## Estado actual y límites de autoridad
 
 Usá Git como historial técnico auditable, no como respaldo indiferenciado. Antes
-de modificar el repositorio, leé `AGENTS.md`, el ADR aplicable, `CONTRIBUTING.md`
-y el plan gobernado cuando corresponda.
+de modificar el repositorio, leé `AGENTS.md`, `llms.txt`, el ADR aplicable,
+`CONTRIBUTING.md` y el plan gobernado cuando corresponda. Para un cambio de
+componente, leé también `vaaet-core/AGENTS.md` o `vaaet-ml/AGENTS.md`; ADR-0021
+gobierna sus límites y ADR-0022 cualquier serving futuro con YOLO.
 
 VAAET usa actualmente `main` como rama principal y `feature/*` para trabajo
 aislado. No hay una rama `develop`, Git Flow completo, plantilla de pull request,
@@ -34,8 +36,8 @@ tipo(scope): verbo en voseo formal + resultado concreto
 
 Usá sólo estos tipos: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`,
 `test` y `chore`. Elegí un scope real de VAAET cuando aclare el alcance:
-`vision`, `features`, `inference`, `data`, `training`, `evaluation`,
-`artifacts`, `notebooks`, `docs`, `ci` o `dvc`.
+`core`, `ml`, `vision`, `features`, `inference`, `data`, `training`,
+`evaluation`, `artifacts`, `notebooks`, `docs`, `ci` o `dvc`.
 
 Preferí verbos como `incorporá`, `corregí`, `actualizá`, `documentá`,
 `preservá`, `optimizá`, `validá`, `migrá` y `eliminá`. Evitá verbos de acción en

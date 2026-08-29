@@ -7,18 +7,18 @@ description: Explorá y auditá datos VAAET de forma reproducible, sin fuga ni d
 
 ## Propósito y alcance
 
-Usá el análisis exploratorio de datos (EDA) para formular y comprobar preguntas sobre la telemetría de VAAET, detectar problemas de calidad y producir evidencia legible para decisiones humanas. Mantené los notebooks como orquestadores finos: la lógica reutilizable y testeable pertenece a `src/vaaet/`.
+Usá el análisis exploratorio de datos (EDA) para formular y comprobar preguntas sobre la telemetría de VAAET, detectar problemas de calidad y producir evidencia legible para decisiones humanas. Mantené los notebooks de `vaaet-ml/` como orquestadores finos: la lógica reutilizable de evaluación pertenece a `vaaet-ml/src/vaaet_ml/evaluation/`, mientras contratos y política de features permanecen en `vaaet-core/src/vaaet/`.
 
-Esta skill guía análisis futuros; no afirma que VAAET ya tenga un notebook, un pipeline o utilidades genéricas de EDA. Las funciones `plot_training_history()` y `plot_training_evaluation()` de `vaaet.evaluation.reporting` sirven para evaluar entrenamiento: no las presentes como un subsistema EDA completo.
+Esta skill guía análisis futuros; no afirma que VAAET ya tenga un notebook, un pipeline o utilidades genéricas de EDA. Las funciones `plot_training_history()` y `plot_training_evaluation()` de `vaaet_ml.evaluation.reporting` sirven para evaluar entrenamiento: no las presentes como un subsistema EDA completo.
 
-Antes de modificar una exploración, leé `AGENTS.md` y las ADR aplicables, en especial ADR-0013 a ADR-0019. Los contratos, snapshots inmutables, input locks y holdouts humanos congelados prevalecen sobre una hipótesis exploratoria.
+Antes de modificar una exploración, leé `AGENTS.md`, `vaaet-ml/AGENTS.md`, ADR-0021 y las ADR aplicables, en especial ADR-0013 a ADR-0019. Los contratos, snapshots inmutables, input locks y holdouts humanos congelados prevalecen sobre una hipótesis exploratoria.
 
 ## Preservá datos, cohortes y contratos
 
 - Partí de un snapshot, catálogo y `pipeline_run` identificables. Registrá procedencia, versión, filtros, intervalo temporal, clips incluidos y semilla de muestreo sin exponer rutas privadas ni secretos.
 - Definí por escrito la pregunta, la cohorte de análisis y la decisión que podría informar antes de graficar. Separá por clip y tiempo cuando la observación pueda repetirse dentro de un video.
 - No inspecciones validation ni test congelados para elegir features, umbrales, transformaciones o arquitectura. Usá únicamente la cohorte de desarrollo autorizada; el holdout humano sólo admite evaluación final compatible.
-- Conservá exactamente las 19 `FEATURE_COLS`, su orden y los contratos de `vaaet.data.datasets`, `vaaet.features`, `vaaet.training` y los bundles. Solicitá autorización y un ADR antes de proponer cambios a features, etiquetas, umbrales, datos gobernados o MLP.
+- Conservá exactamente las 19 `FEATURE_COLS`, su orden y los contratos de `vaaet`, `vaaet_ml.data`, `vaaet_ml.training` y los bundles. Solicitá autorización y un ADR antes de proponer cambios a features, etiquetas, umbrales, datos gobernados o MLP.
 - Reconocé que `Normal`, `Reduced` y `Congested` son las salidas aprendidas. `Accident` requiere confirmación humana: no lo infieras, etiquetes ni lo cuantifiques como ground truth automático.
 - En `SEED_BOOTSTRAP`, tratá observaciones proxy y sintéticas como evidencia limitada. En `HITL_RETRAINING`, usá etiquetas humanas efectivas y conservá la separación entre datos semilla, HITL y holdouts.
 
@@ -38,7 +38,7 @@ Muestreá de forma determinista cuando el volumen impida explorar la cohorte com
 - Incluí título técnico, ejes con unidades, leyenda, escala y paleta accesible. Preferí alternativas que no dependan sólo del color y evitá escalas que exageren diferencias.
 - Acompañá cada visual relevante con hipótesis, hallazgo, limitación y decisión posible. Eliminá gráficos que no respondan una pregunta ni cambien una decisión.
 - Controlá cardinalidad y sobreimpresión: agregá, estratificá o muestreá de forma documentada antes de renderizar nubes de puntos ilegibles.
-- No uses celdas monolíticas ni repitas bloques extensos. Si una rutina se reutiliza, proponé extraerla a `src/vaaet/evaluation/` con pruebas y autorización; no crees un paquete paralelo de visualización.
+- No uses celdas monolíticas ni repitas bloques extensos. Si una rutina se reutiliza, proponé extraerla a `vaaet-ml/src/vaaet_ml/evaluation/` con pruebas y autorización; no crees un paquete paralelo de visualización.
 
 ## Gestioná memoria y salidas con prudencia
 
@@ -67,11 +67,9 @@ Las metas de velocidad, cobertura de nulos o cantidad de insights son benchmarks
 
 Cuando una tarea autorizada modifique código, notebooks o documentación vinculados al EDA, ejecutá los gates de VAAET en proporción al cambio:
 
-1. `ruff check src tests scripts`
-2. `pytest tests/ -v --tb=short`
-3. `python -m compileall -q src tests scripts`
-4. Parseo con `ast.parse()` de las celdas de los tres notebooks.
-5. Comprobación de enlaces Markdown.
-6. `git diff --check`
+1. Los gates de `vaaet-ml/AGENTS.md` y, si se toca un contrato portable, los de `vaaet-core/AGENTS.md`.
+2. Parseo con `ast.parse()` de las celdas de los cuatro notebooks en `vaaet-ml/notebooks/`.
+3. Comprobación de enlaces Markdown.
+4. `git diff --check`
 
 No agregues notebooks, utilidades, dependencias, datasets, artefactos, DVC, ADRs ni CI sólo por aplicar esta skill. Pedí autorización cuando el hallazgo requiera alterar un contrato, un dato gobernado o una decisión arquitectónica.

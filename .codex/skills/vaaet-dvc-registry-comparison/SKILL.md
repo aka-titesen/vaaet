@@ -11,9 +11,9 @@ Treat DVC plus its configured Google Drive remote as VAAET's model registry. Com
 
 ## Preserve registry and bundle boundaries
 
-Follow ADR-0011 and ADR-0012. Keep DVC as the registry and version `artifacts/traffic-state/` as one atomic bundle: Keras model, scaler, label mapping, and `model-manifest.json`. Never version the binary files directly in Git or register individual bundle files separately.
+Follow ADR-0021 and the active DVC governance. Keep DVC as the root registry and version `vaaet-ml/artifacts/traffic-state/` as one atomic bundle: Keras model, scaler, label mapping, and `model-manifest.json`. Never version the binary files directly in Git or register individual bundle files separately.
 
-Run `vaaet.artifacts.validate_manifest()` before loading Keras or joblib. Preserve DVC remotes, `current.json`, seed snapshots, HITL catalogs, frozen holdouts, and input locks; comparison is read-only and must not update any pointer or registry state.
+Run `vaaet.artifacts.validate_manifest()` from the portable core before loading Keras or joblib. Preserve DVC remotes, `current.json`, seed snapshots, HITL catalogs, frozen holdouts, and input locks in `vaaet-ml/`; comparison is read-only and must not update any pointer or registry state.
 
 
 ## Materialize candidates without side effects
@@ -42,7 +42,7 @@ Do not open ports or create public URLs. Do not add MLflow, Streamlit, Gradio, n
 
 Keep DVC credentials in its local configuration or approved secrets; never print OAuth material, Drive identifiers, URLs containing tokens, private paths, model-review notes, or raw data. Preserve the manifest's checksums and reject corrupt, incomplete, or mixed bundles.
 
-For changes in scope, run Ruff, pytest, compilation, notebook-cell parsing, Markdown link checks, and `git diff --check`. Validate DVC authentication, Drive access, local materialization, and any private Colab interaction manually.
+For changes in scope, run the ML gates and relevant core contract gates from their component `AGENTS.md` files, plus notebook-cell parsing, Markdown links, and `git diff --check`. Validate DVC authentication, Drive access, local materialization, and any private Colab interaction manually.
 
 ---
 

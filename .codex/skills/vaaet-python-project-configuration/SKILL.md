@@ -7,22 +7,20 @@ description: Configure, review, or harden VAAET Python project setup. Use for vi
 
 ## Preserve VAAET's source of truth
 
-Use `pyproject.toml` as the sole dependency, build, test, and Ruff configuration source. VAAET supports Python 3.10–3.13; do not widen that range without explicit authorization.
+Use each component's `pyproject.toml` as its sole dependency, build, test, and Ruff configuration source: `vaaet-core/pyproject.toml` for the portable package and `vaaet-ml/pyproject.toml` for the laboratory. The repository root is not an installable package. VAAET supports Python 3.10–3.13; do not widen that range without explicit authorization.
 
-Keep its dependency groups intentionally separate:
+Keep dependency groups intentionally separate by component:
 
-- Core runtime: project dependencies.
-- Optional domains: `vision`, `training`, `database`, and `visualization` extras.
-- Development/quality: the `dev` extra.
-- Model/data versioning: the `dvc` extra.
+- `vaaet-core`: core runtime plus `vision`, `inference`, and `dev` extras.
+- `vaaet-ml`: laboratory runtime plus `training`, `database`, `visualization`, `dvc`, and `dev` extras.
 
 Install only the extras needed for the selected workflow. Do not create `requirements/`, `setup.cfg`, `requirements.txt`, lockfiles, or a second dependency resolver for VAAET unless the user explicitly authorizes a dependency-management change.
 
 ## Work in an isolated environment
 
-For local development, create a project-local `.venv` with a supported Python version, activate it for the host shell, then install the required project extras. Never install project dependencies globally.
+For local development, create an isolated `.venv` with a supported Python version, activate it for the host shell, then install only the required extras. For a full ML workflow, install `vaaet-core` first and `vaaet-ml` second. Never install project dependencies globally.
 
-Use normal package installation from the repository: editable installs for local development and a built wheel for Colab. Keep notebook setup limited to the existing package-installation cell; do not install individual packages in notebook processing cells or loops.
+Use normal component installation from the repository: editable installs for local development and built wheels or declared component installs for Colab. Keep notebook setup limited to the existing package-installation cell; do not install individual packages in notebook processing cells or loops.
 
 Use `pip check` to diagnose a managed runtime after installation. Do not replace declared dependency ranges with `pip freeze` output. A fully pinned lock is an optional reproducibility mechanism that needs an approved tool and update policy.
 
@@ -30,15 +28,14 @@ Use `pip check` to diagnose a managed runtime after installation. Do not replace
 
 Use Ruff as VAAET's formatter/linter authority and keep its configuration in `pyproject.toml`. Run the repository gates:
 
-1. `ruff check src tests scripts`
-2. `pytest tests/ -v --tb=short`
-3. `python -m compileall -q src tests scripts`
-4. Parse all notebook code cells.
-5. Check Markdown links and run `git diff --check`.
+1. Run the `vaaet-core/AGENTS.md` commands when core changes.
+2. Run the `vaaet-ml/AGENTS.md` commands when ML changes, after installing core first when required.
+3. Run root `pyright --project pyrightconfig.json` for configured typing scope.
+4. Parse code cells from all four notebooks in `vaaet-ml/notebooks/`, check Markdown links, and run `git diff --check`.
 
 Do not add Black, isort, Flake8, or `setup.cfg` to VAAET. They duplicate Ruff's role and create conflicting formatting/lint rules.
 
-Treat MyPy, coverage thresholds, pre-commit, Bandit, pip-audit, dependency locks, and CI enforcement as proposals, not implicit edits. Before adding any of them, explain the benefit, package/CI impact, configuration scope, false-positive policy, and maintenance owner; then obtain authorization because they change project dependencies or workflows.
+Treat MyPy, coverage thresholds, pre-commit, Bandit, pip-audit, dependency locks, and expanded CI enforcement as proposals, not implicit edits. Pyright is the configured static-type tool. Before adding any proposal, explain the benefit, package/CI impact, configuration scope, false-positive policy, and maintenance owner; then obtain authorization because it changes dependencies or workflows.
 
 ## Keep configuration secure and fail fast
 

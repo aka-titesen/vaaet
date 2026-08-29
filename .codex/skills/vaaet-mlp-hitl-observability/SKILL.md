@@ -9,13 +9,15 @@ description: Guide safe VAAET tabular MLP training and review. Use for seed boot
 
 Preserve VAAET's human-first learning lifecycle. Treat a seed model as an auditable pilot, not as production evidence, and use visual diagnostics to explain measured behavior without overstating model confidence.
 
+Keep model contracts, feature policy, bundle validation, and serving-compatible inference in `vaaet-core/`; keep datasets, training, diagnostics, notebooks, DVC, and PostgreSQL in `vaaet-ml/`. The laboratory may depend on core; core must not depend on ML.
+
 ## Preserve the public learning contract
 
 Keep the canonical 19 `FEATURE_COLS` in their existing order. Preserve the current MLP, its three learned outputs—`Normal`, `Reduced`, and `Congested`—and its bundle v2 interfaces unless authorization and the applicable ADR permit a change.
 
 Keep `Accident` outside the learned target. A reliable automatic signal remains `Congested` with `accident_rule_triggered`; only an effective human validation can publish the public Accident state.
 
-Respect ADR-0014 and ADR-0017 through ADR-0019 as the current authority. Use earlier MLP ADRs only as historical context.
+Respect ADR-0021, ADR-0014, and ADR-0017 through ADR-0019 as the current authority. Use earlier MLP ADRs only as historical context.
 
 
 ## Use the two explicit training modes
@@ -32,7 +34,7 @@ Use immutable seed snapshots, finalized HITL session packages, the active catalo
 
 Split complete clips before fitting scalers, balancing, or selecting thresholds. Keep synthetic records out of validation/test and require the existing partition validation to reject leakage. Select the decision policy on validation cost; leave test frozen for final evidence.
 
-Keep TensorFlow/Keras, scikit-learn, Matplotlib, and Seaborn within the declared project extras. Use the existing input policy identically in training and serving, including legacy quality-feature neutralization.
+Keep TensorFlow/Keras, scikit-learn, Matplotlib, and Seaborn within the declared `vaaet-ml` extras. Use the core-owned input policy identically in training and serving, including legacy quality-feature neutralization.
 
 ## Make diagnostics interpretable
 
@@ -48,7 +50,7 @@ Create only the existing bundle v2 files and validate its manifest before use. P
 
 Require a real frozen human holdout, adequate telemetry coverage, no leakage, per-class support and intervals, retrospective review, and prospective shadow evidence before manual promotion. Report incident candidates as false candidates per hour and negative exposure; do not publish Accident recall without confirmed incidents.
 
-For changes in scope, run Ruff, pytest, compilation, notebook-cell parsing, Markdown link checks, and `git diff --check`. Validate Drive persistence and a real Colab training run manually.
+For changes in scope, run the ML gates and any affected core contract gates from their `AGENTS.md` files, plus notebook-cell parsing, Markdown links, and `git diff --check`. Validate Drive persistence and a real Colab training run manually.
 
 ---
 

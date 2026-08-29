@@ -138,7 +138,7 @@ def _load_code_cells(path: Path) -> tuple[list[tuple[int, str, ast.Module]], lis
             findings.append(Finding("ERROR", path, detail, cell_number))
             continue
         if _has_src_import(tree):
-            findings.append(Finding("ERROR", path, "import through vaaet.*, not src.*", cell_number))
+            findings.append(Finding("ERROR", path, "import through vaaet.* or vaaet_ml.*, never src.*", cell_number))
         code_cells.append((cell_number, source, tree))
     return code_cells, findings
 

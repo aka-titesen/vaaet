@@ -17,6 +17,9 @@ than copying their contents into a new summary.
 | Agent operating boundaries | `AGENTS.md` |
 | Dense machine-readable project summary | `llms.txt` |
 | Documentation navigation | `docs/index.md` |
+| Portable Python component | `vaaet-core/` and `vaaet-core/AGENTS.md` |
+| ML laboratory component | `vaaet-ml/` and `vaaet-ml/AGENTS.md` |
+| Reserved application boundary | `vaaet-app/` (no code until approved) |
 | Architecture and ADRs | `docs/architecture/` |
 | ML, product, operations, quality, governance | their matching `docs/` domains |
 | Specialized Codex guidance | `.codex/skills/` |
@@ -25,6 +28,10 @@ Treat ADRs, data contracts, and security rules as stronger evidence than a
 README or dense summary. Preserve the 19 features, public-state policy, bundle
 contract, HITL invariants, and database governance described by their active
 ADRs.
+
+Before editing component code, read the root context and the owning component's
+`AGENTS.md`. ADR-0021 governs the core--ML--app boundary; read ADR-0022 before
+planning any serving path that uses YOLO.
 
 Do not create a parallel root such as `llm.txt`, `architecture.md`, or
 `instructions.md`. Do not introduce `.ai/`, `agents_custom/`, generic prompt
@@ -158,11 +165,10 @@ restantes y el comando de commit sugerido; esperar el ACK humano.
 - Decisión humana: <ACK, NACK, pendiente o N/A>
 ```
 
-Use VAAET scopes such as `vision`, `features`, `inference`, `data`, `training`,
-`evaluation`, `artifacts`, `notebooks`, `docs`, or `ci` when they clarify a
-Conventional Commit. Do not invent generic `frontend`, `backend`, `database`,
-or `infra` scopes unless an approved future monorepo component actually owns
-the change.
+Use VAAET scopes such as `core`, `ml`, `vision`, `features`, `inference`,
+`data`, `training`, `evaluation`, `artifacts`, `notebooks`, `docs`, or `ci`
+when they clarify a Conventional Commit. Do not invent generic `frontend`,
+`backend`, `database`, or `infra` scopes while `vaaet-app/` remains reserved.
 
 ## Review quality without adding tooling by default
 

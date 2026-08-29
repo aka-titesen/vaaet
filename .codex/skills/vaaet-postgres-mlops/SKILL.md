@@ -7,7 +7,7 @@ description: Configure, review, diagnose, or safely evolve VAAET PostgreSQL pers
 
 ## Preserve the database contract
 
-Use PostgreSQL 14+ and the existing VAAET contracts. Read ADR-0015 and ADR-0016 before changing persistence behavior. Do not change schemas, tables, views, grants, roles, migrations, the 19 features, or state semantics without explicit authorization and an ADR.
+Use PostgreSQL 14+ only from the ML laboratory and preserve the existing VAAET contracts. Read ADR-0021, ADR-0015, and ADR-0016 before changing persistence behavior. `vaaet-core` must not depend on PostgreSQL. Do not change schemas, tables, views, grants, roles, migrations, the 19 features, or state semantics without explicit authorization and an ADR.
 
 Use qualified names and their responsibilities:
 
@@ -22,7 +22,7 @@ Keep `public` views read-only compatibility only. Treat PostgreSQL as the operat
 
 ## Connect securely with least privilege
 
-Use `DatabaseProfile` and `load_database_settings()` from `vaaet.data.database`. Select exactly one of `collection`, `inference`, `training`, or `review` per operation. Load shared endpoint values and profile-specific credentials from Colab Secrets first, then local environment; never display, serialize, or log them.
+Use `DatabaseProfile` and `load_database_settings()` from `vaaet_ml.data.database`. Select exactly one of `collection`, `inference`, `training`, or `review` per operation. Load shared endpoint values and profile-specific credentials from Colab Secrets first, then local environment; never display, serialize, or log them.
 
 Build URLs through `sqlalchemy.URL.create()` and engines through the project factory. Reuse its small `QueuePool`, pre-ping, timeout, health check, redacted `DatabaseSettings`, and cleanup behavior. Do not open one connection per row or build a DSN with string interpolation.
 
@@ -38,7 +38,7 @@ Do not call `Base.metadata.create_all()`, `drop_all()`, ad-hoc DDL, `ALTER TABLE
 
 ## Persist atomically and idempotently
 
-Use the existing persistence and pipeline-run APIs. Start a run before an enabled workflow, attach its UUID to raw/features/predictions or review data as applicable, and finish it with only typed, redacted metadata. Without PostgreSQL, retain the local redacted manifest and outputs.
+Use the existing `vaaet_ml` persistence and pipeline-run APIs. Start a run before an enabled workflow, attach its UUID to raw/features/predictions or review data as applicable, and finish it with only typed, redacted metadata. Without PostgreSQL, retain the local redacted manifest and outputs.
 
 Write related telemetry, features, and predictions in bounded batches and transactional units. Use the existing natural keys and upsert contracts; do not commit per frame, silently overwrite append-only feedback, or make persistence an implicit side effect of offline analysis.
 

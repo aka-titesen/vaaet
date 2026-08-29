@@ -16,13 +16,14 @@ from sklearn.metrics import f1_score
 from vaaet.artifacts import validate_manifest
 from vaaet.calibration import apply_temperature_scaling, multiclass_brier_score
 from vaaet.inference.traffic_state import classify_telemetry_dataframe
+from vaaet.settings import FEATURE_COLS, MODEL_STATE_LABELS
 
 from vaaet_ml.evaluation.reporting import (
     build_classification_support_table,
     expected_calibration_error,
     expected_confusion_cost,
 )
-from vaaet_ml.settings import FEATURE_COLS, MODEL_STATE_LABELS, RANDOM_SEED, SCALER_PATH
+from vaaet_ml.settings import RANDOM_SEED, SCALER_PATH
 from vaaet_ml.training.holdout import HumanHoldoutSnapshot, require_comparable_holdouts
 from vaaet_ml.training.lifecycle import ModelInputPolicy, apply_model_input_policy
 

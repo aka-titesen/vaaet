@@ -4,20 +4,22 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Mapping, Sequence
+from typing import cast
 from uuid import UUID, uuid4
 
 import pandas as pd
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
+from vaaet.logging import get_logger
+from vaaet.settings import STATE_LABELS
 
 from vaaet_ml.data.database import DatabaseSettings, get_engine
 from vaaet_ml.data.dataset_artifacts import finalize_review_session
 from vaaet_ml.data.ingestion import create_dataset_package
 from vaaet_ml.data.pipeline_runs import PipelineRunMetadata, PipelineWorkflow, pipeline_run
-from vaaet_ml.settings import STATE_LABELS
 
 REVIEW_QUEUE_QUERY = """
 SELECT prediction_id, pipeline_run_id, clip_id, record_time, traffic_state,
@@ -41,6 +43,9 @@ INSERT INTO vaaet_feedback.human_validations (
     CAST(:pipeline_run_id AS UUID)
 )
 """
+
+logger = get_logger(__name__)
+ReviewSubmitter = Callable[["HumanValidation"], None]
 
 
 @dataclass(frozen=True)
@@ -108,16 +113,23 @@ def prepare_inference_review(
 
     session = InferenceReviewSession(export_frame=None, validations=[])
     if not enabled:
-        print("ℹ️ Revisión humana desactivada. Para el próximo video usá ENABLE_HUMAN_REVIEW=True.")
+        logger.info("Revisión humana desactivada; activala explícitamente para el próximo video.")
         return session
     if reviewer_id is None:
         raise ValueError("A stable reviewer identifier is required for human review.")
     if settings is not None and inference_pipeline_run_id is not None:
+        if classified is None:
+            raise ValueError("Classified telemetry is required when review uses PostgreSQL.")
         full_queue = load_review_queue(
             settings=settings, pipeline_run_id=inference_pipeline_run_id, mode="all"
         )
         review_queue = select_review_queue(full_queue, mode=mode)
-        print(f"✅ Cola PostgreSQL: {len(review_queue)} de {len(full_queue)} filas seleccionadas ({mode}).")
+        logger.info(
+            "Cola PostgreSQL preparada: selected_rows=%s total_rows=%s mode=%s",
+            len(review_queue),
+            len(full_queue),
+            mode,
+        )
         prediction_keys = full_queue[["clip_id", "record_time", "prediction_id"]].copy()
         prediction_keys["record_time"] = pd.to_datetime(prediction_keys["record_time"], utc=True)
         session.export_frame = classified.copy()
@@ -137,7 +149,7 @@ def prepare_inference_review(
         build_review_widget(review_queue, reviewer_id=reviewer_id, on_submit=persist_and_accumulate)
         return session
     if classified is None or classified.empty:
-        print("ℹ️ Revisión HITL omitida: no hay minutos clasificables.")
+        logger.info("Revisión HITL omitida: no hay minutos clasificables.")
         return session
 
     reason = (
@@ -145,12 +157,16 @@ def prepare_inference_review(
         if inference_pipeline_run_id is None
         else "el perfil review no está disponible"
     )
-    print(f"ℹ️ Revisión portable: {reason}.")
-    print("   Las decisiones no modifican PostgreSQL y quedan en el paquete inmutable.")
+    logger.info("Revisión portable: reason=%s; las decisiones no modifican PostgreSQL.", reason)
     session.export_frame = classified.copy().reset_index(drop=True)
     session.export_frame["prediction_id"] = session.export_frame.index + 1
     review_queue = select_review_queue(session.export_frame, mode=mode)
-    print(f"✅ Cola portable: {len(review_queue)} de {len(session.export_frame)} filas seleccionadas ({mode}).")
+    logger.info(
+        "Cola portable preparada: selected_rows=%s total_rows=%s mode=%s",
+        len(review_queue),
+        len(session.export_frame),
+        mode,
+    )
     build_review_widget(review_queue, reviewer_id=reviewer_id, on_submit=session.validations.append)
     return session
 
@@ -168,7 +184,10 @@ def load_review_queue(
         frame = pd.read_sql(
             text(REVIEW_QUEUE_QUERY),
             active_engine,
-            params={"pipeline_run_id": str(pipeline_run_id) if pipeline_run_id else None},
+            params=cast(
+                Mapping[str, object],
+                {"pipeline_run_id": str(pipeline_run_id) if pipeline_run_id else None},
+            ),
         )
     finally:
         if owns_engine:
@@ -280,7 +299,12 @@ def export_offline_review_package(
     )
 
 
-def build_review_widget(queue: pd.DataFrame, *, reviewer_id: str, on_submit):
+def build_review_widget(
+    queue: pd.DataFrame,
+    *,
+    reviewer_id: str,
+    on_submit: ReviewSubmitter,
+) -> object | None:
     """Build an explicit Colab form; widgets remain an optional lazy import."""
     import ipywidgets as widgets
     from IPython.display import display
@@ -324,7 +348,7 @@ def build_review_widget(queue: pd.DataFrame, *, reviewer_id: str, on_submit):
             submit.disabled = True
             skip.disabled = True
 
-    def submit_row(_button) -> None:
+    def submit_row(_button: object) -> None:
         row = queue.iloc[position["value"]]
         decision = HumanValidation(
             prediction_id=int(row["prediction_id"]),

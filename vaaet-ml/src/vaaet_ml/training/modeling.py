@@ -6,8 +6,7 @@ from __future__ import annotations
 
 from tensorflow.keras import Sequential
 from tensorflow.keras.layers import BatchNormalization, Dense, Dropout, Input
-
-from vaaet_ml.settings import FEATURE_COLS, N_MODEL_STATES
+from vaaet.settings import FEATURE_COLS, N_MODEL_STATES
 
 __all__ = ["build_traffic_state_mlp"]
 

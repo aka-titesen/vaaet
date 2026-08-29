@@ -5,7 +5,6 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -13,6 +12,7 @@ import pandas as pd
 from vaaet.calibration import apply_temperature_scaling
 from vaaet.features.engineering import engineer_features
 from vaaet.features.labeling import assign_instant_state, build_accident_signal_frame
+from vaaet.inference.protocols import FeatureScaler, TrafficStateModel
 from vaaet.lifecycle import ModelInputPolicy, apply_model_input_policy
 from vaaet.settings import (
     ACCIDENT_GATE_MIN_EVIDENCE_SCORE,
@@ -98,7 +98,7 @@ def _empty_classification_result(frame: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
-def _ensure_feature_compatibility(scaler: Any, feature_cols: list[str]) -> None:
+def _ensure_feature_compatibility(scaler: FeatureScaler, feature_cols: list[str]) -> None:
     expected = getattr(scaler, "n_features_in_", None)
     if expected is not None and int(expected) != len(feature_cols):
         raise ValueError(
@@ -106,7 +106,7 @@ def _ensure_feature_compatibility(scaler: Any, feature_cols: list[str]) -> None:
         )
 
 
-def _validate_probabilities(probabilities: Any, rows: int) -> np.ndarray:
+def _validate_probabilities(probabilities: object, rows: int) -> np.ndarray:
     values = np.asarray(probabilities, dtype=float)
     if values.shape != (rows, len(MODEL_STATE_LABELS)):
         raise ValueError(
@@ -149,7 +149,7 @@ def apply_stable_state_policy(
     pending: int | None = None
     pending_count = 0
     for position, (clip_id, raw_code, confidence, margin) in enumerate(
-        zip(clips, raw_codes, raw_confidence, margins)
+        zip(clips, raw_codes, raw_confidence, margins, strict=False)
     ):
         if clip_id != prior_clip:
             prior_clip = clip_id
@@ -246,7 +246,7 @@ def apply_conservative_accident_gate(
     weak_count = 0
     clips = group_key.astype(str).to_numpy()
     for position, (clip_id, is_persistent, is_strong) in enumerate(
-        zip(clips, persistent.to_numpy(), strong.to_numpy())
+        zip(clips, persistent.to_numpy(), strong.to_numpy(), strict=False)
     ):
         if clip_id != prior_clip:
             prior_clip = clip_id
@@ -282,13 +282,13 @@ def apply_conservative_accident_gate(
 
 def classify_telemetry_dataframe(
     df_features: pd.DataFrame,
-    model: Any,
-    scaler: Any,
+    model: TrafficStateModel,
+    scaler: FeatureScaler,
     *,
     label_mapping: Mapping[int, str] | None = None,
     feature_cols: list[str] | None = None,
     model_version: str = MODEL_VERSION,
-    decision_policy: Mapping[str, Any] | None = None,
+    decision_policy: Mapping[str, object] | None = None,
     input_policy: ModelInputPolicy | str = ModelInputPolicy.CANONICAL_V2,
 ) -> pd.DataFrame:
     """Run the three-class MLP and the exact production decision chain."""
@@ -330,14 +330,14 @@ def classify_telemetry_dataframe(
 
 def classify_raw_telemetry(
     df_telemetry: pd.DataFrame,
-    model: Any,
-    scaler: Any,
+    model: TrafficStateModel,
+    scaler: FeatureScaler,
     *,
     label_mapping: Mapping[int, str] | None = None,
     feature_cols: list[str] | None = None,
     model_version: str = MODEL_VERSION,
     inference_mode: str = "stable",
-    decision_policy: Mapping[str, Any] | None = None,
+    decision_policy: Mapping[str, object] | None = None,
     input_policy: ModelInputPolicy | str = ModelInputPolicy.CANONICAL_V2,
 ) -> pd.DataFrame:
     """Engineer complete minute windows and classify them safely."""

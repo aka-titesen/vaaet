@@ -9,6 +9,9 @@ import shutil
 import subprocess
 from pathlib import Path
 
+from vaaet.logging import get_logger
+
+logger = get_logger(__name__)
 
 def resolve_pg_restore_for_backup(
     backup_path: Path,
@@ -29,14 +32,14 @@ def resolve_pg_restore_for_backup(
             "traffic_data_raw.csv instead."
         )
     version = subprocess.check_output([pg_restore_path, "--version"], text=True).strip()
-    print(f"✅ Lector de backup listo: {version} | {pg_restore_path}")
+    logger.info("Lector de backup PostgreSQL disponible: version=%s", version)
     return pg_restore_path
 
 
 def _install_colab_pg_restore_17() -> Path:
     binary = Path("/usr/lib/postgresql/17/bin/pg_restore")
     if not binary.is_file():
-        print("📦 Preparando el cliente PostgreSQL 17 oficial para leer el backup...")
+        logger.info("Preparando el cliente PostgreSQL 17 para leer el backup.")
         environment = {**os.environ, "DEBIAN_FRONTEND": "noninteractive"}
         pgdg_directory = Path("/usr/share/postgresql-common/pgdg")
         pgdg_key = pgdg_directory / "apt.postgresql.org.asc"
@@ -87,7 +90,7 @@ def _install_colab_pg_restore_17() -> Path:
             ) from exc
     if not binary.is_file() or not os.access(binary, os.X_OK):
         raise RuntimeError(
-            f"PostgreSQL 17 installation did not provide an executable: {binary}. "
+            "PostgreSQL 17 installation did not provide an executable. "
             "Upload traffic_data_raw.csv instead."
         )
     return binary

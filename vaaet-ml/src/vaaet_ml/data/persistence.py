@@ -4,8 +4,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, Mapping
 from uuid import UUID, uuid4
 
 import pandas as pd
@@ -14,11 +14,11 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.exc import ProgrammingError
 from vaaet.artifacts import FEATURE_SCHEMA_VERSION
 from vaaet.logging import get_logger
+from vaaet.settings import MODEL_VERSION, STATE_LABELS, TELEMETRY_SCHEMA_VERSION
 from vaaet.timestamps import normalize_timestamp
 
 from vaaet_ml.data.database import DatabaseSettings, get_engine
 from vaaet_ml.data.pipeline_runs import PipelineRunMetadata, PipelineWorkflow, pipeline_run
-from vaaet_ml.settings import MODEL_VERSION, STATE_LABELS, TELEMETRY_SCHEMA_VERSION
 
 logger = get_logger(__name__)
 
@@ -164,7 +164,7 @@ ON CONFLICT (telemetry_feature_id, model_version) DO UPDATE SET
 """
 
 
-def _raw_payload(row: pd.Series, pipeline_run_id: str) -> dict[str, Any]:
+def _raw_payload(row: pd.Series, pipeline_run_id: str) -> dict[str, object]:
     return {
         "pipeline_run_id": pipeline_run_id,
         "clip_id": str(row["clip_id"]),
@@ -189,7 +189,7 @@ def _raw_payload(row: pd.Series, pipeline_run_id: str) -> dict[str, Any]:
     }
 
 
-def _feature_payload(row: pd.Series, pipeline_run_id: str) -> dict[str, Any]:
+def _feature_payload(row: pd.Series, pipeline_run_id: str) -> dict[str, object]:
     source_id = row.get("source_record_id", row.get("id"))
     return {
         "source_record_id": _nullable_int(source_id),
@@ -236,7 +236,7 @@ def _prediction_payload(
     feature_id: int,
     pipeline_run_id: str,
     model_version: str,
-) -> dict[str, Any]:
+) -> dict[str, object]:
     state = int(row.get("traffic_state", 0))
     model_state = int(row.get("model_traffic_state", state))
     if state not in (0, 1, 2) or model_state not in (0, 1, 2):

@@ -29,6 +29,7 @@ Desde `vaaet-core/`, instalar los extras estrictamente necesarios y ejecutar:
 ```bash
 python -m pip install -e ".[vision,inference,dev]"
 ruff check src tests
+pyright --project ../pyrightconfig.json
 pytest tests -v --tb=short
 python -m compileall -q src tests
 git diff --check

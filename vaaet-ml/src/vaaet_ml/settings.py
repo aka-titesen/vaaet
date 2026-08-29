@@ -1,12 +1,32 @@
 # SPDX-FileCopyrightText: 2026 VAAET Contributors
 # SPDX-License-Identifier: AGPL-3.0-only
-"""Configuración operativa exclusiva del laboratorio VAAET ML."""
+"""Configuración exclusiva del laboratorio y reexportaciones compatibles."""
 
 from __future__ import annotations
 
 import os
 
-from vaaet.settings import *  # noqa: F403
+from vaaet.settings import (
+    ACCIDENT_GATE_MIN_EVIDENCE_SCORE,
+    CANONICAL_TIMEZONE,
+    DATA_ORIGIN_COL,
+    DATA_ORIGINS,
+    FEATURE_COLS,
+    INCIDENT_PERSISTENCE_MINUTES,
+    LABELING_THRESHOLDS,
+    MODEL_STATE_LABELS,
+    MODEL_VERSION,
+    N_MODEL_STATES,
+    N_STATES,
+    SPEED_MEASUREMENT_QUALITY_MIN,
+    SPEED_RANGE,
+    STATE_LABELS,
+    SYNTHETIC_SCENARIO_COL,
+    SYNTHETIC_SCENARIOS,
+    TELEMETRY_SCHEMA_VERSION,
+    TRAFFIC_LOCAL_TIMEZONE,
+    VEHICLE_TYPES,
+)
 
 RANDOM_SEED: int = 42
 MODEL_DIR: str = os.path.join("artifacts", "traffic-state")
@@ -25,3 +45,37 @@ DATABASE_SCHEMAS: tuple[str, ...] = (
     "vaaet_feedback",
     "vaaet_ops",
 )
+
+# Estos nombres conservan la compatibilidad de notebooks 4.x. El código nuevo
+# debe importar los contratos portables directamente desde ``vaaet.settings``.
+__all__ = [
+    "ACCIDENT_GATE_MIN_EVIDENCE_SCORE",
+    "CANONICAL_TIMEZONE",
+    "DATABASE_SCHEMAS",
+    "DATA_ORIGINS",
+    "DATA_ORIGIN_COL",
+    "DATA_PROCESSED_DIR",
+    "DATA_RAW_DIR",
+    "DB_ENV_VARS",
+    "DEFAULT_DB_PORT",
+    "DRIVE_ARTIFACT_DIR",
+    "FEATURE_COLS",
+    "INCIDENT_PERSISTENCE_MINUTES",
+    "LABELING_THRESHOLDS",
+    "MODEL_DIR",
+    "MODEL_PATH",
+    "MODEL_STATE_LABELS",
+    "MODEL_VERSION",
+    "N_MODEL_STATES",
+    "N_STATES",
+    "RANDOM_SEED",
+    "SCALER_PATH",
+    "SPEED_MEASUREMENT_QUALITY_MIN",
+    "SPEED_RANGE",
+    "STATE_LABELS",
+    "SYNTHETIC_SCENARIOS",
+    "SYNTHETIC_SCENARIO_COL",
+    "TELEMETRY_SCHEMA_VERSION",
+    "TRAFFIC_LOCAL_TIMEZONE",
+    "VEHICLE_TYPES",
+]

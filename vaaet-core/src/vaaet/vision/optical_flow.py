@@ -13,7 +13,6 @@ See ADR-0009 for the decision context.
 from __future__ import annotations
 
 from collections import deque
-from typing import Any
 
 import cv2
 import numpy as np
@@ -68,16 +67,17 @@ class OpticalFlowEstimator:
         self.last_tracking_ratio: float = 0.0
         self.last_good_points: int = 0
         self.last_total_points: int = 0
-        # LK parameters dict (passed directly to cv2.calcOpticalFlowPyrLK)
-        self._lk_params: dict[str, Any] = dict(
-            winSize=self.win_size,
-            maxLevel=self.max_level,
-            criteria=(
+        # OpenCV recibe este diccionario directamente; sus valores se validan
+        # al construir el estimador y no se propagan fuera del adaptador.
+        self._lk_params: dict[str, object] = {
+            "winSize": self.win_size,
+            "maxLevel": self.max_level,
+            "criteria": (
                 cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT,
                 10,
                 0.03,
             ),
-        )
+        }
 
     # Public API
     def update(self, frame: np.ndarray) -> np.ndarray:

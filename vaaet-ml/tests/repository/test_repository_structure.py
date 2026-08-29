@@ -44,6 +44,28 @@ def test_training_and_ingestion_modules_import_without_cycles() -> None:
     )
 
 
+def test_dataset_codec_breaks_the_artifacts_ingestion_cycle() -> None:
+    artifacts_source = REPO_ROOT.joinpath("src", "vaaet_ml", "data", "dataset_artifacts.py").read_text(
+        encoding="utf-8"
+    )
+    codec_source = REPO_ROOT.joinpath("src", "vaaet_ml", "data", "package_codec.py").read_text(
+        encoding="utf-8"
+    )
+    assert "vaaet_ml.data.ingestion" not in artifacts_source
+    assert "vaaet_ml.data.dataset_artifacts" not in codec_source
+
+
+def test_pyright_strict_profile_and_ci_job_cover_both_source_roots() -> None:
+    configuration = (WORKSPACE_ROOT / "pyrightconfig.json").read_text(encoding="utf-8")
+    workflow = (WORKSPACE_ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+
+    assert '"typeCheckingMode": "strict"' in configuration
+    assert '"vaaet-core/src"' in configuration
+    assert '"vaaet-ml/src"' in configuration
+    assert "typing:" in workflow
+    assert "pyright --project pyrightconfig.json --level error" in workflow
+
+
 def _concatenate_code_cells(notebook_path: Path) -> str:
     with notebook_path.open("r", encoding="utf-8") as handle:
         notebook = json.load(handle)
@@ -156,7 +178,7 @@ def test_internal_markdown_links_resolve() -> None:
     broken: list[str] = []
     for markdown_path in WORKSPACE_ROOT.rglob("*.md"):
         relative = markdown_path.relative_to(WORKSPACE_ROOT).as_posix()
-        if relative.startswith("plantillas_docs/"):
+        if relative.startswith(("plantillas_docs/", ".venv/")):
             continue
         for target_text in link_pattern.findall(markdown_path.read_text(encoding="utf-8")):
             clean_target = target_text.split("#", 1)[0].split("?", 1)[0]
@@ -214,11 +236,16 @@ def test_dvc_ci_installs_the_declared_extra_from_the_workspace() -> None:
 
 def test_python_313_is_declared_and_exercised_by_ci() -> None:
     pyproject = (REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8")
+    core_pyproject = (WORKSPACE_ROOT / "vaaet-core" / "pyproject.toml").read_text(
+        encoding="utf-8"
+    )
     workflow = (WORKSPACE_ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
 
     assert 'requires-python = ">=3.10,<3.14"' in pyproject
     assert '"Programming Language :: Python :: 3.13"' in pyproject
-    assert 'python_version >= \'3.13\'' in pyproject
+    assert "tensorflow" not in pyproject
+    assert "vaaet-core[inference]==0.1.0" in pyproject
+    assert "python_version >= '3.13'" in core_pyproject
     assert 'python-version: ["3.10", "3.11", "3.12", "3.13"]' in workflow
 
 

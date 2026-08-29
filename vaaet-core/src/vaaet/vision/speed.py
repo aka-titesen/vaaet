@@ -12,10 +12,11 @@ See ADR-0004, ADR-0006 and ADR-0009 for the decision context.
 from __future__ import annotations
 
 from collections import deque
-from typing import Any
+from typing import Protocol
 
 import numpy as np
 
+from vaaet.logging import get_logger
 from vaaet.settings import (
     NEAR_ZERO_AVG_FRAME_MAX,
     NEAR_ZERO_MAX_FRAME_MAX,
@@ -47,6 +48,8 @@ from vaaet.settings import (
     STATIONARY_TOTAL_DISP_MAX,
 )
 
+logger = get_logger(__name__)
+
 __all__ = [
     "estimate_speed",
     "compensate_camera_motion",
@@ -59,6 +62,13 @@ __all__ = [
     "SmoothedSpeedTracker",
     "TrackMotionStateTracker",
 ]
+
+
+class SpeedRegressor(Protocol):
+    """Adaptador mínimo para una predicción auxiliar de velocidad."""
+
+    def predict(self, features: np.ndarray) -> np.ndarray:
+        """Devuelve una predicción escalar por fila de features."""
 
 
 def _lerp(start: float, end: float, alpha: float) -> float:
@@ -314,7 +324,7 @@ class SmoothedSpeedTracker:
     def __init__(
         self,
         window_size: int = 10,
-        mlp_model: Any = None,
+        mlp_model: SpeedRegressor | None = None,
     ) -> None:
         self.window_size = window_size
         self.mlp_model = mlp_model
@@ -342,7 +352,8 @@ class SmoothedSpeedTracker:
             try:
                 pred = self.mlp_model.predict(mlp_features.reshape(1, -1))
                 mlp_speed = float(pred[0])
-            except Exception:
+            except (IndexError, TypeError, ValueError) as error:
+                logger.debug("Predicción auxiliar de velocidad descartada: %s", type(error).__name__)
                 mlp_speed = None
 
         return fuse_speed(avg_physics, mlp_speed)

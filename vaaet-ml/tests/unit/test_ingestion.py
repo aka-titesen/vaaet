@@ -131,14 +131,14 @@ def test_dataset_package_roundtrip_and_checksum(tmp_path: Path) -> None:
             if member.filename == "telemetry-features.csv":
                 payload += b"\ncorruption"
             target.writestr(member, payload)
-    with pytest.raises(ValueError, match="Checksum mismatch"):
+    with pytest.raises(ValueError, match="checksum de una tabla"):
         load_dataset_package(damaged)
 
 
 def test_dataset_package_never_overwrites_silently(tmp_path: Path) -> None:
     package = _package_tables(tmp_path / "immutable.zip")
     original = package.read_bytes()
-    with pytest.raises(FileExistsError, match="already exists"):
+    with pytest.raises(FileExistsError, match="ya existe"):
         _package_tables(package)
     assert package.read_bytes() == original
 
@@ -272,7 +272,7 @@ def test_rejects_wrong_package_contract(tmp_path: Path) -> None:
                 manifest["contract_version"] = "unsupported"
                 payload = json.dumps(manifest).encode()
             target.writestr(member, payload)
-    with pytest.raises(ValueError, match="Unsupported dataset package"):
+    with pytest.raises(ValueError, match="contrato de paquete no admitida"):
         load_dataset_package(rewritten)
 
 

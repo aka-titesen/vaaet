@@ -16,3 +16,12 @@ cualquier serving futuro con YOLO.
 
 Los cambios arquitectónicos deben actualizar su ADR y el plan gobernado
 correspondiente. No incluir secretos, binarios ML ni datos sensibles en Git.
+
+## Calidad local
+
+El tipado estático se configura desde [`pyrightconfig.json`](pyrightconfig.json)
+con alcance exclusivo sobre ambos directorios `src/`. Instalá los extras `dev`
+del componente que modifiques y los extras operativos requeridos por su
+workflow. Desde la raíz, una verificación completa instala primero core y luego
+ML, ejecuta `python -m pip check`, Ruff, Pyright, pruebas, compilación y la
+auditoría de notebooks.

@@ -9,8 +9,9 @@ description: Build, review, refactor, or test professional Python for VAAET Data
 
 Build production-quality Python 3.10–3.13 for Data Science, computer vision, MLOps, and notebooks. Optimize for correctness, maintainability, observability, testability, and reproducibility—not abstraction for its own sake.
 
-- Keep notebooks as orchestration and visualization interfaces. Move reusable business logic into `src/vaaet/`; do not mutate `sys.path`.
-- Preserve VAAET layers: settings/contracts/artifacts, data, features, vision, inference, evaluation, and training.
+- Preserve the monorepo boundary. Put portable perception, telemetry, contracts, bundle validation, and inference in `vaaet-core/src/vaaet/`; put datasets, training, evaluation, PostgreSQL, and notebook support in `vaaet-ml/src/vaaet_ml/`. Do not make core depend on ML, DVC, Drive, PostgreSQL, or notebook APIs.
+- Keep notebooks as orchestration and visualization interfaces. Import `vaaet` for portable operations and `vaaet_ml` for laboratory work; do not mutate `sys.path`.
+- Preserve VAAET layers: core owns contracts/artifacts, features, vision, and inference; ML owns settings, data, training, and evaluation.
 - Apply KISS and YAGNI first. Use DRY only when duplication represents one stable concept; do not create a generic framework for one workflow.
 - Read applicable ADRs before changing a contract. Do not modify the 19 `FEATURE_COLS`, MLP, thresholds, PostgreSQL schema, public states, or bundle v2 without authorization and an ADR.
 
@@ -24,6 +25,18 @@ Avoid `Any`. Allow it only at a third-party boundary that cannot be typed, isola
 
 Model domain results as immutable dataclasses when they have stable fields. Keep transport/persistence dictionaries at the boundary and convert them into validated domain objects promptly.
 
+## Prefer Pythonic code with judgment
+
+Prefer concise native constructs when they make the domain easier to read, not merely shorter.
+
+- Use list, dict, and set comprehensions for small, pure mappings or filters. Use a named loop when there are side effects, validation, error handling, non-trivial nesting, or a meaningful intermediate name. Prefer generators when lazy consumption avoids materializing data.
+- Use context managers (`with`) for files, database sessions, temporary resources, and any object with an explicit lifecycle. Never rely on manual close calls surviving every error path.
+- Use `mapping.get(key, default)` only when a missing key is expected and the default is semantically valid. Access the key directly and validate it when absence signals a malformed contract.
+- Use a conditional expression only for a short, obvious value assignment. Prefer an `if` block for side effects or compound conditions.
+- Use `match`/`case` for stable structural dispatch supported by Python 3.10+, such as a closed command or validated variant shape. Do not hide ordered business rules, thresholds, or error recovery behind broad pattern matching.
+- Prefer `enumerate()` over manual counters, `zip()` over indexing parallel collections, and unpacking when the shape is explicit. Use `zip(..., strict=True)` when equal lengths are a domain invariant; otherwise decide and document the intended truncation or validation behavior.
+- Use f-strings for local text and presentation formatting. Preserve parameterized logging such as `logger.info("stage=%s", stage)` in reusable code so logging remains lazy and follows the project convention.
+
 ## Keep responsibilities small and observable
 
 - Let data modules acquire, validate, and persist; let vision modules process frames; let features modules engineer the canonical features; let inference modules classify; let training/evaluation modules control lifecycle and quality.
@@ -35,7 +48,7 @@ Use `vaaet.logging` in reusable code. Log structured, actionable context at the 
 
 ## Fail with domain meaning
 
-Raise the narrowest existing exception from `vaaet.exceptions` or add a documented subtype rooted in the project hierarchy when callers need a different recovery action. Include safe identifiers such as stage, clip ID, record time, contract version, or field name.
+Raise the narrowest existing exception from the owning component hierarchy (`vaaet.exceptions` or `vaaet_ml.exceptions`) or add a documented subtype when callers need a different recovery action. Include safe identifiers such as stage, clip ID, record time, contract version, or field name.
 
 Do not catch `Exception` merely to continue. Catch only expected external or validation failures, add useful context with exception chaining, and stop a corrupted pipeline before it produces an artifact or persistence side effect. Use redacted `pipeline_run` metadata for operational lineage.
 
@@ -52,21 +65,20 @@ Treat at least 90% coverage as the quality target for new or materially changed 
 
 ## Quality gates and Definition of Done
 
-For every implementation, run the repository-required checks:
+For every implementation, run the required checks in each component that changed:
 
-1. `ruff check src tests scripts`
-2. `pytest tests/ -v --tb=short`
-3. `python -m compileall -q src tests scripts`
-4. Parse code cells from all three notebooks.
-5. Check Markdown links and run `git diff --check`.
+1. In `vaaet-core/`: `ruff check src tests`, `pyright --project ../pyrightconfig.json`, `pytest tests -v --tb=short`, and `python -m compileall -q src tests`.
+2. In `vaaet-ml/`: `ruff check src tests scripts`, `pyright --project ../pyrightconfig.json`, `pytest tests/ -v --tb=short`, and `python -m compileall -q src tests scripts`.
+3. Parse code cells from the four notebooks in `vaaet-ml/notebooks/` when notebooks or their imported workflow code change.
+4. Check Markdown links and run `git diff --check` from the repository root.
 
-When static typing is approved and configured, run the scoped MyPy command in CI and require zero errors for its configured scope. Do not run `mypy .` as a blanket repository gate until configuration, third-party stubs, and an incremental baseline have been explicitly adopted.
+Treat Pyright's configured scope as the static-type gate. Do not expand that scope, add MyPy, stubs, coverage plugins, CI gates, or dependencies without explicit authorization and an incremental baseline.
 
 For a new notebook, keep executable orchestration minimal—preferably under 50 lines per operation cell—and call tested modules. For existing notebooks, extract logic incrementally; do not perform a large refactor without authorization.
 
 ## Reject these antipatterns
 
-- Do not build monolithic notebook functions that duplicate `src/vaaet/` logic.
+- Do not build monolithic notebook functions that duplicate `vaaet-core/src/vaaet/` or `vaaet-ml/src/vaaet_ml/` logic.
 - Do not silently swallow failures with `except Exception: pass` or log-and-continue after data corruption.
 - Do not use pervasive `Any`, unvalidated `dict[str, object]`, or untyped model/data boundaries.
 - Do not hardcode credentials, connections, model file paths, or environment-specific configuration.

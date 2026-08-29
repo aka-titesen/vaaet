@@ -118,7 +118,7 @@ class PipelineMetrics:
         object.__setattr__(self, "stage_seconds", MappingProxyType(normalized))
 
     @classmethod
-    def empty(cls) -> "PipelineMetrics":
+    def empty(cls) -> PipelineMetrics:
         """Return the backward-compatible default used before a run completes."""
         return cls(0, 0.0, 0.0, {})
 
@@ -316,11 +316,17 @@ class VisionPipelineSession:
                 frame=frame,
             )
             rendered = self.process_frame(packet)
-            self._metrics.measure("render_encode", lambda: writer.write(rendered.frame))
+            self._metrics.measure(
+                "render_encode",
+                lambda rendered_packet=rendered: writer.write(rendered_packet.frame),
+            )
             frames_processed = frame_index
 
             if frame_index % self.frames_per_minute == 0:
-                self._metrics.measure("minute_policy", lambda: self._complete_minute(rendered))
+                self._metrics.measure(
+                    "minute_policy",
+                    lambda rendered_packet=rendered: self._complete_minute(rendered_packet),
+                )
 
         return PipelineRunOutput(
             telemetry_records=tuple(self._records),

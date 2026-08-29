@@ -9,17 +9,23 @@ import json
 import os
 import shutil
 import uuid
+from collections.abc import Mapping, Sequence
 from dataclasses import asdict, dataclass, is_dataclass
 from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path, PurePosixPath
-from typing import Any, Mapping, Sequence
 
 import pandas as pd
 from vaaet.artifacts import FEATURE_SCHEMA_VERSION
+from vaaet.settings import FEATURE_COLS, MODEL_STATE_LABELS
 from vaaet.timestamps import normalize_timestamp_series
 
-from vaaet_ml.settings import FEATURE_COLS, MODEL_STATE_LABELS
+from vaaet_ml.data.package_codec import (
+    DATASET_PACKAGE_CONTRACT,
+    SEED_DATASET_PACKAGE_CONTRACT,
+    create_dataset_package,
+    load_dataset_package,
+)
 
 SEED_ARTIFACT_CONTRACT = "vaaet-seed-bootstrap-v1"
 SEED_POINTER_CONTRACT = "vaaet-seed-bootstrap-pointer-v1"
@@ -66,7 +72,7 @@ class SeedArtifactConfig:
 @dataclass(frozen=True)
 class SeedArtifactSnapshot:
     path: Path
-    manifest: Mapping[str, Any]
+    manifest: Mapping[str, object]
     features: pd.DataFrame
 
     @property
@@ -109,7 +115,7 @@ class FinalizedReviewSession:
 @dataclass(frozen=True)
 class TrainingInputLock:
     path: Path
-    document: Mapping[str, Any]
+    document: Mapping[str, object]
 
     @property
     def descriptor(self) -> dict[str, str]:
@@ -160,7 +166,7 @@ def _json_safe(value: object) -> object:
     return value
 
 
-def _atomic_json_write(path: Path, document: Mapping[str, Any]) -> None:
+def _atomic_json_write(path: Path, document: Mapping[str, object]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_name(f".{path.name}.{uuid.uuid4().hex}.tmp")
     try:
@@ -262,7 +268,7 @@ def _prepare_seed_features(frame: pd.DataFrame) -> pd.DataFrame:
     )
 
 
-def _read_package_manifest(path: Path) -> dict[str, Any]:
+def _read_package_manifest(path: Path) -> dict[str, object]:
     import zipfile
 
     try:
@@ -327,12 +333,6 @@ class VersionedSeedStore:
         return snapshot
 
     def load_snapshot(self, path: str | Path) -> SeedArtifactSnapshot:
-        from vaaet_ml.data.ingestion import (
-            DATASET_PACKAGE_CONTRACT,
-            SEED_DATASET_PACKAGE_CONTRACT,
-            load_dataset_package,
-        )
-
         package = Path(path)
         frames = load_dataset_package(
             package,
@@ -389,8 +389,6 @@ class VersionedSeedStore:
     def resolve(
         self, features: pd.DataFrame, config: SeedArtifactConfig
     ) -> SeedArtifactSnapshot:
-        from vaaet_ml.data.ingestion import create_dataset_package
-
         prepared = _prepare_seed_features(features)
         fingerprint = _frames_fingerprint({"features": prepared})
         current = self.load_current()
@@ -484,7 +482,7 @@ class HitlReviewCatalog:
         self.path = Path(catalog_path)
         self.root = self.path.parent
 
-    def load(self) -> dict[str, Any]:
+    def load(self) -> dict[str, object]:
         if not self.path.is_file():
             return {
                 "contract": HITL_CATALOG_CONTRACT,
@@ -565,7 +563,7 @@ class HitlReviewCatalog:
             if not isinstance(entry["vaaet_version"], str) or not entry["vaaet_version"]:
                 raise ValueError("HITL catalog VAAET version must be non-empty.")
 
-    def find(self, *, pipeline_run_id: str, fingerprint: str) -> dict[str, Any] | None:
+    def find(self, *, pipeline_run_id: str, fingerprint: str) -> dict[str, object] | None:
         return next(
             (
                 entry
@@ -576,7 +574,7 @@ class HitlReviewCatalog:
             None,
         )
 
-    def register(self, entry: Mapping[str, Any]) -> dict[str, Any]:
+    def register(self, entry: Mapping[str, object]) -> dict[str, object]:
         document = self.load()
         existing = next(
             (
@@ -606,7 +604,7 @@ class HitlReviewCatalog:
 
     def selected_entries(
         self, selection: CatalogSelection = CatalogSelection.ALL_ACTIVE
-    ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    ) -> tuple[dict[str, object], list[dict[str, object]]]:
         selection = CatalogSelection(selection)
         document = self.load()
         if selection is CatalogSelection.ALL_ACTIVE:
@@ -616,7 +614,7 @@ class HitlReviewCatalog:
         entries.sort(key=lambda entry: (entry["created_at"], entry["package_id"]))
         return document, entries
 
-    def set_status(self, package_id: str, status: str) -> dict[str, Any]:
+    def set_status(self, package_id: str, status: str) -> dict[str, object]:
         """Activate or quarantine a package without deleting its history."""
         if status not in {"active", "quarantined"}:
             raise ValueError("Catalog status must be active or quarantined.")
@@ -641,7 +639,7 @@ class HitlReviewCatalog:
         _atomic_json_write(self.path, updated)
         return updated
 
-    def package_path(self, entry: Mapping[str, Any]) -> Path:
+    def package_path(self, entry: Mapping[str, object]) -> Path:
         relative = _safe_relative_path(entry.get("path"))
         candidate = self.root.joinpath(*relative.parts).resolve()
         root = self.root.resolve()
@@ -679,7 +677,7 @@ def _normalize_review_frames(
         str(value)
         if _valid_uuid(value)
         else _stable_uuid("feature", run_uuid, row.clip_id, row.record_time)
-        for value, row in zip(existing_feature_ids, features.itertuples())
+        for value, row in zip(existing_feature_ids, features.itertuples(), strict=False)
     ]
     features["feature_schema_version"] = FEATURE_SCHEMA_VERSION
     feature_metadata = [
@@ -711,9 +709,14 @@ def _normalize_review_frames(
         value
         if _valid_uuid(value)
         else _stable_uuid("prediction", run_uuid, feature_id, model_version)
-        for value, feature_id in zip(source_prediction_ids.astype(str), features["id"])
+        for value, feature_id in zip(
+            source_prediction_ids.astype(str), features["id"], strict=False
+        )
     ]
-    id_map = {str(old): new for old, new in zip(source_prediction_ids, prediction_ids)}
+    id_map = {
+        str(old): new
+        for old, new in zip(source_prediction_ids, prediction_ids, strict=False)
+    }
     prediction_columns = [
         column
         for column in (
@@ -774,6 +777,7 @@ def _normalize_review_frames(
                     supplied_ids,
                     validation_frame["prediction_id"],
                     validation_frame["validated_state"],
+                    strict=False,
                 )
             )
         ]
@@ -842,8 +846,6 @@ def finalize_review_session(
     canonical_root: str | Path | None = None,
 ) -> FinalizedReviewSession:
     """Finalize one immutable review session and optionally register it in Drive."""
-    from vaaet_ml.data.ingestion import create_dataset_package, load_dataset_package
-
     finalized_at = _utc_now()
     frames = _normalize_review_frames(
         classified,
@@ -1012,8 +1014,6 @@ def import_legacy_hitl_package(
     canonical_root: str | Path,
 ) -> FinalizedReviewSession:
     """Explicitly migrate one legacy mutable HITL ZIP into the immutable catalog."""
-    from vaaet_ml.data.ingestion import load_dataset_package
-
     frames = load_dataset_package(package_path)
     features = frames.get("features", pd.DataFrame())
     predictions = frames.get("predictions", pd.DataFrame())
@@ -1079,11 +1079,15 @@ def _resolve_validation_graph(validations: pd.DataFrame) -> pd.DataFrame:
     parents: dict[str, str | None] = {}
     children: dict[str, list[str]] = {identifier: [] for identifier in ids}
     prediction_by_id = dict(
-        zip(validations["id"].astype(str), validations["prediction_id"].astype(str))
+        zip(
+            validations["id"].astype(str),
+            validations["prediction_id"].astype(str),
+            strict=False,
+        )
     )
     for row in validations.itertuples():
         identifier = str(row.id)
-        raw_parent = getattr(row, "supersedes_validation_id")
+        raw_parent = row.supersedes_validation_id
         parent = None if pd.isna(raw_parent) or not str(raw_parent).strip() else str(raw_parent)
         if parent is not None:
             if parent not in ids:
@@ -1120,10 +1124,8 @@ def _resolve_validation_graph(validations: pd.DataFrame) -> pd.DataFrame:
 
 def load_hitl_catalog_feedback(
     source: HitlCatalogSource,
-) -> tuple[pd.DataFrame, dict[str, Any]]:
+) -> tuple[pd.DataFrame, dict[str, object]]:
     """Load and globally resolve effective human feedback from active packages."""
-    from vaaet_ml.data.ingestion import load_dataset_package
-
     catalog = HitlReviewCatalog(source.catalog_path)
     document, entries = catalog.selected_entries(source.selection)
     if not entries:

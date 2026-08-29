@@ -4,18 +4,15 @@
 
 from __future__ import annotations
 
-import hashlib
-import json
-import tempfile
 import warnings
-import zipfile
+from collections.abc import Sequence
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Sequence
 
 import pandas as pd
 from vaaet.artifacts import FEATURE_SCHEMA_VERSION
+from vaaet.settings import FEATURE_COLS
 from vaaet.timestamps import (
     count_naive_timestamps,
     normalize_timestamp_series,
@@ -31,17 +28,14 @@ from vaaet_ml.data.database import (
     restore_backup_to_sql,
 )
 from vaaet_ml.data.dataset_artifacts import HitlCatalogSource, load_hitl_catalog_feedback
-from vaaet_ml.settings import FEATURE_COLS
+from vaaet_ml.data.package_codec import (
+    DATASET_PACKAGE_CONTRACT,
+    SEED_DATASET_PACKAGE_CONTRACT,
+    create_dataset_package,
+    load_dataset_package,
+)
 from vaaet_ml.training.lifecycle import TrainingMode
 
-DATASET_PACKAGE_CONTRACT = "vaaet-training-dataset-v1"
-SEED_DATASET_PACKAGE_CONTRACT = "vaaet-seed-bootstrap-v1"
-PACKAGE_FILES = {
-    "raw": "raw-telemetry.csv",
-    "features": "telemetry-features.csv",
-    "predictions": "traffic-predictions.csv",
-    "validations": "human-validations.csv",
-}
 RAW_REQUIRED_COLUMNS = {
     "clip_id",
     "record_time",
@@ -121,140 +115,6 @@ class TrainingDataset:
     validated_feedback: pd.DataFrame
     confirmed_incidents: pd.DataFrame
     provenance: pd.DataFrame
-
-
-def _sha256(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
-
-
-def _safe_extract(archive: zipfile.ZipFile, destination: Path) -> None:
-    root = destination.resolve()
-    for member in archive.infolist():
-        target = (destination / member.filename).resolve()
-        if root not in target.parents and target != root:
-            raise ValueError(f"Unsafe path in dataset package: {member.filename}")
-    archive.extractall(destination)
-
-
-def create_dataset_package(
-    output_path: str | Path,
-    *,
-    raw: pd.DataFrame | None = None,
-    features: pd.DataFrame | None = None,
-    predictions: pd.DataFrame | None = None,
-    validations: pd.DataFrame | None = None,
-    provenance: dict[str, object] | None = None,
-    contract_version: str = DATASET_PACKAGE_CONTRACT,
-    package_metadata: dict[str, object] | None = None,
-    overwrite: bool = False,
-    include_empty_components: tuple[str, ...] = (),
-) -> Path:
-    """Create a checksum-protected portable dataset package."""
-    output = Path(output_path)
-    if output.exists() and not overwrite:
-        raise FileExistsError(f"Dataset package already exists: {output}")
-    if contract_version not in {DATASET_PACKAGE_CONTRACT, SEED_DATASET_PACKAGE_CONTRACT}:
-        raise ValueError(f"Unsupported dataset package contract: {contract_version}")
-    output.parent.mkdir(parents=True, exist_ok=True)
-    frames = {
-        "raw": raw,
-        "features": features,
-        "predictions": predictions,
-        "validations": validations,
-    }
-    unknown_empty_components = set(include_empty_components) - set(frames)
-    if unknown_empty_components:
-        raise ValueError(
-            f"Unknown empty dataset package components: {sorted(unknown_empty_components)}"
-        )
-    if not any(frame is not None and not frame.empty for frame in frames.values()):
-        raise ValueError("A dataset package must contain at least one non-empty table.")
-    with tempfile.TemporaryDirectory(prefix="vaaet-dataset-") as temp_dir:
-        root = Path(temp_dir)
-        files: dict[str, dict[str, object]] = {}
-        for key, frame in frames.items():
-            if frame is None or (frame.empty and key not in include_empty_components):
-                continue
-            filename = PACKAGE_FILES[key]
-            path = root / filename
-            frame.to_csv(path, index=False)
-            files[key] = {
-                "filename": filename,
-                "rows": int(len(frame)),
-                "sha256": _sha256(path),
-                "columns": list(frame.columns),
-            }
-            if "record_time" in frame:
-                timestamps = normalize_timestamp_series(
-                    frame["record_time"], field_name=f"{key}.record_time"
-                )
-                files[key]["record_time_min"] = timestamps.min().isoformat()
-                files[key]["record_time_max"] = timestamps.max().isoformat()
-        manifest = {
-            "contract_version": contract_version,
-            "timezone": "UTC",
-            "feature_schema_version": FEATURE_SCHEMA_VERSION,
-            "files": files,
-            "provenance": provenance or {},
-            "package_metadata": package_metadata or {},
-        }
-        (root / "dataset-manifest.json").write_text(
-            json.dumps(manifest, indent=2, sort_keys=True), encoding="utf-8"
-        )
-        with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED) as archive:
-            archive.write(root / "dataset-manifest.json", "dataset-manifest.json")
-            for metadata in files.values():
-                filename = str(metadata["filename"])
-                archive.write(root / filename, filename)
-    return output
-
-
-def load_dataset_package(
-    path: str | Path,
-    *,
-    accepted_contracts: tuple[str, ...] = (DATASET_PACKAGE_CONTRACT,),
-) -> dict[str, pd.DataFrame]:
-    package = Path(path)
-    if not package.is_file():
-        raise FileNotFoundError(f"Dataset package not found: {package}")
-    try:
-        with tempfile.TemporaryDirectory(prefix="vaaet-dataset-read-") as temp_dir:
-            root = Path(temp_dir)
-            with zipfile.ZipFile(package) as archive:
-                _safe_extract(archive, root)
-            manifest_path = root / "dataset-manifest.json"
-            if not manifest_path.is_file():
-                raise ValueError("Dataset package is missing dataset-manifest.json.")
-            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-            contract_version = manifest.get("contract_version")
-            if contract_version not in accepted_contracts:
-                raise ValueError("Unsupported dataset package contract version.")
-            frames: dict[str, pd.DataFrame] = {}
-            for key, metadata in manifest.get("files", {}).items():
-                if key not in PACKAGE_FILES or not isinstance(metadata, dict):
-                    raise ValueError(f"Unknown dataset package component: {key}")
-                filename = metadata.get("filename")
-                if filename != PACKAGE_FILES[key]:
-                    raise ValueError(f"Unexpected filename for package component {key}.")
-                file_path = root / str(filename)
-                if not file_path.is_file() or _sha256(file_path) != metadata.get("sha256"):
-                    raise ValueError(f"Checksum mismatch for dataset component {key}.")
-                frame = pd.read_csv(file_path, float_precision="round_trip")
-                if len(frame) != int(metadata.get("rows", -1)):
-                    raise ValueError(f"Row count mismatch for dataset component {key}.")
-                if list(frame.columns) != metadata.get("columns"):
-                    raise ValueError(f"Column contract mismatch for dataset component {key}.")
-                frame.attrs["vaaet_package_provenance"] = manifest.get("provenance", {})
-                frame.attrs["vaaet_package_metadata"] = manifest.get("package_metadata", {})
-                frame.attrs["vaaet_package_contract"] = contract_version
-                frames[key] = frame
-            return frames
-    except (zipfile.BadZipFile, UnicodeError, json.JSONDecodeError) as exc:
-        raise ValueError(f"Invalid dataset package: {exc}") from exc
 
 
 def _load_seed_features(source: SeedDatasetPackageSource) -> pd.DataFrame:

@@ -7,7 +7,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
-from vaaet.exceptions import RuntimeConfigurationError
+from vaaet_ml.exceptions import RuntimeConfigurationError
 
 ReviewMode = Literal["priority", "all"]
 TrainingModeName = Literal["seed_bootstrap", "hitl_retraining"]

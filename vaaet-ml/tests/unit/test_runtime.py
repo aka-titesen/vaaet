@@ -6,9 +6,9 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
-from vaaet.exceptions import RuntimeConfigurationError
 
 from vaaet_ml import runtime
+from vaaet_ml.exceptions import RuntimeConfigurationError
 from vaaet_ml.runtime import (
     _framework_gpu_available,
     _nvidia_smi,

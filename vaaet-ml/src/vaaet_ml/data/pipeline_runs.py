@@ -6,21 +6,21 @@ from __future__ import annotations
 
 import json
 import re
+from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
-from typing import Iterator
 from uuid import UUID, uuid4
 
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
 from vaaet.artifacts import FEATURE_SCHEMA_VERSION
 from vaaet.logging import get_logger
+from vaaet.settings import MODEL_VERSION, TELEMETRY_SCHEMA_VERSION
 
 from vaaet_ml import __version__
-from vaaet_ml.settings import MODEL_VERSION, TELEMETRY_SCHEMA_VERSION
 
 logger = get_logger(__name__)
 

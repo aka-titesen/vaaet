@@ -7,15 +7,15 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 import pandas as pd
-from vaaet.timestamps import normalize_timestamp_series
-
-from vaaet_ml.data.datasets import TELEMETRY_QUALITY_COLUMNS, build_group_ids
-from vaaet_ml.settings import (
+from vaaet.settings import (
     CANONICAL_TIMEZONE,
     FEATURE_COLS,
     TELEMETRY_SCHEMA_VERSION,
     TRAFFIC_LOCAL_TIMEZONE,
 )
+from vaaet.timestamps import normalize_timestamp_series
+
+from vaaet_ml.data.datasets import TELEMETRY_QUALITY_COLUMNS, build_group_ids
 
 __all__ = ["DatasetAudit", "audit_training_dataset", "validate_training_partitions"]
 

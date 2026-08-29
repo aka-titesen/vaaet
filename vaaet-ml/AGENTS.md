@@ -60,11 +60,12 @@ Los notebooks instalan primero `vaaet-core` y luego `vaaet-ml`: importan
 
 1. Instalar `../vaaet-core` y luego este componente local.
 2. `ruff check src tests scripts`
-3. `pytest tests/ -v --tb=short`
-4. `python -m compileall -q src tests scripts`
-4. Compilar las celdas de los cuatro notebooks con `ast.parse()`.
-5. Comprobar enlaces Markdown.
-6. Ejecutar `git diff --check`.
+3. `pyright --project ../pyrightconfig.json`
+4. `pytest tests/ -v --tb=short`
+5. `python -m compileall -q src tests scripts`
+6. Compilar las celdas de los cuatro notebooks con `ast.parse()`.
+7. Comprobar enlaces Markdown.
+8. Ejecutar `git diff --check`.
 
 GPU, Drive, PostgreSQL, descarga de YOLO y DVC remoto se validan manualmente en Colab.
 

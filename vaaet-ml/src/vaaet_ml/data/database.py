@@ -13,11 +13,11 @@ import subprocess
 import tempfile
 import time
 import warnings
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Iterator, Mapping, Sequence
 
 import pandas as pd
 from sqlalchemy import URL, bindparam, create_engine, text
@@ -27,11 +27,11 @@ from sqlalchemy.pool import QueuePool
 from vaaet.exceptions import (
     ArtifactNotFoundError,
     ArtifactValidationError,
-    DatabaseNotConfiguredError,
 )
 from vaaet.logging import get_logger
 from vaaet.timestamps import normalize_timestamp_series
 
+from vaaet_ml.exceptions import DatabaseNotConfiguredError, DatabaseOperationError
 from vaaet_ml.settings import DATABASE_SCHEMAS, DEFAULT_DB_PORT
 
 logger = get_logger(__name__)
@@ -310,7 +310,11 @@ def get_engine(settings: DatabaseSettings | Mapping[str, str] | None = None) -> 
     if settings is None:
         settings = load_database_settings(DatabaseProfile.TRAINING)
     if not isinstance(settings, DatabaseSettings):
-        warnings.warn("Dictionary DB configs are deprecated; use DatabaseSettings.", DeprecationWarning)
+        warnings.warn(
+            "Dictionary DB configs are deprecated; use DatabaseSettings.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         host = settings.get("host", "")
         sslmode = settings.get("sslmode", "disable" if host in _LOCAL_HOSTS else "require")
         settings = DatabaseSettings(
@@ -397,14 +401,19 @@ def test_connection(engine: Engine) -> bool:
         return False
 
 
-def execute_with_retry(operation, *, attempts: int = 3):
-    """Retry a short idempotent database operation on transient connection loss."""
+def execute_with_retry(operation: Callable[[], object], *, attempts: int = 3) -> object:
+    """Reintenta una operación idempotente sin propagar detalles de infraestructura."""
+
+    if attempts < 1:
+        raise ValueError("Database retry attempts must be positive.")
     for attempt in range(1, attempts + 1):
         try:
             return operation()
-        except OperationalError:
+        except OperationalError as exc:
             if attempt == attempts:
-                raise
+                raise DatabaseOperationError(
+                    "PostgreSQL operation failed after bounded retries."
+                ) from exc
             time.sleep(0.5 * (2 ** (attempt - 1)))
     raise AssertionError("unreachable")
 
@@ -560,9 +569,9 @@ def _resolve_pg_restore(pg_restore_path: str | Path | None) -> Path:
         return Path(discovered).resolve()
     resolved = Path(pg_restore_path).expanduser().resolve()
     if not resolved.is_file():
-        raise ArtifactNotFoundError(f"Explicit pg_restore binary not found: {resolved}")
+        raise ArtifactNotFoundError("Explicit pg_restore binary was not found.")
     if not os.access(resolved, os.X_OK):
-        raise ArtifactValidationError(f"Explicit pg_restore path is not executable: {resolved}")
+        raise ArtifactValidationError("Explicit pg_restore binary is not executable.")
     return resolved
 
 
@@ -572,10 +581,7 @@ def _pg_restore_version(binary: Path) -> str:
     )
     version = result.stdout.strip()
     if result.returncode != 0 or not version:
-        diagnostic = result.stderr.strip() or "no version output"
-        raise ArtifactValidationError(
-            f"Cannot execute PostgreSQL backup reader {binary}: {diagnostic}"
-        )
+        raise ArtifactValidationError("Cannot execute PostgreSQL backup reader.")
     return version
 
 
@@ -589,9 +595,7 @@ def _read_backup_catalog(backup: Path, binary: Path) -> tuple[_BackupCatalogEntr
         [str(binary), "-l", str(backup)], capture_output=True, text=True, check=False
     )
     if result.returncode != 0:
-        raise ArtifactValidationError(
-            f"Cannot inspect PostgreSQL backup with {binary}: {result.stderr.strip()}"
-        )
+        raise ArtifactValidationError("Cannot inspect PostgreSQL backup with the configured reader.")
     entries: list[_BackupCatalogEntry] = []
     for line in result.stdout.splitlines():
         match = _TOC_TABLE_DATA_PATTERN.match(line)
@@ -610,7 +614,7 @@ def inspect_backup_catalog(
 ) -> tuple[str, ...]:
     backup = Path(backup_path)
     if not backup.is_file():
-        raise ArtifactNotFoundError(f"Backup file not found: {backup}")
+        raise ArtifactNotFoundError("Backup file was not found.")
     binary = _resolve_pg_restore(pg_restore_path)
     entries = _read_backup_catalog(backup, binary)
     recognized = {
@@ -629,7 +633,7 @@ def restore_backup_to_sql(
 ) -> Path:
     backup = Path(backup_path)
     if not backup.is_file():
-        raise ArtifactNotFoundError(f"Backup file not found: {backup}")
+        raise ArtifactNotFoundError("Backup file was not found.")
     binary = _resolve_pg_restore(pg_restore_path)
     version = _pg_restore_version(binary)
     destination = Path(output_path) if output_path else backup.with_suffix(".sql")
@@ -676,18 +680,13 @@ def restore_backup_to_sql(
     stderr = result.stderr.strip()
     if any(value in stderr.lower() for value in ("unsupported version", "unsupported archive")):
         destination.unlink(missing_ok=True)
-        raise RuntimeError(
-            f"pg_restore version mismatch ({version}, binary={binary}).\nstderr: {stderr}"
-        )
+        raise ArtifactValidationError("PostgreSQL backup reader version is incompatible.")
     if result.returncode != 0:
         destination.unlink(missing_ok=True)
-        raise RuntimeError(
-            f"pg_restore failed (exit {result.returncode}, reader={version}, "
-            f"tables={list(requested_tables)}):\n{stderr or 'no diagnostic output'}"
-        )
+        raise ArtifactValidationError("PostgreSQL backup extraction failed.")
     if not destination.is_file() or destination.stat().st_size == 0:
         destination.unlink(missing_ok=True)
-        raise RuntimeError(f"pg_restore produced an empty or missing file: {destination}")
+        raise ArtifactValidationError("PostgreSQL backup extraction produced no data.")
     if requested_tables:
         extracted_tables: set[str] = set()
         with destination.open(encoding="utf-8", errors="replace") as handle:
@@ -711,7 +710,7 @@ def parse_sql_dump_tables(sql_path: str | Path) -> dict[str, pd.DataFrame]:
     """Read recognized COPY blocks without executing dump SQL."""
     path = Path(sql_path)
     if not path.is_file():
-        raise ArtifactNotFoundError(f"SQL file not found: {path}")
+        raise ArtifactNotFoundError("SQL dump file was not found.")
     lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
     frames: dict[str, pd.DataFrame] = {}
     index = 0

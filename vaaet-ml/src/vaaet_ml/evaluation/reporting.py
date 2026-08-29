@@ -9,12 +9,7 @@ from math import sqrt
 
 import numpy as np
 import pandas as pd
-
-from vaaet_ml.settings import (
-    DATA_ORIGIN_COL,
-    STATE_LABELS,
-    SYNTHETIC_SCENARIO_COL,
-)
+from vaaet.settings import DATA_ORIGIN_COL, STATE_LABELS, SYNTHETIC_SCENARIO_COL
 
 __all__ = [
     "build_class_support_notes",

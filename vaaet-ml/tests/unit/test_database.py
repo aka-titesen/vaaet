@@ -254,7 +254,7 @@ class TestRestoreBackupToSql:
     def test_missing_backup_file(self, tmp_path: Path) -> None:
         from vaaet_ml.data.database import restore_backup_to_sql
 
-        with pytest.raises(FileNotFoundError, match="Backup file not found"):
+        with pytest.raises(FileNotFoundError, match="Backup file was not found"):
             restore_backup_to_sql(tmp_path / "nonexistent.backup")
 
     def test_missing_pg_restore(
@@ -278,7 +278,7 @@ class TestRestoreBackupToSql:
         backup = tmp_path / "test.backup"
         backup.write_bytes(b"PGDMP")
 
-        with pytest.raises(FileNotFoundError, match="Explicit pg_restore binary not found"):
+        with pytest.raises(FileNotFoundError, match="Explicit pg_restore binary was not found"):
             restore_backup_to_sql(
                 backup,
                 pg_restore_path=tmp_path / "missing-pg_restore",
@@ -337,7 +337,7 @@ class TestRestoreBackupToSql:
     def test_version_mismatch_detected(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """pg_restore stderr with 'unsupported version' must raise RuntimeError."""
+        """Una incompatibilidad del lector no debe filtrar binarios ni stderr."""
         from unittest.mock import MagicMock, patch
 
         from vaaet_ml.data.database import restore_backup_to_sql
@@ -365,7 +365,7 @@ class TestRestoreBackupToSql:
             return run_result  # actual pg_restore call
 
         with patch("vaaet_ml.data.database.subprocess.run", side_effect=fake_run):
-            with pytest.raises(RuntimeError, match=r"version mismatch .*binary="):
+            with pytest.raises(ValueError, match="reader version is incompatible"):
                 restore_backup_to_sql(backup)
 
     def test_selects_exact_schema_qualified_table_via_toc(
@@ -447,7 +447,7 @@ class TestRestoreBackupToSql:
 
         monkeypatch.setattr("vaaet_ml.data.database.subprocess.run", fake_run)
 
-        with pytest.raises(RuntimeError, match="exit 1"):
+        with pytest.raises(ValueError, match="backup extraction failed"):
             restore_backup_to_sql(
                 backup, output_path=output, pg_restore_path=pg_restore
             )
@@ -674,7 +674,7 @@ class TestParseSqlDump:
     def test_missing_file(self, tmp_path: Path) -> None:
         from vaaet_ml.data.database import parse_sql_dump
 
-        with pytest.raises(FileNotFoundError, match="SQL file not found"):
+        with pytest.raises(FileNotFoundError, match="SQL dump file was not found"):
             parse_sql_dump(tmp_path / "nonexistent.sql")
 
     def test_no_copy_block(self, tmp_path: Path) -> None:

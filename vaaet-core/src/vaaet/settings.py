@@ -9,25 +9,27 @@ belong to the separate laboratory component.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from types import MappingProxyType
+from typing import Final
 
 # Temporal contract
 
-CANONICAL_TIMEZONE: str = "UTC"
-TRAFFIC_LOCAL_TIMEZONE: str = "America/Argentina/Buenos_Aires"
+CANONICAL_TIMEZONE: Final[str] = "UTC"
+TRAFFIC_LOCAL_TIMEZONE: Final[str] = "America/Argentina/Buenos_Aires"
 
 
 # Dataset provenance
 
-DATA_ORIGIN_COL: str = "data_origin"
-SYNTHETIC_SCENARIO_COL: str = "synthetic_scenario"
-DATA_ORIGINS: tuple[str, ...] = ("real", "synthetic")
-SYNTHETIC_SCENARIOS: tuple[str, ...] = ("observed", "accident", "congestion")
+DATA_ORIGIN_COL: Final[str] = "data_origin"
+SYNTHETIC_SCENARIO_COL: Final[str] = "synthetic_scenario"
+DATA_ORIGINS: Final[tuple[str, ...]] = ("real", "synthetic")
+SYNTHETIC_SCENARIOS: Final[tuple[str, ...]] = ("observed", "accident", "congestion")
 
 # Traffic state definitions
 
-STATE_LABELS: dict[int, str] = MappingProxyType(
-    {  # type: ignore[assignment]
+STATE_LABELS: Final[Mapping[int, str]] = MappingProxyType(
+    {
         0: "Normal",
         1: "Reduced",
         2: "Congested",
@@ -38,18 +40,18 @@ STATE_LABELS: dict[int, str] = MappingProxyType(
 # The public contract keeps four states, while the learned classifier models
 # only the stable traffic-flow states. Accident is a human-confirmed outcome
 # produced by the hierarchical decision policy, never a direct MLP output.
-MODEL_STATE_LABELS: dict[int, str] = MappingProxyType(  # type: ignore[assignment]
+MODEL_STATE_LABELS: Final[Mapping[int, str]] = MappingProxyType(
     {key: STATE_LABELS[key] for key in (0, 1, 2)}
 )
 
 # Number of traffic-state classes
-N_STATES: int = len(STATE_LABELS)
-N_MODEL_STATES: int = len(MODEL_STATE_LABELS)
+N_STATES: Final[int] = len(STATE_LABELS)
+N_MODEL_STATES: Final[int] = len(MODEL_STATE_LABELS)
 
 
 # Feature columns (19) — canonical order used by scaler and model
 
-FEATURE_COLS: list[str] = [
+FEATURE_COLS: Final[list[str]] = [
     "avg_speed",
     "total_vehicles",
     "count_car",
@@ -77,8 +79,8 @@ FEATURE_COLS: list[str] = [
 # Recalibrated 2026-03-11 from generic textbook values to bridge-specific
 # percentiles so that all 4 classes appear in the ~2 000-record dataset.
 
-LABELING_THRESHOLDS: dict[str, float | int] = MappingProxyType(
-    {  # type: ignore[assignment]
+LABELING_THRESHOLDS: Final[Mapping[str, float | int]] = MappingProxyType(
+    {
         "accident_speed_max": 2,
         "accident_delta_min": -15,
         "accident_cumulative_delta_min": -18,
@@ -106,7 +108,7 @@ INCIDENT_RECOVERY_MINUTES: int = 3
 
 # Conservative post-model policy. Concrete per-class thresholds are stored in
 # bundle v2 so they can be selected on validation without changing the API.
-DEFAULT_CLASS_THRESHOLDS: dict[int, float] = MappingProxyType(  # type: ignore[assignment]
+DEFAULT_CLASS_THRESHOLDS: Final[Mapping[int, float]] = MappingProxyType(
     {0: 0.60, 1: 0.60, 2: 0.70}
 )
 DEFAULT_MIN_PROBABILITY_MARGIN: float = 0.10
@@ -122,8 +124,8 @@ TELEMETRY_SCHEMA_VERSION: str = "traffic-telemetry-v2"
 
 # Bridge domain context
 
-BRIDGE_CONFIG: dict[str, float | str] = MappingProxyType(
-    {  # type: ignore[assignment]
+BRIDGE_CONFIG: Final[Mapping[str, float | str]] = MappingProxyType(
+    {
         "name": "General Manuel Belgrano",
         "length_m": 1700,
         "road_width_m": 8.3,
@@ -131,7 +133,7 @@ BRIDGE_CONFIG: dict[str, float | str] = MappingProxyType(
     }
 )
 
-VEHICLE_TYPES: tuple[str, ...] = ("car", "truck", "bus", "motorcycle", "bicycle")
+VEHICLE_TYPES: Final[tuple[str, ...]] = ("car", "truck", "bus", "motorcycle", "bicycle")
 
 # Speed plausibility filter [min, max] in km/h
 SPEED_RANGE: tuple[float, float] = (2.0, 120.0)
@@ -143,8 +145,8 @@ SPEED_RANGE: tuple[float, float] = (2.0, 120.0)
 # Logic: shorter clips can afford heavier models (higher accuracy, fewer frames).
 # Longer clips require lighter models to finish in reasonable time.
 # Implements the adaptive selection strategy in ADR-0002.
-YOLO_MODEL_VARIANTS: dict[str, dict[str, int | str]] = MappingProxyType(
-    {  # type: ignore[assignment]
+YOLO_MODEL_VARIANTS: Final[Mapping[str, Mapping[str, int | str]]] = MappingProxyType(
+    {
         "yolo11x": {"max_duration": 300, "label": "xlarge — clips < 5 min"},
         "yolo11l": {"max_duration": 1800, "label": "large — clips 5-30 min"},
         "yolo11m": {"max_duration": 10800, "label": "medium — clips 30 min-3 h"},
@@ -180,8 +182,8 @@ OPTICAL_FLOW_MIN_TRACKING_RATIO: float = 0.35
 PIXELS_PER_METER: float = 12.0
 
 # Perspective correction zones (fraction of frame height)
-PERSPECTIVE_ZONES: dict[str, dict[str, float]] = MappingProxyType(
-    {  # type: ignore[assignment]
+PERSPECTIVE_ZONES: Final[Mapping[str, Mapping[str, float]]] = MappingProxyType(
+    {
         "near": {"threshold": 0.66, "factor": 1.8},
         "mid": {"threshold": 0.33, "factor": 1.0},
         "far": {"threshold": 0.0, "factor": 0.6},
@@ -211,8 +213,8 @@ SPEED_ESTIMATION_WINDOW: int = 30
 SPEED_DISPLACEMENT_NOISE_FLOOR: float = 2.0
 
 # Per-vehicle-type speed limits (km/h) for plausibility filtering
-SPEED_LIMITS_PER_TYPE: dict[str, tuple[float, float]] = MappingProxyType(
-    {  # type: ignore[assignment]
+SPEED_LIMITS_PER_TYPE: Final[Mapping[str, tuple[float, float]]] = MappingProxyType(
+    {
         "car": (2.0, 120.0),
         "truck": (2.0, 90.0),
         "bus": (2.0, 80.0),

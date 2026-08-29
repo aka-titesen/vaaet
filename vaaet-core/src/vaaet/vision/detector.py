@@ -12,12 +12,16 @@ ADR-0002 and ADR-0009 for the decision context.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Protocol, cast
 
 import numpy as np
 
+from vaaet.logging import get_logger
 from vaaet.settings import YOLO_CONFIDENCE, YOLO_MODEL_VARIANTS, YOLO_NMS_IOU
+
+logger = get_logger(__name__)
 
 __all__ = [
     "Detection",
@@ -25,7 +29,7 @@ __all__ = [
     "select_model_variant",
 ]
 
-# COCO class indices for vehicle types
+# Índices COCO habilitados por el contrato de telemetría vehicular.
 _COCO_VEHICLE_IDS: dict[int, str] = {
     2: "car",
     3: "motorcycle",
@@ -37,7 +41,7 @@ _COCO_VEHICLE_IDS: dict[int, str] = {
 
 @dataclass(frozen=True)
 class Detection:
-    """A single vehicle detection."""
+    """Una detección vehicular normalizada para tracking."""
 
     bbox: tuple[int, int, int, int]  # x1, y1, x2, y2
     vehicle_type: str
@@ -50,8 +54,15 @@ class Detection:
         object.__setattr__(self, "centroid", (cx, cy))
 
 
+class _YOLOModel(Protocol):
+    """Superficie mínima del runtime Ultralytics aislada del dominio."""
+
+    def __call__(self, frame: np.ndarray, **options: object) -> Iterable[object]:
+        """Ejecuta inferencia sobre un frame BGR."""
+
+
 class YOLODetector:
-    """Thin wrapper around Ultralytics YOLO for vehicle detection.
+    """Adaptador acotado de Ultralytics YOLO para detección vehicular.
 
     Args:
         model_variant: YOLO model variant name (e.g. ``"yolo11m"``).
@@ -68,17 +79,18 @@ class YOLODetector:
         self.model_variant = model_variant
         self.confidence_threshold = confidence_threshold
         self.nms_threshold = nms_threshold
-        self._model: Any | None = None
+        self._model: _YOLOModel | None = None
 
     def load(self) -> None:
-        """Download (if needed) and load the YOLO model."""
-        from ultralytics import YOLO  # deferred import — heavy dependency
+        """Descarga si hace falta y carga el modelo YOLO seleccionado."""
+        from ultralytics import YOLO  # pyright: ignore[reportMissingImports]
 
-        self._model = YOLO(f"{self.model_variant}.pt")
-        print(f"✅ YOLO model loaded: {self.model_variant}")
+        # Ultralytics no expone tipos estables; el cast permanece en este borde.
+        self._model = cast(_YOLOModel, YOLO(f"{self.model_variant}.pt"))
+        logger.info("Modelo YOLO cargado: variant=%s", self.model_variant)
 
     def detect(self, frame: np.ndarray) -> list[Detection]:
-        """Run detection on a single BGR frame.
+        """Ejecuta detección sobre un frame BGR.
 
         Args:
             frame: OpenCV BGR image as a numpy array.
@@ -98,16 +110,28 @@ class YOLODetector:
 
         detections: list[Detection] = []
         for result in results:
-            for box in result.boxes:
-                cls_id = int(box.cls[0])
+            boxes = cast(Iterable[object], getattr(result, "boxes", ()))
+            for box in boxes:
+                class_values = cast(Iterable[object], getattr(box, "cls", ()))
+                confidence_values = cast(Iterable[object], getattr(box, "conf", ()))
+                coordinates = cast(Iterable[Iterable[object]], getattr(box, "xyxy", ()))
+                class_id = next(iter(class_values), None)
+                confidence = next(iter(confidence_values), None)
+                bounding_box = next(iter(coordinates), None)
+                if class_id is None or confidence is None or bounding_box is None:
+                    continue
+                cls_id = int(class_id)
                 if cls_id not in _COCO_VEHICLE_IDS:
                     continue
-                x1, y1, x2, y2 = map(int, box.xyxy[0])
+                try:
+                    x1, y1, x2, y2 = (int(value) for value in bounding_box)
+                except (TypeError, ValueError):
+                    continue
                 detections.append(
                     Detection(
                         bbox=(x1, y1, x2, y2),
                         vehicle_type=_COCO_VEHICLE_IDS[cls_id],
-                        confidence=float(box.conf[0]),
+                        confidence=float(confidence),
                     )
                 )
 

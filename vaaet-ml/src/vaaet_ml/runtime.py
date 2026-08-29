@@ -5,7 +5,6 @@
 from __future__ import annotations
 
 import importlib
-import importlib.metadata
 import os
 import shutil
 import subprocess
@@ -14,7 +13,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from types import ModuleType
 
-from vaaet.exceptions import RuntimeConfigurationError
+from vaaet.logging import configure_logging
+
+from vaaet_ml.exceptions import RuntimeConfigurationError
 
 _SUPPORTED_PYTHON_MIN = (3, 10)
 _SUPPORTED_PYTHON_MAX = (3, 13)
@@ -67,20 +68,18 @@ def _validate_package_origin(
 ) -> Path:
     package_file = getattr(package, "__file__", None)
     if not package_file:
-        resolved_paths = list(getattr(package, "__path__", ()))
         raise RuntimeConfigurationError(
-            f"The '{import_name}' import resolved to a namespace package; rerun the environment cell. "
-            f"Resolved locations: {resolved_paths}"
+            f"The '{import_name}' import resolved to a namespace package; rerun the environment cell."
         )
     origin = Path(package_file).resolve()
     expected_editable_root = (project_root / "src" / import_name).resolve()
     if in_colab and project_root.resolve() in origin.parents:
         raise RuntimeConfigurationError(
-            f"Colab must load installed {import_name}, not the checkout: {origin}"
+            f"Colab must load installed {import_name}, not the checkout."
         )
     if not in_colab and origin.parent != expected_editable_root:
         raise RuntimeConfigurationError(
-            f"Local editable installation has an unexpected origin: {origin}"
+            f"Local editable installation has an unexpected origin for {import_name}."
         )
     return origin
 
@@ -122,12 +121,13 @@ def _nvidia_smi() -> str | None:
 
 
 def _memory_diagnostics() -> tuple[float | None, float | None]:
-    if not hasattr(os, "sysconf"):
+    sysconf = getattr(os, "sysconf", None)
+    if not callable(sysconf):
         return None, None
     try:
-        page_size = int(os.sysconf("SC_PAGE_SIZE"))
-        total_pages = int(os.sysconf("SC_PHYS_PAGES"))
-        available_pages = int(os.sysconf("SC_AVPHYS_PAGES"))
+        page_size = int(sysconf("SC_PAGE_SIZE"))
+        total_pages = int(sysconf("SC_PHYS_PAGES"))
+        available_pages = int(sysconf("SC_AVPHYS_PAGES"))
     except (OSError, ValueError):
         return None, None
     return total_pages * page_size / _GIB, available_pages * page_size / _GIB
@@ -158,6 +158,7 @@ def bootstrap_notebook_runtime(
 ) -> RuntimeDiagnostics:
     """Validate the installed package and preflight the runtime without exposing secrets."""
 
+    configure_logging()
     _validate_python_version((sys.version_info.major, sys.version_info.minor))
     if not (workspace_root / ".git").is_dir() or not all(
         path.joinpath("pyproject.toml").is_file() for path in (core_root, ml_root)

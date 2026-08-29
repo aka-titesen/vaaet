@@ -110,8 +110,12 @@ def _fallback_group_split(
         max(1, int(round(len(unique_groups) * test_size))),
     )
     test_group_set = set(unique_groups[-test_group_count:])
-    train_idx = np.array([idx for idx, grp in zip(df.index, groups) if grp not in test_group_set])
-    test_idx = np.array([idx for idx, grp in zip(df.index, groups) if grp in test_group_set])
+    train_idx = np.array(
+        [idx for idx, grp in zip(df.index, groups, strict=False) if grp not in test_group_set]
+    )
+    test_idx = np.array(
+        [idx for idx, grp in zip(df.index, groups, strict=False) if grp in test_group_set]
+    )
     return GroupedSplit(train_idx=train_idx, test_idx=test_idx, groups=groups)
 
 

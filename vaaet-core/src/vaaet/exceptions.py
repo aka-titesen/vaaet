@@ -1,37 +1,25 @@
 # SPDX-FileCopyrightText: 2026 VAAET Contributors
 # SPDX-License-Identifier: AGPL-3.0-only
-"""Domain exceptions used across the active VAAET pipeline."""
+"""Excepciones de dominio portables para artefactos y visión."""
 
 from __future__ import annotations
 
 
 class VAAETError(Exception):
-    """Base class for domain-specific runtime errors."""
+    """Raíz de los errores de dominio portables de VAAET."""
 
 
 class ArtifactNotFoundError(FileNotFoundError, VAAETError):
-    """Raised when a required file or external artifact is missing."""
+    """Señala que falta un artefacto local requerido por un contrato."""
 
 
 class ArtifactValidationError(ValueError, VAAETError):
-    """Raised when a model artifact bundle violates the serving contract."""
+    """Señala que un bundle o artefacto viola su contrato portable."""
 
 
 class VideoValidationError(ValueError, VAAETError):
-    """Raised when a video cannot be validated or inspected safely."""
+    """Señala que un video no puede validarse de manera segura."""
 
 
 class VideoOpenError(RuntimeError, VAAETError):
-    """Raised when OpenCV cannot open a video."""
-
-
-class DatabaseNotConfiguredError(RuntimeError, VAAETError):
-    """Raised when optional database settings are missing."""
-
-
-class DatabaseOperationError(RuntimeError, VAAETError):
-    """Raised when a database operation fails in a non-recoverable way."""
-
-
-class RuntimeConfigurationError(RuntimeError, VAAETError):
-    """Raised when a notebook runtime cannot satisfy VAAET safety requirements."""
+    """Señala que OpenCV no pudo abrir un recurso de video."""

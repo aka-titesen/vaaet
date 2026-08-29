@@ -48,11 +48,17 @@ python -m venv .venv
 # Activá .venv con tu shell.
 python -m pip install --upgrade pip
 python -m pip install -e "./vaaet-core[vision,inference,dev]"
-python -m pip install -e "./vaaet-ml[training,visualization,database,dev]"
+python -m pip install -e "./vaaet-ml[training,evaluation,visualization,database,dev]"
 python -m pip check
 ruff check vaaet-ml/src vaaet-ml/tests vaaet-ml/scripts
+pyright --project pyrightconfig.json
 pytest vaaet-ml/tests
 ```
+
+`training` y `evaluation` declaran `vaaet-core[inference]` como requisito
+transitivo; no vuelven a declarar TensorFlow. El extra `vision` se reserva para
+workflows de adquisición o inferencia de video y `dvc` sólo para operación local
+del registro de artefactos.
 
 Cada notebook tiene una sola celda de preparación: clona o actualiza
 `https://github.com/zgfnicolas/vaaet` en `/content/vaaet`, resuelve

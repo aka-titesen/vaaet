@@ -10,9 +10,10 @@ import json
 import re
 import subprocess
 import uuid
+from collections.abc import Mapping
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Mapping
+from typing import TypedDict, cast
 
 from vaaet.exceptions import ArtifactNotFoundError, ArtifactValidationError
 from vaaet.lifecycle import (
@@ -76,6 +77,27 @@ REQUIRED_POLICY_FIELDS = {
 _SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 
 
+class TrafficBundleManifest(TypedDict):
+    """Estructura validada del manifiesto v2 consumida antes de deserializar."""
+
+    contract_version: int
+    feature_schema_version: str
+    model_version: str
+    generated_at: str
+    git_commit: str
+    feature_columns: list[str]
+    class_mapping: Mapping[str, str]
+    model_output_mapping: Mapping[str, str]
+    decision_policy: Mapping[str, object]
+    files: Mapping[str, Mapping[str, object]]
+    dependencies: Mapping[str, str]
+    metrics: Mapping[str, object]
+    data_provenance: Mapping[str, object]
+    training_lifecycle: Mapping[str, object]
+    human_holdout: Mapping[str, object] | None
+    training_input_lock: Mapping[str, object] | None
+
+
 def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
@@ -101,23 +123,40 @@ def _git_commit(path: Path) -> str:
     return result.stdout.strip() or "unknown"
 
 
+def _require_object_section(
+    manifest: Mapping[str, object],
+    field_name: str,
+) -> dict[str, object]:
+    """Devuelve una sección JSON objeto o informa el contrato incumplido.
+
+    El manifiesto llega desde JSON como datos no confiables. Este único límite
+    reduce el estrechamiento repetido de tipos y evita que los validadores de
+    dominio operen sobre objetos arbitrarios.
+    """
+
+    value = manifest[field_name]
+    if not isinstance(value, dict):
+        raise ArtifactValidationError(f"Manifest field '{field_name}' must be an object.")
+    return cast(dict[str, object], value)
+
+
 def create_manifest(
     bundle_dir: str | Path,
     *,
-    metrics: Mapping[str, Any],
-    data_provenance: Mapping[str, Any],
-    training_lifecycle: Mapping[str, Any],
-    decision_policy: Mapping[str, Any] | None = None,
-    human_holdout: Mapping[str, Any] | None = None,
-    training_input_lock: Mapping[str, Any] | None = None,
+    metrics: Mapping[str, object],
+    data_provenance: Mapping[str, object],
+    training_lifecycle: Mapping[str, object],
+    decision_policy: Mapping[str, object] | None = None,
+    human_holdout: Mapping[str, object] | None = None,
+    training_input_lock: Mapping[str, object] | None = None,
 ) -> Path:
-    """Create the serving manifest after a successful training export."""
+    """Crea el manifiesto de serving después de una exportación válida."""
     directory = Path(bundle_dir).resolve()
     missing = [name for name in REQUIRED_FILES if not (directory / name).is_file()]
     if missing:
         raise ArtifactNotFoundError(f"Missing artifact files: {', '.join(missing)}")
 
-    policy = {
+    policy: dict[str, object] = {
         "architecture": "hierarchical-stable-flow-with-incident-candidate",
         "class_thresholds": {
             str(key): value for key, value in DEFAULT_CLASS_THRESHOLDS.items()
@@ -132,7 +171,7 @@ def create_manifest(
     if decision_policy:
         policy.update(dict(decision_policy))
     lifecycle = dict(training_lifecycle)
-    manifest = {
+    manifest: dict[str, object] = {
         "contract_version": CONTRACT_VERSION,
         "feature_schema_version": FEATURE_SCHEMA_VERSION,
         "model_version": MODEL_VERSION,
@@ -162,19 +201,20 @@ def create_manifest(
     return output
 
 
-def validate_manifest(bundle_dir: str | Path) -> dict[str, Any]:
-    """Validate compatibility and integrity before loading a model bundle."""
+def validate_manifest(bundle_dir: str | Path) -> TrafficBundleManifest:
+    """Valida compatibilidad e integridad antes de cargar un bundle v2."""
     directory = Path(bundle_dir).resolve()
     manifest_path = directory / MANIFEST_FILE
     if not manifest_path.is_file():
-        raise ArtifactNotFoundError(f"Missing artifact manifest: {manifest_path}")
+        raise ArtifactNotFoundError(f"Missing artifact manifest: {MANIFEST_FILE}")
 
     try:
-        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        raw_manifest: object = json.loads(manifest_path.read_text(encoding="utf-8"))
     except (OSError, UnicodeError, json.JSONDecodeError) as exc:
         raise ArtifactValidationError(f"Invalid artifact manifest: {exc}") from exc
-    if not isinstance(manifest, dict):
+    if not isinstance(raw_manifest, dict):
         raise ArtifactValidationError("Artifact manifest must be a JSON object.")
+    manifest = cast(dict[str, object], raw_manifest)
 
     missing_fields = sorted(REQUIRED_FIELDS - manifest.keys())
     if missing_fields:
@@ -202,9 +242,7 @@ def validate_manifest(bundle_dir: str | Path) -> dict[str, Any]:
     expected_outputs = {str(key): value for key, value in MODEL_STATE_LABELS.items()}
     if manifest["model_output_mapping"] != expected_outputs:
         raise ArtifactValidationError("Artifact MLP output mapping is incompatible with VAAET.")
-    lifecycle = manifest["training_lifecycle"]
-    if not isinstance(lifecycle, dict):
-        raise ArtifactValidationError("Manifest training_lifecycle must be an object.")
+    lifecycle = _require_object_section(manifest, "training_lifecycle")
     lifecycle_fields = {
         "training_mode",
         "supervision",
@@ -241,9 +279,7 @@ def validate_manifest(bundle_dir: str | Path) -> dict[str, Any]:
         or lifecycle["supervision"] != "human-validated-with-proxy-memory"
     ):
         raise ArtifactValidationError("HITL bundles must be human-validated candidates or production.")
-    policy = manifest["decision_policy"]
-    if not isinstance(policy, dict):
-        raise ArtifactValidationError("Manifest decision_policy must be an object.")
+    policy = _require_object_section(manifest, "decision_policy")
     missing_policy = sorted(REQUIRED_POLICY_FIELDS - policy.keys())
     if missing_policy:
         raise ArtifactValidationError(
@@ -267,22 +303,22 @@ def validate_manifest(bundle_dir: str | Path) -> dict[str, Any]:
         raise ArtifactValidationError("Decision policy temperature must be numeric.")
     if not 0.0 < float(temperature) <= 10.0:
         raise ArtifactValidationError("Decision policy temperature is outside the supported range.")
-    for field in ("files", "dependencies", "metrics", "data_provenance"):
-        if not isinstance(manifest[field], dict):
-            raise ArtifactValidationError(f"Manifest field '{field}' must be an object.")
+    files = _require_object_section(manifest, "files")
+    dependencies = _require_object_section(manifest, "dependencies")
+    metrics = _require_object_section(manifest, "metrics")
+    provenance = _require_object_section(manifest, "data_provenance")
     for name in REQUIRED_DEPENDENCIES:
-        version = manifest["dependencies"].get(name)
+        version = dependencies.get(name)
         if not isinstance(version, str) or not version:
             raise ArtifactValidationError(f"Missing or invalid dependency version: {name}")
-    f1_macro = manifest["metrics"].get("f1_macro")
+    f1_macro = metrics.get("f1_macro")
     if isinstance(f1_macro, bool) or not isinstance(f1_macro, (int, float)) or not 0 <= f1_macro <= 1:
         raise ArtifactValidationError("Manifest metrics.f1_macro must be a number between 0 and 1.")
-    missing_provenance = sorted(REQUIRED_PROVENANCE_FIELDS - manifest["data_provenance"].keys())
+    missing_provenance = sorted(REQUIRED_PROVENANCE_FIELDS - provenance.keys())
     if missing_provenance:
         raise ArtifactValidationError(
             f"Missing data provenance fields: {', '.join(missing_provenance)}"
         )
-    provenance = manifest["data_provenance"]
     if not isinstance(provenance["origin"], str) or not provenance["origin"]:
         raise ArtifactValidationError("Manifest data_provenance.origin must be a non-empty string.")
     if type(provenance["record_count"]) is not int or provenance["record_count"] < 0:
@@ -306,6 +342,7 @@ def validate_manifest(bundle_dir: str | Path) -> dict[str, Any]:
             raise ArtifactValidationError(
                 "A frozen human holdout requires its versioned snapshot descriptor."
             )
+        holdout = cast(dict[str, object], holdout)
         required_holdout = {
             "contract",
             "snapshot_id",
@@ -342,6 +379,7 @@ def validate_manifest(bundle_dir: str | Path) -> dict[str, Any]:
     if input_lock is not None:
         if not isinstance(input_lock, dict):
             raise ArtifactValidationError("training_input_lock must be an object or null.")
+        input_lock = cast(dict[str, object], input_lock)
         required_lock = {"contract", "lock_id", "fingerprint"}
         if missing_lock := sorted(required_lock - input_lock.keys()):
             raise ArtifactValidationError(
@@ -361,7 +399,7 @@ def validate_manifest(bundle_dir: str | Path) -> dict[str, Any]:
         isinstance(item, str) for item in provenance["promotion_blockers"]
     ):
         raise ArtifactValidationError("promotion_blockers must be a list of strings.")
-    metric_eligibility = manifest["metrics"].get("production_eligible")
+    metric_eligibility = metrics.get("production_eligible")
     if type(metric_eligibility) is not bool or metric_eligibility != provenance["production_eligible"]:
         raise ArtifactValidationError("Production eligibility must be explicit and consistent.")
     if lifecycle["production_eligible"] != metric_eligibility:
@@ -371,14 +409,15 @@ def validate_manifest(bundle_dir: str | Path) -> dict[str, Any]:
 
     for name in REQUIRED_FILES:
         path = directory / name
-        file_entry = manifest["files"].get(name)
+        file_entry = files.get(name)
         if not isinstance(file_entry, dict):
             raise ArtifactValidationError(f"Missing or invalid manifest file entry: {name}")
+        file_entry = cast(dict[str, object], file_entry)
         expected = file_entry.get("sha256")
         if not path.is_file():
-            raise ArtifactNotFoundError(f"Missing artifact file: {path}")
+            raise ArtifactNotFoundError(f"Missing artifact file: {name}")
         if not isinstance(expected, str) or not _SHA256_PATTERN.fullmatch(expected):
             raise ArtifactValidationError(f"Invalid SHA-256 entry for artifact file: {name}")
         if _sha256(path) != expected:
             raise ArtifactValidationError(f"Checksum mismatch for artifact file: {name}")
-    return manifest
+    return cast(TrafficBundleManifest, manifest)

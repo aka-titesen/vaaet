@@ -1,0 +1,41 @@
+{
+  "include": ["vaaet-core/src", "vaaet-ml/src"],
+  "exclude": ["**/__pycache__", ".venv", "build", "dist"],
+  "pythonVersion": "3.10",
+  "venvPath": ".",
+  "venv": ".venv",
+  "typeCheckingMode": "strict",
+  "reportMissingTypeStubs": "none",
+  "reportUnknownArgumentType": "warning",
+  "reportUnknownLambdaType": "warning",
+  "reportUnknownMemberType": "warning",
+  "reportUnknownParameterType": "warning",
+  "reportUnknownVariableType": "warning",
+  "reportMissingTypeArgument": "warning",
+  "reportArgumentType": "warning",
+  "reportAssignmentType": "warning",
+  "reportAttributeAccessIssue": "warning",
+  "reportCallIssue": "warning",
+  "reportDeprecated": "warning",
+  "reportGeneralTypeIssues": "warning",
+  "reportIndexIssue": "warning",
+  "reportMissingImports": "warning",
+  "reportMissingParameterType": "warning",
+  "reportOperatorIssue": "warning",
+  "reportOptionalCall": "warning",
+  "reportOptionalMemberAccess": "warning",
+  "reportPrivateUsage": "warning",
+  "reportReturnType": "warning",
+  "reportUnnecessaryIsInstance": "warning",
+  "reportUnusedImport": "warning",
+  "executionEnvironments": [
+    {
+      "root": "vaaet-core/src",
+      "extraPaths": ["vaaet-core/src"]
+    },
+    {
+      "root": "vaaet-ml/src",
+      "extraPaths": ["vaaet-core/src", "vaaet-ml/src"]
+    }
+  ]
+}

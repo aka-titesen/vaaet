@@ -4,11 +4,19 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Mapping
+from typing import cast
 
-from vaaet.artifacts import LABEL_MAPPING_FILE, MODEL_FILE, SCALER_FILE, validate_manifest
+from vaaet.artifacts import (
+    LABEL_MAPPING_FILE,
+    MODEL_FILE,
+    SCALER_FILE,
+    TrafficBundleManifest,
+    validate_manifest,
+)
+from vaaet.inference.protocols import FeatureScaler, TrafficStateModel
 from vaaet.settings import FEATURE_COLS, STATE_LABELS
 
 
@@ -16,9 +24,9 @@ from vaaet.settings import FEATURE_COLS, STATE_LABELS
 class LoadedTrafficBundle:
     """A bundle that passed its portable contract before deserialization."""
 
-    manifest: dict[str, object]
-    model: object
-    scaler: object
+    manifest: TrafficBundleManifest
+    model: TrafficStateModel
+    scaler: FeatureScaler
     label_mapping: dict[int, str]
     deployment_stage: str
     input_policy: str
@@ -68,8 +76,8 @@ def load_traffic_bundle(
     import joblib
     import tensorflow as tf
 
-    model = tf.keras.models.load_model(directory / MODEL_FILE)
-    scaler = joblib.load(directory / SCALER_FILE)
+    model = cast(TrafficStateModel, tf.keras.models.load_model(directory / MODEL_FILE))
+    scaler = cast(FeatureScaler, joblib.load(directory / SCALER_FILE))
     label_mapping = joblib.load(directory / LABEL_MAPPING_FILE)
     if dict(label_mapping) != dict(STATE_LABELS):
         raise RuntimeError("label_mapping.joblib no coincide con los cuatro estados públicos.")

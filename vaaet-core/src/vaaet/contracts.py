@@ -9,8 +9,10 @@ code and shared modules can evolve without drifting silently.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Literal, Mapping
+from datetime import date, datetime
+from typing import Literal, cast
 
 import pandas as pd
 
@@ -36,7 +38,40 @@ __all__ = [
 
 
 def _coerce_timestamp(value: object, field_name: str) -> pd.Timestamp:
-    return normalize_timestamp(value, field_name=field_name)
+    timestamp_input = cast(str | int | float | date | datetime, value)
+    return normalize_timestamp(timestamp_input, field_name=field_name)
+
+
+def _coerce_int(value: object, field_name: str) -> int:
+    """Convierte un escalar externo y conserva un error de frontera claro."""
+
+    try:
+        return int(cast(str | int | float, value))
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{field_name} must be an integer") from exc
+
+
+def _coerce_float(value: object, field_name: str) -> float:
+    """Convierte un escalar externo sin filtrar detalles del adaptador."""
+
+    try:
+        return float(cast(str | int | float, value))
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{field_name} must be numeric") from exc
+
+
+def _coerce_data_origin(value: object) -> DataOrigin:
+    origin = str(value)
+    if origin not in DATA_ORIGINS:
+        raise ValueError(f"data_origin must be one of {DATA_ORIGINS}")
+    return cast(DataOrigin, origin)
+
+
+def _coerce_synthetic_scenario(value: object) -> SyntheticScenario:
+    scenario = str(value)
+    if scenario not in SYNTHETIC_SCENARIOS:
+        raise ValueError(f"synthetic_scenario must be one of {SYNTHETIC_SCENARIOS}")
+    return cast(SyntheticScenario, scenario)
 
 
 def _validate_non_negative_int(value: int, field_name: str) -> None:
@@ -121,26 +156,36 @@ class TelemetryRecord:
         _validate_origin(self.data_origin, self.synthetic_scenario)
 
     @classmethod
-    def from_mapping(cls, row: Mapping[str, object]) -> "TelemetryRecord":
+    def from_mapping(cls, row: Mapping[str, object]) -> TelemetryRecord:
         return cls(
-            id=int(row["id"]),
+            id=_coerce_int(row["id"], "id"),
             record_time=row["record_time"],
-            avg_speed=float(row["avg_speed"]),
-            count_car=int(row["count_car"]),
-            count_truck=int(row["count_truck"]),
-            count_bus=int(row["count_bus"]),
-            count_motorcycle=int(row["count_motorcycle"]),
-            count_bicycle=int(row["count_bicycle"]),
-            total_vehicles=int(row["total_vehicles"]),
+            avg_speed=_coerce_float(row["avg_speed"], "avg_speed"),
+            count_car=_coerce_int(row["count_car"], "count_car"),
+            count_truck=_coerce_int(row["count_truck"], "count_truck"),
+            count_bus=_coerce_int(row["count_bus"], "count_bus"),
+            count_motorcycle=_coerce_int(row["count_motorcycle"], "count_motorcycle"),
+            count_bicycle=_coerce_int(row["count_bicycle"], "count_bicycle"),
+            total_vehicles=_coerce_int(row["total_vehicles"], "total_vehicles"),
             clip_id=str(row["clip_id"]) if row.get("clip_id") is not None else None,
-            data_origin=str(row.get("data_origin", "real")),
-            synthetic_scenario=str(row.get("synthetic_scenario", "observed")),
-            near_zero_motion_count=int(row.get("near_zero_motion_count", 0)),
-            stationary_confirmed_count=int(row.get("stationary_confirmed_count", 0)),
-            rejected_speed_count=int(row.get("rejected_speed_count", 0)),
-            recovered_track_count=int(row.get("recovered_track_count", 0)),
-            speed_sample_count=int(row.get("speed_sample_count", 0)),
-            speed_measurement_quality=float(row.get("speed_measurement_quality", 1.0)),
+            data_origin=_coerce_data_origin(row.get("data_origin", "real")),
+            synthetic_scenario=_coerce_synthetic_scenario(row.get("synthetic_scenario", "observed")),
+            near_zero_motion_count=_coerce_int(
+                row.get("near_zero_motion_count", 0), "near_zero_motion_count"
+            ),
+            stationary_confirmed_count=_coerce_int(
+                row.get("stationary_confirmed_count", 0), "stationary_confirmed_count"
+            ),
+            rejected_speed_count=_coerce_int(
+                row.get("rejected_speed_count", 0), "rejected_speed_count"
+            ),
+            recovered_track_count=_coerce_int(
+                row.get("recovered_track_count", 0), "recovered_track_count"
+            ),
+            speed_sample_count=_coerce_int(row.get("speed_sample_count", 0), "speed_sample_count"),
+            speed_measurement_quality=_coerce_float(
+                row.get("speed_measurement_quality", 1.0), "speed_measurement_quality"
+            ),
         )
 
 

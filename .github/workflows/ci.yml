@@ -160,6 +160,22 @@ jobs:
           test -d .dvc
           test -d vaaet-ml/artifacts/traffic-state
 
+  typing:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Instalar ambos componentes y extras para el análisis estático
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e "vaaet-core[vision,inference,dev]"
+          python -m pip install -e "vaaet-ml[training,evaluation,database,visualization,dev]"
+          python -m pip check
+      - name: Verificar tipado estricto de código de producción
+        run: pyright --project pyrightconfig.json --level error
+
   docs-links:
     runs-on: ubuntu-latest
     steps:

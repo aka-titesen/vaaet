@@ -23,15 +23,15 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
-from vaaet.timestamps import normalize_timestamp, normalize_timestamp_series
-
-from vaaet_ml.settings import (
+from vaaet.settings import (
     DATA_ORIGIN_COL,
     LABELING_THRESHOLDS,
-    RANDOM_SEED,
     SYNTHETIC_SCENARIO_COL,
     TELEMETRY_SCHEMA_VERSION,
 )
+from vaaet.timestamps import normalize_timestamp, normalize_timestamp_series
+
+from vaaet_ml.settings import RANDOM_SEED
 
 __all__ = [
     "augment_with_synthetic",

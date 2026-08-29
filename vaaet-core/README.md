@@ -17,7 +17,13 @@ python -m venv .venv
 python -m pip install --upgrade pip
 python -m pip install -e "./vaaet-core[vision,inference,dev]"
 python -m pip check
+pyright --project pyrightconfig.json
 ```
+
+Si ejecutás el comando desde `vaaet-core/`, usá
+`pyright --project ../pyrightconfig.json`. El extra base no instala frameworks
+de serving: `joblib`, scikit-learn y TensorFlow pertenecen a `inference`; YOLO
+pertenece a `vision`.
 
 `vision` incorpora YOLO para detección. VAAET se distribuye bajo AGPL-3.0-only:
 una demo web pública que use este extra debe publicar su código correspondiente

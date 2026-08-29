@@ -12,18 +12,18 @@ import random
 import tempfile
 import uuid
 import zipfile
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
-from typing import Any, Mapping
 
 import pandas as pd
 from vaaet.artifacts import FEATURE_SCHEMA_VERSION
+from vaaet.settings import FEATURE_COLS, MODEL_STATE_LABELS
 from vaaet.timestamps import normalize_timestamp_series
 
 from vaaet_ml.data.datasets import build_group_ids
-from vaaet_ml.settings import FEATURE_COLS, MODEL_STATE_LABELS
 
 HUMAN_HOLDOUT_CONTRACT = "vaaet-human-holdout-v1"
 HUMAN_HOLDOUT_POINTER_CONTRACT = "vaaet-human-holdout-pointer-v1"
@@ -99,7 +99,7 @@ class HumanHoldoutSnapshot:
 
     validation: pd.DataFrame
     test: pd.DataFrame
-    manifest: Mapping[str, Any]
+    manifest: Mapping[str, object]
     path: Path
 
     @property

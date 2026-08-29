@@ -11,14 +11,10 @@ import numpy as np
 import pandas as pd
 from vaaet.artifacts import FEATURE_SCHEMA_VERSION
 from vaaet.features.engineering import engineer_features
+from vaaet.settings import DATA_ORIGIN_COL, FEATURE_COLS, TELEMETRY_SCHEMA_VERSION
 from vaaet.timestamps import normalize_timestamp_series
 
-from vaaet_ml.settings import (
-    DATA_ORIGIN_COL,
-    FEATURE_COLS,
-    RANDOM_SEED,
-    TELEMETRY_SCHEMA_VERSION,
-)
+from vaaet_ml.settings import RANDOM_SEED
 
 __all__ = [
     "DriftReport",
@@ -248,7 +244,7 @@ def plot_feature_drift(
 
     rows = int(np.ceil(len(selected) / 2))
     figure, axes = plt.subplots(rows, 2, figsize=(14, 4 * rows), squeeze=False)
-    for axis, feature in zip(axes.ravel(), selected):
+    for axis, feature in zip(axes.ravel(), selected, strict=False):
         reference = report.reference.frame[feature].dropna()
         operational = report.operational.frame[feature].dropna()
         if len(reference) > sample_size:

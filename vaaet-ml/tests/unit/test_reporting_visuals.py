@@ -21,6 +21,18 @@ def test_plot_training_history_requires_complete_history() -> None:
         plot_training_history({"loss": [1.0]})
 
 
+def test_plot_training_history_and_evaluation_accept_valid_inputs() -> None:
+    plot_training_history(
+        {"loss": [1.0], "val_loss": [1.1], "accuracy": [0.7], "val_accuracy": [0.6]}
+    )
+    plot_training_evaluation(
+        [0, 1, 2],
+        [0, 1, 2],
+        [0, 1, 2],
+        np.array([[0.9, 0.05, 0.05], [0.1, 0.8, 0.1], [0.1, 0.1, 0.8]]),
+    )
+
+
 def test_plot_training_evaluation_validates_probability_shape() -> None:
     with pytest.raises(ValueError, match="shape"):
         plot_training_evaluation([0], [0], [0], np.array([[1.0, 0.0]]))

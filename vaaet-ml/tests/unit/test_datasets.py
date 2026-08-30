@@ -137,3 +137,33 @@ class TestGroupAwareTrainTestSplit:
         assert train_groups.isdisjoint(test_groups)
         assert len(split.train_idx) > 0
         assert len(split.test_idx) > 0
+
+
+def test_group_helpers_cover_empty_and_fallback_contracts() -> None:
+    assert build_group_ids(pd.DataFrame()).empty
+
+    no_time = pd.DataFrame({"clip_id": ["clip-a", None]})
+    assert build_group_ids(no_time).tolist() == ["clip-a", "row_1"]
+
+    by_time = pd.DataFrame({"record_time": ["2026-01-01T00:00:00Z"]})
+    assert build_group_ids(by_time).iloc[0].startswith("window_")
+    assert build_group_ids(pd.DataFrame({"value": [1]})).iloc[0] == "row_0"
+
+
+def test_group_splits_handle_empty_and_single_group_sources() -> None:
+    empty = group_aware_train_test_split(pd.DataFrame())
+    assert empty.train_idx.size == empty.test_idx.size == 0
+
+    single = pd.DataFrame(
+        {
+            "clip_id": ["only", "only"],
+            "record_time": pd.date_range("2026-01-01", periods=2, freq="min"),
+            "traffic_state": [0, 0],
+        }
+    )
+    split = group_aware_train_test_split(single, test_size=0.5)
+    assert split.train_idx.size == split.test_idx.size == 1
+
+    one_record = group_aware_train_test_split(single.iloc[:1])
+    assert one_record.train_idx.size == 1
+    assert one_record.test_idx.size == 0

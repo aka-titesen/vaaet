@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: 2026 VAAET Contributors
 # SPDX-License-Identifier: AGPL-3.0-only
-"""Hierarchical, leakage-free traffic-state decisions shared by train and serve."""
+"""Clasificación jerárquica de tránsito compartida entre entrenamiento y serving."""
 
 from __future__ import annotations
 
@@ -11,19 +11,20 @@ import pandas as pd
 
 from vaaet.calibration import apply_temperature_scaling
 from vaaet.features.engineering import engineer_features
-from vaaet.features.labeling import assign_instant_state, build_accident_signal_frame
+from vaaet.features.labeling import assign_instant_state
+from vaaet.inference.policy import (
+    CLASSIFICATION_RESULT_COLUMNS,
+    apply_conservative_accident_gate,
+    apply_stable_state_policy,
+    empty_classification_result,
+)
 from vaaet.inference.protocols import FeatureScaler, TrafficStateModel
 from vaaet.lifecycle import ModelInputPolicy, apply_model_input_policy
 from vaaet.settings import (
-    ACCIDENT_GATE_MIN_EVIDENCE_SCORE,
-    DEFAULT_CLASS_THRESHOLDS,
     DEFAULT_MIN_PROBABILITY_MARGIN,
     FEATURE_COLS,
-    INCIDENT_PERSISTENCE_MINUTES,
-    INCIDENT_RECOVERY_MINUTES,
     MODEL_STATE_LABELS,
     MODEL_VERSION,
-    OPTICAL_FLOW_QUALITY_MIN,
     RECOVERY_PERSISTENCE_MINUTES,
     STATE_LABELS,
     WORSENING_PERSISTENCE_MINUTES,
@@ -38,64 +39,10 @@ __all__ = [
 ]
 
 
-CLASSIFICATION_RESULT_COLUMNS: tuple[str, ...] = (
-    "model_traffic_state",
-    "model_state_label",
-    "model_confidence",
-    "probability_margin",
-    "decision_abstained",
-    "traffic_state",
-    "state_label",
-    "confidence",
-    "model_version",
-    "accident_low_speed",
-    "accident_recent_braking",
-    "accident_cumulative_braking",
-    "accident_persistent_low_speed",
-    "accident_quality_ok",
-    "accident_near_zero_motion",
-    "accident_stationary_confirmed",
-    "accident_motion_evidence",
-    "accident_evidence_score",
-    "accident_rule_triggered",
-    "accident_alert_started",
-    "accident_gate_applied",
-    "measurement_reliable",
-)
-
-_CLASSIFICATION_RESULT_DTYPES: Mapping[str, str] = {
-    "model_traffic_state": "Int64",
-    "model_state_label": "string",
-    "model_confidence": "float64",
-    "probability_margin": "float64",
-    "decision_abstained": "bool",
-    "traffic_state": "Int64",
-    "state_label": "string",
-    "confidence": "float64",
-    "model_version": "string",
-    "accident_low_speed": "bool",
-    "accident_recent_braking": "bool",
-    "accident_cumulative_braking": "bool",
-    "accident_persistent_low_speed": "bool",
-    "accident_quality_ok": "bool",
-    "accident_near_zero_motion": "bool",
-    "accident_stationary_confirmed": "bool",
-    "accident_motion_evidence": "bool",
-    "accident_evidence_score": "float64",
-    "accident_rule_triggered": "bool",
-    "accident_alert_started": "bool",
-    "accident_gate_applied": "bool",
-    "measurement_reliable": "bool",
-}
-
-
 def _empty_classification_result(frame: pd.DataFrame) -> pd.DataFrame:
-    """Return an empty frame that still satisfies the classification contract."""
-    out = frame.copy()
-    for column in CLASSIFICATION_RESULT_COLUMNS:
-        if column not in out:
-            out[column] = pd.Series(index=out.index, dtype=_CLASSIFICATION_RESULT_DTYPES[column])
-    return out
+    """Conserva el helper privado para consumidores internos de VAAET 4.x."""
+
+    return empty_classification_result(frame)
 
 
 def _ensure_feature_compatibility(scaler: FeatureScaler, feature_cols: list[str]) -> None:
@@ -118,168 +65,6 @@ def _validate_probabilities(probabilities: object, rows: int) -> np.ndarray:
     return values
 
 
-def apply_stable_state_policy(
-    df: pd.DataFrame,
-    probabilities: np.ndarray,
-    *,
-    class_thresholds: Mapping[int, float] | None = None,
-    minimum_margin: float = DEFAULT_MIN_PROBABILITY_MARGIN,
-    worsening_persistence: int = WORSENING_PERSISTENCE_MINUTES,
-    recovery_persistence: int = RECOVERY_PERSISTENCE_MINUTES,
-) -> pd.DataFrame:
-    """Apply confidence, adjacency, persistence, and hysteresis per clip."""
-    if df.empty:
-        return df.copy()
-    proba = _validate_probabilities(probabilities, len(df))
-    thresholds = dict(DEFAULT_CLASS_THRESHOLDS)
-    if class_thresholds:
-        thresholds.update({int(key): float(value) for key, value in class_thresholds.items()})
-
-    out = df.copy()
-    raw_codes = proba.argmax(axis=1).astype(int)
-    sorted_proba = np.sort(proba, axis=1)
-    raw_confidence = proba[np.arange(len(out)), raw_codes]
-    margins = sorted_proba[:, -1] - sorted_proba[:, -2]
-    stable_codes = np.empty(len(out), dtype=int)
-    abstained = np.zeros(len(out), dtype=bool)
-
-    clips = out.get("clip_id", pd.Series("all", index=out.index)).astype(str).to_numpy()
-    prior_clip: str | None = None
-    stable: int | None = None
-    pending: int | None = None
-    pending_count = 0
-    for position, (clip_id, raw_code, confidence, margin) in enumerate(
-        zip(clips, raw_codes, raw_confidence, margins, strict=False)
-    ):
-        if clip_id != prior_clip:
-            prior_clip = clip_id
-            stable = None
-            pending = None
-            pending_count = 0
-
-        accepted = confidence >= thresholds[raw_code] and margin >= minimum_margin
-        if stable is None:
-            # A first isolated Congested estimate starts safely at Reduced.
-            stable = min(int(raw_code), 1) if accepted else 1
-            abstained[position] = not accepted or raw_code == 2
-            stable_codes[position] = stable
-            continue
-        if not accepted:
-            abstained[position] = True
-            stable_codes[position] = stable
-            pending = None
-            pending_count = 0
-            continue
-
-        target = int(raw_code)
-        if abs(target - stable) > 1:
-            target = stable + (1 if target > stable else -1)
-        if target == stable:
-            pending = None
-            pending_count = 0
-        else:
-            if pending == target:
-                pending_count += 1
-            else:
-                pending = target
-                pending_count = 1
-            required = worsening_persistence if target > stable else recovery_persistence
-            if pending_count >= required:
-                stable = target
-                pending = None
-                pending_count = 0
-            else:
-                abstained[position] = True
-        stable_codes[position] = stable
-
-    out["model_traffic_state"] = raw_codes
-    out["model_state_label"] = pd.Series(raw_codes, index=out.index).map(MODEL_STATE_LABELS)
-    out["model_confidence"] = np.round(raw_confidence, 4)
-    out["probability_margin"] = np.round(margins, 4)
-    out["decision_abstained"] = abstained
-    out["traffic_state"] = stable_codes
-    out["state_label"] = pd.Series(stable_codes, index=out.index).map(STATE_LABELS)
-    out["confidence"] = np.round(proba[np.arange(len(out)), stable_codes], 4)
-    return out
-
-
-def apply_conservative_accident_gate(
-    df: pd.DataFrame,
-    *,
-    predicted_state_col: str = "traffic_state",
-    confidence_col: str = "confidence",
-) -> pd.DataFrame:
-    """Emit a persistent incident candidate without automatic Accident state."""
-    if df.empty:
-        return df.copy()
-    out = df.copy()
-    signals = build_accident_signal_frame(out)
-    out = pd.concat([out, signals], axis=1)
-
-    optical_flow = pd.to_numeric(
-        out.get("optical_flow_tracking_ratio", pd.Series(np.nan, index=out.index)),
-        errors="coerce",
-    )
-    quality_reliable = signals["accident_quality_ok"] & optical_flow.ge(
-        OPTICAL_FLOW_QUALITY_MIN
-    )
-    strong = (
-        signals["accident_evidence_score"].ge(ACCIDENT_GATE_MIN_EVIDENCE_SCORE)
-        & signals["accident_persistent_low_speed"]
-        & (signals["accident_recent_braking"] | signals["accident_cumulative_braking"])
-        & signals["accident_motion_evidence"]
-        & quality_reliable
-        & pd.to_numeric(out["total_vehicles"], errors="coerce").fillna(0).gt(0)
-    )
-    group_key = out.get("clip_id", pd.Series("all", index=out.index))
-    persistent = strong.groupby(group_key, sort=False).transform(
-        lambda values: values.rolling(
-            window=INCIDENT_PERSISTENCE_MINUTES,
-            min_periods=INCIDENT_PERSISTENCE_MINUTES,
-        ).sum()
-    ).ge(INCIDENT_PERSISTENCE_MINUTES)
-
-    active_values = np.zeros(len(out), dtype=bool)
-    started_values = np.zeros(len(out), dtype=bool)
-    prior_clip: str | None = None
-    active = False
-    weak_count = 0
-    clips = group_key.astype(str).to_numpy()
-    for position, (clip_id, is_persistent, is_strong) in enumerate(
-        zip(clips, persistent.to_numpy(), strong.to_numpy(), strict=False)
-    ):
-        if clip_id != prior_clip:
-            prior_clip = clip_id
-            active = False
-            weak_count = 0
-        if is_persistent:
-            if not active:
-                started_values[position] = True
-            active = True
-            weak_count = 0
-        elif active:
-            weak_count = 0 if is_strong else weak_count + 1
-            if weak_count >= INCIDENT_RECOVERY_MINUTES:
-                active = False
-                weak_count = 0
-        active_values[position] = active
-
-    out["accident_rule_triggered"] = active_values
-    out["accident_alert_started"] = started_values
-    out["accident_gate_applied"] = False
-    out["measurement_reliable"] = quality_reliable
-    # A candidate is operationally Congested until a human confirms Accident.
-    out.loc[active_values, predicted_state_col] = 2
-    out.loc[active_values, "state_label"] = STATE_LABELS[2]
-    out.loc[active_values, confidence_col] = np.maximum(
-        pd.to_numeric(out.loc[active_values, confidence_col], errors="coerce").fillna(0.0),
-        out.loc[active_values, "accident_evidence_score"],
-    ).round(4)
-    if out[predicted_state_col].eq(3).any():
-        raise RuntimeError("Hierarchical policy invariant violated: automatic Accident state.")
-    return out
-
-
 def classify_telemetry_dataframe(
     df_features: pd.DataFrame,
     model: TrafficStateModel,
@@ -291,8 +76,9 @@ def classify_telemetry_dataframe(
     decision_policy: Mapping[str, object] | None = None,
     input_policy: ModelInputPolicy | str = ModelInputPolicy.CANONICAL_V2,
 ) -> pd.DataFrame:
-    """Run the three-class MLP and the exact production decision chain."""
-    del label_mapping  # Public labels are governed centrally by STATE_LABELS.
+    """Ejecuta el MLP de tres clases y la cadena de decisión de producción."""
+
+    del label_mapping  # Las etiquetas públicas se gobiernan centralmente.
     if df_features.empty:
         return _empty_classification_result(df_features)
     active_features = feature_cols or FEATURE_COLS
@@ -300,17 +86,17 @@ def classify_telemetry_dataframe(
     if active_features != FEATURE_COLS:
         raise ValueError("Custom feature order is not supported by bundle v2.")
     model_matrix = apply_model_input_policy(df_features, input_policy)
-    X = scaler.transform(model_matrix.to_numpy())
+    probabilities = _validate_probabilities(
+        model.predict(scaler.transform(model_matrix.to_numpy()), verbose=0), len(df_features)
+    )
     policy = dict(decision_policy or {})
-    probabilities = _validate_probabilities(model.predict(X, verbose=0), len(df_features))
-    probabilities = apply_temperature_scaling(
+    calibrated_probabilities = apply_temperature_scaling(
         probabilities, float(policy.get("temperature", 1.0))
     )
-    thresholds = policy.get("class_thresholds")
-    out = apply_stable_state_policy(
+    result = apply_stable_state_policy(
         df_features,
-        probabilities,
-        class_thresholds=thresholds,
+        calibrated_probabilities,
+        class_thresholds=policy.get("class_thresholds"),
         minimum_margin=float(
             policy.get("minimum_probability_margin", DEFAULT_MIN_PROBABILITY_MARGIN)
         ),
@@ -321,11 +107,11 @@ def classify_telemetry_dataframe(
             policy.get("recovery_persistence_minutes", RECOVERY_PERSISTENCE_MINUTES)
         ),
     )
-    out["model_version"] = model_version
-    out = apply_conservative_accident_gate(out)
-    out["traffic_state"] = out["traffic_state"].astype(int)
-    out["state_label"] = out["traffic_state"].map(STATE_LABELS)
-    return out
+    result["model_version"] = model_version
+    result = apply_conservative_accident_gate(result)
+    result["traffic_state"] = result["traffic_state"].astype(int)
+    result["state_label"] = result["traffic_state"].map(STATE_LABELS)
+    return result
 
 
 def classify_raw_telemetry(
@@ -340,18 +126,18 @@ def classify_raw_telemetry(
     decision_policy: Mapping[str, object] | None = None,
     input_policy: ModelInputPolicy | str = ModelInputPolicy.CANONICAL_V2,
 ) -> pd.DataFrame:
-    """Engineer complete minute windows and classify them safely."""
+    """Genera features de minutos completos y los clasifica de manera segura."""
+
     if df_telemetry.empty:
         return _empty_classification_result(df_telemetry)
     if inference_mode == "sprint":
-        out = df_telemetry.copy()
-        out["traffic_state"] = assign_instant_state(out).astype(int)
-        out["state_label"] = out["traffic_state"].map(STATE_LABELS)
-        out["confidence"] = 0.0
-        out["model_version"] = "sprint_heuristic_non_production"
-        out["accident_rule_triggered"] = False
-        return out
-
+        result = df_telemetry.copy()
+        result["traffic_state"] = assign_instant_state(result).astype(int)
+        result["state_label"] = result["traffic_state"].map(STATE_LABELS)
+        result["confidence"] = 0.0
+        result["model_version"] = "sprint_heuristic_non_production"
+        result["accident_rule_triggered"] = False
+        return result
     features = engineer_features(df_telemetry)
     if features.empty:
         return _empty_classification_result(features)

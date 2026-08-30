@@ -1,10 +1,9 @@
 # SPDX-FileCopyrightText: 2026 VAAET Contributors
 # SPDX-License-Identifier: AGPL-3.0-only
-"""Lightweight SORT tracker for the VAAET production pipeline.
+"""Tracker SORT liviano para el pipeline operativo de VAAET.
 
-Implements a simplified SORT (Simple Online and Realtime Tracking) algorithm
-based on Euclidean distance matching between centroids. See ADR-0003 and
-ADR-0009 for the decision context.
+Implementa una variante simplificada de SORT basada en la distancia euclídea
+entre centroides. Consultar ADR-0003 y ADR-0009 para el contexto de la decisión.
 """
 
 from __future__ import annotations
@@ -28,7 +27,7 @@ __all__ = [
 
 @dataclass
 class Track:
-    """A tracked vehicle with position history and a count-once flag."""
+    """Vehículo seguido con historial de posiciones y conteo único."""
 
     track_id: int
     vehicle_type: str
@@ -39,10 +38,10 @@ class Track:
     frames_since_seen: int = 0
     recovered_after_gap: int = 0
     total_frames: int = 0
-    counted: bool = False  # True after the vehicle has been tallied once
+    counted: bool = False  # Se activa después del único conteo permitido.
 
     def update(self, centroid: tuple[int, int]) -> None:
-        """Update the track with a new centroid position."""
+        """Actualiza el track con la posición de su nuevo centroide."""
         gap = self.frames_since_seen
         self.centroid = centroid
         self.history.append(centroid)
@@ -51,7 +50,7 @@ class Track:
         self.total_frames += 1
 
     def mark_counted(self) -> bool:
-        """Mark this track as counted. Returns True on first call only."""
+        """Marca el track como contado y sólo devuelve ``True`` la primera vez."""
         if self.counted:
             return False
         self.counted = True
@@ -59,11 +58,11 @@ class Track:
 
 
 class SORTTracker:
-    """Euclidean-distance SORT tracker for vehicle centroids.
+    """Tracker SORT por distancia euclídea para centroides de vehículos.
 
     Args:
-        max_distance: Maximum pixel distance for matching.
-        max_lost: Frames before a track is removed.
+        max_distance: Distancia máxima en píxeles para asociar una detección.
+        max_lost: Cantidad de frames ausentes antes de eliminar un track.
     """
 
     def __init__(
@@ -79,16 +78,16 @@ class SORTTracker:
 
     @property
     def active_tracks(self) -> list[Track]:
-        """Return currently active (non-lost) tracks."""
+        """Devuelve los tracks activos, es decir, no ausentes en este frame."""
         return [t for t in self._tracks if t.frames_since_seen == 0]
 
     @property
     def all_tracks(self) -> list[Track]:
-        """Return all tracks (including lost but not yet pruned)."""
+        """Devuelve todos los tracks, incluso los ausentes aún no depurados."""
         return list(self._tracks)
 
     def reset(self) -> None:
-        """Clear all tracks (call between clips or minutes)."""
+        """Restablece el estado entre clips o segmentos de análisis."""
         self._tracks.clear()
         self._next_id = 1
         self.last_pruned_track_ids = []
@@ -97,73 +96,62 @@ class SORTTracker:
         self,
         detections: list[tuple[tuple[int, int], str]],
     ) -> list[Track]:
-        """Match new detections to existing tracks.
-
-        Args:
-            detections: List of ``(centroid, vehicle_type)`` tuples.
-
-        Returns:
-            List of all active tracks after the update.
-        """
-        if not detections:
-            for track in self._tracks:
-                track.frames_since_seen += 1
-            self._prune()
-            return self.active_tracks
-
-        # Build cost matrix (Euclidean distance)
-        det_centroids = np.array([d[0] for d in detections], dtype=float)
-        matched_det: set[int] = set()
-        matched_trk: set[int] = set()
-
-        if self._tracks:
-            trk_centroids = np.array(
-                [t.centroid for t in self._tracks],
-                dtype=float,
-            )
-            # Pairwise distance matrix: (n_tracks, n_detections)
-            diff = trk_centroids[:, None, :] - det_centroids[None, :, :]
-            dists = np.linalg.norm(diff, axis=2)
-
-            # Greedy matching (lowest distance first)
-            flat_order = np.argsort(dists, axis=None)
-            for flat_idx in flat_order:
-                t_idx = int(flat_idx // dists.shape[1])
-                d_idx = int(flat_idx % dists.shape[1])
-                if t_idx in matched_trk or d_idx in matched_det:
-                    continue
-                if dists[t_idx, d_idx] > self.max_distance:
-                    break
-                # Match only same vehicle type
-                if self._tracks[t_idx].vehicle_type != detections[d_idx][1]:
-                    continue
-                self._tracks[t_idx].update(detections[d_idx][0])
-                matched_trk.add(t_idx)
-                matched_det.add(d_idx)
-
-        # Increment lost counter for unmatched tracks
-        for i, track in enumerate(self._tracks):
-            if i not in matched_trk:
-                track.frames_since_seen += 1
-
-        # Create new tracks for unmatched detections
-        for j, det in enumerate(detections):
-            if j not in matched_det:
-                new_track = Track(
-                    track_id=self._next_id,
-                    vehicle_type=det[1],
-                    centroid=det[0],
-                )
-                new_track.history.append(det[0])
-                new_track.total_frames = 1
-                self._tracks.append(new_track)
-                self._next_id += 1
-
+        """Asocia detecciones nuevas y conserva la identidad ordenada de cada track."""
+        matched_tracks, matched_detections = self._match_existing_tracks(detections)
+        self._mark_unmatched_tracks(matched_tracks)
+        self._append_unmatched_detections(detections, matched_detections)
         self._prune()
         return self.active_tracks
 
+    def _match_existing_tracks(
+        self, detections: list[tuple[tuple[int, int], str]]
+    ) -> tuple[set[int], set[int]]:
+        if not detections or not self._tracks:
+            return set(), set()
+        distances = self._distance_matrix(detections)
+        matched_tracks: set[int] = set()
+        matched_detections: set[int] = set()
+        for flat_index in np.argsort(distances, axis=None):
+            track_index = int(flat_index // distances.shape[1])
+            detection_index = int(flat_index % distances.shape[1])
+            if track_index in matched_tracks or detection_index in matched_detections:
+                continue
+            if distances[track_index, detection_index] > self.max_distance:
+                break
+            if self._tracks[track_index].vehicle_type != detections[detection_index][1]:
+                continue
+            self._tracks[track_index].update(detections[detection_index][0])
+            matched_tracks.add(track_index)
+            matched_detections.add(detection_index)
+        return matched_tracks, matched_detections
+
+    def _distance_matrix(self, detections: list[tuple[tuple[int, int], str]]) -> np.ndarray:
+        track_centroids = np.array([track.centroid for track in self._tracks], dtype=float)
+        detection_centroids = np.array([centroid for centroid, _ in detections], dtype=float)
+        differences = track_centroids[:, None, :] - detection_centroids[None, :, :]
+        return np.linalg.norm(differences, axis=2)
+
+    def _mark_unmatched_tracks(self, matched_tracks: set[int]) -> None:
+        for index, track in enumerate(self._tracks):
+            if index not in matched_tracks:
+                track.frames_since_seen += 1
+
+    def _append_unmatched_detections(
+        self,
+        detections: list[tuple[tuple[int, int], str]],
+        matched_detections: set[int],
+    ) -> None:
+        for index, (centroid, vehicle_type) in enumerate(detections):
+            if index in matched_detections:
+                continue
+            track = Track(self._next_id, vehicle_type, centroid)
+            track.history.append(centroid)
+            track.total_frames = 1
+            self._tracks.append(track)
+            self._next_id += 1
+
     def _prune(self) -> None:
-        """Remove tracks that have been lost for too long."""
+        """Elimina tracks que superaron el máximo de frames ausentes."""
         pruned = [t.track_id for t in self._tracks if t.frames_since_seen > self.max_lost]
         self.last_pruned_track_ids = pruned
         self._tracks = [t for t in self._tracks if t.frames_since_seen <= self.max_lost]

@@ -3,88 +3,84 @@ name: vaaet-python-ml-engineering
 description: Build, review, refactor, or test professional Python for VAAET Data Science, computer vision, MLOps, and notebooks. Use for typed modular code, domain exceptions, logging, pytest, quality gates, notebook-to-module extraction, or maintainable model/data pipelines.
 ---
 
-# VAAET Python ML Engineering
+# Ingeniería Pythonica para VAAET
 
-## Apply this operating model
+Construí Python profesional para VAAET 3.10–3.13: claro, tipado, comprobable y reproducible. Priorizá la corrección y el contrato de dominio por encima de acortar líneas o introducir abstracciones prematuras.
 
-Build production-quality Python 3.10–3.13 for Data Science, computer vision, MLOps, and notebooks. Optimize for correctness, maintainability, observability, testability, and reproducibility—not abstraction for its own sake.
+## 1. Decidí primero el límite y la forma del diseño
 
-- Preserve the monorepo boundary. Put portable perception, telemetry, contracts, bundle validation, and inference in `vaaet-core/src/vaaet/`; put datasets, training, evaluation, PostgreSQL, and notebook support in `vaaet-ml/src/vaaet_ml/`. Do not make core depend on ML, DVC, Drive, PostgreSQL, or notebook APIs.
-- Keep notebooks as orchestration and visualization interfaces. Import `vaaet` for portable operations and `vaaet_ml` for laboratory work; do not mutate `sys.path`.
-- Preserve VAAET layers: core owns contracts/artifacts, features, vision, and inference; ML owns settings, data, training, and evaluation.
-- Apply KISS and YAGNI first. Use DRY only when duplication represents one stable concept; do not create a generic framework for one workflow.
-- Read applicable ADRs before changing a contract. Do not modify the 19 `FEATURE_COLS`, MLP, thresholds, PostgreSQL schema, public states, or bundle v2 without authorization and an ADR.
+- Preservá el monorepo: la percepción portable, telemetría, contratos, validación del bundle e inferencia viven en `vaaet-core/src/vaaet/`; datasets, entrenamiento, evaluación, PostgreSQL y soporte de notebooks viven en `vaaet-ml/src/vaaet_ml/`. `vaaet-core` no depende de ML, DVC, Drive, PostgreSQL ni APIs de notebooks.
+- Los notebooks sólo orquestan y visualizan. Importan `vaaet` para operaciones portables y `vaaet_ml` para laboratorio; no mutan `sys.path` ni duplican lógica reusable.
+- Antes de cambiar un contrato, leé los ADRs aplicables. No cambies las 19 `FEATURE_COLS`, el MLP, umbrales, estados públicos, esquema PostgreSQL ni bundle v2 sin autorización y ADR.
+- Aplicá KISS y YAGNI. Usá DRY cuando la duplicación represente un concepto estable, no para crear un framework de un único flujo.
 
-## Type and model data explicitly
+Elegí funciones puras para transformaciones deterministas: reciben datos explícitos, devuelven resultados sin mutar entradas ni depender del entorno, y se prueban con facilidad. Usá objetos cuando exista estado legítimo o ciclo de vida: modelos cargados, sesiones, recursos externos, configuración validada o trackers. Representá valores de dominio estables con `@dataclass(frozen=True)` cuando corresponda.
 
-Annotate public functions, class attributes, return values, and non-obvious local values. Use built-in generic syntax (`list[str]`, `dict[str, float]`), `Path`, `datetime`, `Literal`, `TypedDict`, `Protocol`, `Enum`, and frozen `@dataclass` where they accurately express the domain.
+Inyectá dependencias externas —engine de base, proveedor de modelos, reloj, raíz de archivos o cliente de descarga— en lugar de fijarlas como globales mutables. Preferí `Protocol` para dependencias sustituibles; incorporá un ABC sólo si hay comportamiento compartido o un ciclo de vida que realmente se deba imponer.
 
-Use concrete NumPy/Pandas or framework types at library boundaries. Validate shape, columns, state codes, checksums, and units at runtime; static typing does not validate data received from video, CSV, PostgreSQL, Drive, or a model.
+## 2. Tipá y validá en los bordes
 
-Avoid `Any`. Allow it only at a third-party boundary that cannot be typed, isolate it in the smallest adapter, validate immediately, and avoid propagating it through the domain. Prefer `Protocol` for a swappable dependency; use an ABC only when shared behavior or lifecycle enforcement is genuinely required.
+- Anotá funciones públicas, atributos de clase, retornos y locales no obvios. Preferí `list[str]`, `dict[str, float]`, `Path`, `datetime`, `Literal`, `TypedDict`, `Protocol` y `Enum` cuando expresen el dominio.
+- Validá en runtime forma, columnas, unidades, códigos de estado, checksums y versiones de contrato. El tipado estático no valida datos provenientes de video, CSV, PostgreSQL, Drive o un modelo.
+- Mantené diccionarios de transporte o persistencia en el borde y convertílos pronto en objetos de dominio validados. Aislá `Any` en el adaptador mínimo de una librería sin tipos, validalo de inmediato y no lo propagues.
+- Usá los validadores y dataclasses existentes. Pydantic, MyPy, nuevos stubs o cambios de alcance de Pyright son propuestas: requieren autorización, dependencias si aplican y una adopción incremental separada.
 
-Model domain results as immutable dataclasses when they have stable fields. Keep transport/persistence dictionaries at the boundary and convert them into validated domain objects promptly.
+## 3. Escribí Pythonic con criterio
 
-## Prefer Pythonic code with judgment
+La concisión sirve cuando conserva la lectura del dominio; no es un objetivo en sí mismo.
 
-Prefer concise native constructs when they make the domain easier to read, not merely shorter.
+- Usá guard clauses para rechazar temprano entradas inválidas o estados imposibles. Mantené las reglas de dominio que dependen de orden, prioridad o recuperación en bloques explícitos.
+- Usá comprensiones de listas, diccionarios o conjuntos para transformaciones pequeñas, puras y legibles. Elegí un bucle con nombre ante efectos laterales, validación, manejo de errores, anidamiento no trivial o intermediarios significativos.
+- Preferí generadores cuando el consumo sea incremental y evitar materializar la colección sea útil. No los uses si se necesita recorrer la misma secuencia varias veces o si ocultan el punto donde puede fallar el cálculo.
+- Usá `with` para archivos, sesiones, recursos temporales y todo recurso con ciclo de vida. No dependas de cierres manuales que pueden omitirse ante un error.
+- Usá `mapping.get(clave, predeterminado)` sólo si la ausencia es esperable y el predeterminado es válido. Accedé directamente y validá cuando una clave faltante indique un contrato malformado.
+- Reservá el ternario para una asignación corta y evidente. Preferí `if` para efectos laterales, condiciones compuestas o varias ramas.
+- Usá `match`/`case` para dispatch estructural estable en Python 3.10+, como variantes ya validadas. No escondas reglas de negocio ordenadas, umbrales o recuperación de errores en coincidencias amplias.
+- Preferí `enumerate()` a contadores manuales, `zip()` a índices paralelos y desempaquetado cuando la forma sea explícita. Usá `zip(..., strict=True)` si longitudes iguales son un invariante; de otro modo definí y validá la semántica de truncamiento.
+- Usá f-strings para texto local y presentación. Conservá logging parametrizado, por ejemplo `logger.info("stage=%s", stage)`, para no formatear mensajes descartados y respetar la convención del proyecto.
 
-- Use list, dict, and set comprehensions for small, pure mappings or filters. Use a named loop when there are side effects, validation, error handling, non-trivial nesting, or a meaningful intermediate name. Prefer generators when lazy consumption avoids materializing data.
-- Use context managers (`with`) for files, database sessions, temporary resources, and any object with an explicit lifecycle. Never rely on manual close calls surviving every error path.
-- Use `mapping.get(key, default)` only when a missing key is expected and the default is semantically valid. Access the key directly and validate it when absence signals a malformed contract.
-- Use a conditional expression only for a short, obvious value assignment. Prefer an `if` block for side effects or compound conditions.
-- Use `match`/`case` for stable structural dispatch supported by Python 3.10+, such as a closed command or validated variant shape. Do not hide ordered business rules, thresholds, or error recovery behind broad pattern matching.
-- Prefer `enumerate()` over manual counters, `zip()` over indexing parallel collections, and unpacking when the shape is explicit. Use `zip(..., strict=True)` when equal lengths are a domain invariant; otherwise decide and document the intended truncation or validation behavior.
-- Use f-strings for local text and presentation formatting. Preserve parameterized logging such as `logger.info("stage=%s", stage)` in reusable code so logging remains lazy and follows the project convention.
+## 4. Hacé visible el comportamiento y protegé los recursos
 
-## Keep responsibilities small and observable
+- Dejá que datos adquiera, valide y persista; visión procese frames; features produzca las variables canónicas; inferencia clasifique; y entrenamiento/evaluación gestione ciclo de vida y calidad.
+- Una función debe tener una responsabilidad entendible. Ramificación profunda, múltiples efectos y rutas de error confusas son señales para revisar el diseño. Complejidad alta o archivos extensos son señales de revisión, no límites mecánicos que obliguen a fragmentar módulos correctos.
+- Usá `vaaet.logging` en código reusable: `INFO` para ciclo de vida, `WARNING` para degradación recuperable, `ERROR` para fallos y `DEBUG` para diagnósticos acotados. No registres secretos, DSNs, certificados, credenciales, rutas privadas ni excepciones sin redactar. JSON logging es una mejora futura, no una dependencia ni configuración implícita.
+- Elevá la excepción más específica de `vaaet.exceptions` o `vaaet_ml.exceptions`, o agregá un subtipo documentado si cambia la recuperación posible. Encadená excepciones esperables con contexto seguro y detené pipelines corruptos antes de persistir o publicar artefactos.
+- Delegá SQL parametrizado a la capa existente: nunca interpolés valores o identificadores no controlados en sentencias SQL. Recibí `Path` o valores de ruta en un borde validado, resolvelos contra una raíz permitida y rechazá escapes de esa raíz. No expongas esos valores en logs.
 
-- Let data modules acquire, validate, and persist; let vision modules process frames; let features modules engineer the canonical features; let inference modules classify; let training/evaluation modules control lifecycle and quality.
-- Inject external systems—database engines, model providers, clocks, filesystem roots, and download clients—rather than hardcoding connections or global mutable state.
-- Keep one explicit responsibility per function. Split functions whose nested branching or error paths obscure correctness; use a complexity target below 10 as a review heuristic, not a substitute for judgment.
-- Do not make a notebook cell, a `print`, a mutable DataFrame attribute, or a filesystem convention the sole contract between modules.
+## 5. Concurrencia sólo con evidencia
 
-Use `vaaet.logging` in reusable code. Log structured, actionable context at the appropriate level: lifecycle events at `INFO`, recoverable degradation at `WARNING`, failed operations at `ERROR`, and bounded diagnostics at `DEBUG`. Never log secrets, DSNs, certificates, private paths, raw credentials, or unredacted exception payloads.
+No deduzcas una implementación por el tipo de tarea. Medí CPU, I/O, memoria, tamaño de lotes, FPS y orden lógico primero: extensiones nativas pueden liberar el GIL, una operación de I/O puede no justificar `asyncio`, y CPU alta no implica automáticamente `ProcessPoolExecutor`.
 
-## Fail with domain meaning
+`vaaet.vision.analyze_video()` conserva su flujo ordenado y síncrono: SORT, flujo óptico, suavizado, estado estacionario y telemetría por minuto no se paralelizan ni externalizan. No agregues hilos, procesos, colas o workers para el pipeline de visión sin profiling, alcance aprobado y la guía `vaaet-resilient-async-architecture`. Cualquier API o worker futuro en `vaaet-app/` exige contrato HTTP versionado y respeta los límites de serving vigentes.
 
-Raise the narrowest existing exception from the owning component hierarchy (`vaaet.exceptions` or `vaaet_ml.exceptions`) or add a documented subtype when callers need a different recovery action. Include safe identifiers such as stage, clip ID, record time, contract version, or field name.
+## Probá contratos, no infraestructura pesada
 
-Do not catch `Exception` merely to continue. Catch only expected external or validation failures, add useful context with exception chaining, and stop a corrupted pipeline before it produces an artifact or persistence side effect. Use redacted `pipeline_run` metadata for operational lineage.
+Al cambiar comportamiento, actualizá pruebas junto al código:
 
-## Test the contract, not heavy infrastructure
+- Probá transformaciones puras, validaciones, excepciones y transiciones con arrays, frames y DataFrames pequeños y deterministas.
+- Usá fixtures, fakes, inyección o mocks para PostgreSQL, Drive, descargas, relojes y modelos. Las pruebas unitarias no requieren pesos YOLO, GPU, credenciales ni una base en vivo.
+- Agregá pruebas de contrato o integración para esquemas, manifiestos, idempotencia, checksums y paridad de notebooks cuando cambien esos bordes. Afirmá comportamiento observable e invariantes, no detalles internos.
+- Mantené semillas explícitas. Un objetivo de 90% de cobertura en módulos core nuevos o modificados materialmente no es una afirmación sobre la cobertura actual; baselining, plugins de cobertura o CI requieren autorización.
 
-Write or update tests alongside behavior changes:
+## Gates y definición de terminado
 
-- Unit-test pure transformations, validation branches, exception paths, and state transitions with small deterministic arrays, frames, and DataFrames.
-- Use fixtures, fakes, dependency injection, or mocks for PostgreSQL, Drive, downloads, clocks, and model calls; never require YOLO weights, a GPU, real credentials, or a live database for unit tests.
-- Add contract/integration tests for schemas, artifact manifests, persistence idempotency, package checksums, and notebook parity when their boundaries change.
-- Assert observable behavior and invariants, not internal implementation details. Keep random seeds explicit.
+Ejecutá los controles del componente que cambió:
 
-Treat at least 90% coverage as the quality target for new or materially changed core modules. Do not claim that the current repository meets it without a coverage report. Adding `mypy`, coverage plugins, or CI gates changes dependencies/tooling and requires explicit authorization; introduce a baseline and ratchet coverage rather than failing unrelated historical code immediately.
+1. En `vaaet-core/`: `ruff check src tests`, `pyright --project ../pyrightconfig.json`, `pytest tests -v --tb=short` y `python -m compileall -q src tests`.
+2. En `vaaet-ml/`: `ruff check src tests scripts`, `pyright --project ../pyrightconfig.json`, `pytest tests -v --tb=short` y `python -m compileall -q src tests scripts`.
+3. Parseá las celdas de código de los cuatro notebooks en `vaaet-ml/notebooks/` si cambian notebooks o el flujo que importan.
+4. Verificá enlaces Markdown y ejecutá `git diff --check` desde la raíz.
 
-## Quality gates and Definition of Done
+Pyright es el gate estático vigente. No agregues MyPy, Pydantic, stubs, hooks, dependencias, configuración de tipado, plugins de cobertura ni gates de CI sin autorización explícita y un baseline incremental. Para notebooks nuevos, mantené la orquestación ejecutable mínima —preferentemente menos de 50 líneas por celda operativa— y llamá módulos probados; extraé lógica existente de forma incremental.
 
-For every implementation, run the required checks in each component that changed:
+## Rechazá estos antipatrones
 
-1. In `vaaet-core/`: `ruff check src tests`, `pyright --project ../pyrightconfig.json`, `pytest tests -v --tb=short`, and `python -m compileall -q src tests`.
-2. In `vaaet-ml/`: `ruff check src tests scripts`, `pyright --project ../pyrightconfig.json`, `pytest tests/ -v --tb=short`, and `python -m compileall -q src tests scripts`.
-3. Parse code cells from the four notebooks in `vaaet-ml/notebooks/` when notebooks or their imported workflow code change.
-4. Check Markdown links and run `git diff --check` from the repository root.
+- Funciones monolíticas de notebooks que duplican `vaaet-core/src/vaaet/` o `vaaet-ml/src/vaaet_ml/`.
+- `except Exception: pass`, continuar luego de corrupción de datos o usar `print` como único contrato entre módulos.
+- `Any` generalizado, datos de borde sin validar, secretos hardcodeados o rutas dependientes del entorno.
+- SQL interpolado, rutas sin validación de frontera, binarios `.pt`, `.keras` o `.joblib` en Git, y abstracciones distribuidas sin necesidad medida.
+- Clases sin estado que sólo ocultan funciones, o una regla de concisión que vuelva opaco al dominio.
 
-Treat Pyright's configured scope as the static-type gate. Do not expand that scope, add MyPy, stubs, coverage plugins, CI gates, or dependencies without explicit authorization and an incremental baseline.
+## Resultado de una revisión
 
-For a new notebook, keep executable orchestration minimal—preferably under 50 lines per operation cell—and call tested modules. For existing notebooks, extract logic incrementally; do not perform a large refactor without authorization.
-
-## Reject these antipatterns
-
-- Do not build monolithic notebook functions that duplicate `vaaet-core/src/vaaet/` or `vaaet-ml/src/vaaet_ml/` logic.
-- Do not silently swallow failures with `except Exception: pass` or log-and-continue after data corruption.
-- Do not use pervasive `Any`, unvalidated `dict[str, object]`, or untyped model/data boundaries.
-- Do not hardcode credentials, connections, model file paths, or environment-specific configuration.
-- Do not add a class hierarchy, ABC, dependency, or distributed abstraction without a present and measured need.
-- Do not store `.pt`, `.keras`, or `.joblib` binaries in Git.
-
-## Review output
-
-When reviewing or changing code, report: the responsibility boundary, typed input/output contract, validation and exception behavior, logging/lineage impact, tests added or needed, and remaining risk. Prefer a small focused patch over an architectural rewrite.
+Al revisar o cambiar código, informá el límite de responsabilidad, contrato tipado de entrada y salida, validación y excepción, impacto en logging o linaje, pruebas ejecutadas o necesarias, evidencia de rendimiento si aplica y riesgo pendiente. Preferí un parche pequeño y enfocado antes que una reescritura arquitectónica.

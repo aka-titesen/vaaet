@@ -6,10 +6,12 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
+import pytest
 
 from vaaet_ml.evaluation.reporting import (
     build_class_support_notes,
     build_classification_support_table,
+    expected_calibration_error,
     expected_confusion_cost,
     select_validation_decision_policy,
     summarize_data_origin,
@@ -26,6 +28,17 @@ def test_classification_support_includes_intervals() -> None:
 
 def test_extreme_confusion_costs_more_than_adjacent() -> None:
     assert expected_confusion_cost([0], [2]) > expected_confusion_cost([0], [1])
+
+
+def test_metrics_reject_invalid_shapes_and_compute_calibration_error() -> None:
+    probabilities = np.array([[0.8, 0.1, 0.1], [0.2, 0.7, 0.1]])
+    assert expected_calibration_error([0, 1], probabilities, bins=2) >= 0.0
+    with pytest.raises(ValueError, match="shape"):
+        expected_calibration_error([0], probabilities)
+    with pytest.raises(ValueError, match="equally sized"):
+        expected_confusion_cost([0], [0, 1])
+    with pytest.raises(ValueError, match="Normal/Reduced/Congested"):
+        expected_confusion_cost([3], [3])
 
 
 def test_decision_policy_is_selected_from_validation_probabilities() -> None:

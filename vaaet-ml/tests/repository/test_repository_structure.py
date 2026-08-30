@@ -36,8 +36,9 @@ def test_training_and_ingestion_modules_import_without_cycles() -> None:
         [
             sys.executable,
             "-c",
-            "import vaaet_ml.data.ingestion; import vaaet_ml.training.partitions; "
-            "import vaaet.inference.traffic_state",
+            "import sys; import vaaet_ml.data.ingestion; import vaaet_ml.training.holdout; "
+            "import vaaet_ml.training.partitions; import vaaet.inference.traffic_state; "
+            "assert 'vaaet_ml.training.balancing' not in sys.modules",
         ],
         cwd=REPO_ROOT,
         check=True,
@@ -53,6 +54,55 @@ def test_dataset_codec_breaks_the_artifacts_ingestion_cycle() -> None:
     )
     assert "vaaet_ml.data.ingestion" not in artifacts_source
     assert "vaaet_ml.data.dataset_artifacts" not in codec_source
+
+
+def test_artifact_facade_keeps_cohesive_owners_and_review_uses_the_codec() -> None:
+    data_root = REPO_ROOT / "src" / "vaaet_ml" / "data"
+    facade = data_root.joinpath("dataset_artifacts.py").read_text(encoding="utf-8")
+    review = data_root.joinpath("review.py").read_text(encoding="utf-8")
+    review_export = data_root.joinpath("review_export.py").read_text(encoding="utf-8")
+
+    for module in (
+        "artifact_serialization.py",
+        "seed_artifacts.py",
+        "hitl_catalog.py",
+        "review_frames.py",
+        "review_finalization.py",
+        "training_input_lock.py",
+    ):
+        assert data_root.joinpath(module).is_file()
+    assert "from vaaet_ml.data.ingestion import create_dataset_package" not in review
+    assert "from vaaet_ml.data.package_codec import create_dataset_package" in review_export
+    assert "from vaaet_ml.data.seed_artifacts import" in facade
+    assert "from vaaet_ml.data.hitl_catalog import" in facade
+    assert "from vaaet_ml.data.review_finalization import" in facade
+
+
+def test_database_review_and_reporting_keep_presentation_at_the_edge() -> None:
+    data_root = REPO_ROOT / "src" / "vaaet_ml" / "data"
+    evaluation_root = REPO_ROOT / "src" / "vaaet_ml" / "evaluation"
+    for module in (
+        "database_settings.py",
+        "database_connection.py",
+        "database_queries.py",
+        "database_backup.py",
+        "review_domain.py",
+        "review_persistence.py",
+        "review_export.py",
+        "review_orchestration.py",
+        "review_widgets.py",
+    ):
+        assert data_root.joinpath(module).is_file()
+    for module in ("reporting_metrics.py", "reporting_summaries.py", "reporting_visuals.py"):
+        assert evaluation_root.joinpath(module).is_file()
+
+    review_service = data_root.joinpath("review_orchestration.py").read_text(encoding="utf-8")
+    review_widgets = data_root.joinpath("review_widgets.py").read_text(encoding="utf-8")
+    database_facade = data_root.joinpath("database.py").read_text(encoding="utf-8")
+    assert "ipywidgets" not in review_service
+    assert "ipywidgets" in review_widgets
+    assert "from vaaet_ml.data.database_backup import" in database_facade
+    assert "from vaaet_ml.data.database_queries import" in database_facade
 
 
 def test_pyright_strict_profile_and_ci_job_cover_both_source_roots() -> None:
@@ -364,3 +414,10 @@ def test_future_product_documents_are_explicitly_non_normative() -> None:
         assert status in content
         assert "$" not in content
         assert "GPU T4/V100" not in content
+
+
+def test_component_ruff_configuration_enforces_complexity_limit() -> None:
+    for component_root in (WORKSPACE_ROOT / "vaaet-core", ML_ROOT):
+        pyproject = (component_root / "pyproject.toml").read_text(encoding="utf-8")
+        assert '"C901"' in pyproject
+        assert "max-complexity = 10" in pyproject

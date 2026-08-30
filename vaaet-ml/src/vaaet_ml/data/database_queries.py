@@ -1,0 +1,171 @@
+# SPDX-FileCopyrightText: 2026 VAAET Contributors
+# SPDX-License-Identifier: AGPL-3.0-only
+"""Consultas PostgreSQL read-only y normalización de su resultado tabular."""
+
+from __future__ import annotations
+
+from collections.abc import Mapping, Sequence
+
+import pandas as pd
+from sqlalchemy import bindparam, text
+from sqlalchemy.engine import Engine
+from sqlalchemy.exc import ProgrammingError
+
+from vaaet_ml.data.database_connection import get_engine
+from vaaet_ml.data.database_settings import DatabaseSettings
+
+RAW_TABLE = "vaaet_raw.traffic_data"
+EFFECTIVE_LABELS_VIEW = "vaaet_feedback.effective_human_labels"
+
+TELEMETRY_QUERY = f"""
+SELECT id, pipeline_run_id, clip_id, record_time, avg_speed,
+       count_car, count_truck, count_bus, count_motorcycle, count_bicycle,
+       total_vehicles, near_zero_motion_count, stationary_confirmed_count,
+       rejected_speed_count, recovered_track_count, speed_sample_count,
+       speed_measurement_quality, optical_flow_tracking_ratio,
+       telemetry_schema_version
+FROM {RAW_TABLE}
+ORDER BY clip_id, record_time
+"""
+
+LEGACY_TELEMETRY_QUERY = """
+SELECT id, clip_id, record_time, avg_speed, count_car, count_truck, count_bus,
+       count_motorcycle, count_bicycle, total_vehicles
+FROM public.traffic_data
+ORDER BY clip_id, record_time
+"""
+
+HUMAN_GROUND_TRUTH_QUERY = f"""
+SELECT id, source_record_id, pipeline_run_id, clip_id, record_time,
+       feature_schema_version, avg_speed, total_vehicles, count_car,
+       count_truck, count_bus, count_motorcycle, count_bicycle,
+       heavy_vehicle_ratio, delta_speed, delta_count, transition_flag,
+       speed_variance, cumulative_delta_speed, low_speed_persistence,
+       speed_measurement_quality, optical_flow_tracking_ratio,
+       near_zero_motion_ratio, stationary_confirmed_ratio,
+       near_zero_motion_count, stationary_confirmed_count,
+       rejected_speed_count, recovered_track_count, speed_sample_count,
+       telemetry_schema_version, data_origin, synthetic_scenario,
+       hour_of_day, weather_condition, created_at, prediction_id,
+       model_version, traffic_state, is_human_validated, reviewer_id,
+       reviewed_at, notes
+FROM {EFFECTIVE_LABELS_VIEW}
+ORDER BY clip_id, record_time
+"""
+
+_LEGACY_MISSING_COLUMNS = (
+    "pipeline_run_id",
+    "near_zero_motion_count",
+    "stationary_confirmed_count",
+    "rejected_speed_count",
+    "recovered_track_count",
+    "speed_sample_count",
+    "speed_measurement_quality",
+    "optical_flow_tracking_ratio",
+    "telemetry_schema_version",
+)
+
+
+def load_telemetry(
+    settings: DatabaseSettings | Mapping[str, str] | None = None,
+    engine: Engine | None = None,
+) -> pd.DataFrame:
+    """Carga telemetría v2 y agrega columnas nulas al fallback legado explícito."""
+
+    owns_engine = engine is None
+    active_engine = engine or get_engine(settings)
+    try:
+        try:
+            return pd.read_sql(text(TELEMETRY_QUERY), active_engine)
+        except ProgrammingError:
+            legacy = pd.read_sql(text(LEGACY_TELEMETRY_QUERY), active_engine)
+            for column in _LEGACY_MISSING_COLUMNS:
+                legacy[column] = pd.NA
+            return legacy
+    finally:
+        if owns_engine:
+            active_engine.dispose()
+
+
+def load_telemetry_window(
+    *,
+    start: pd.Timestamp,
+    end: pd.Timestamp,
+    pipeline_run_ids: Sequence[str] = (),
+    clip_ids: Sequence[str] = (),
+    settings: DatabaseSettings | Mapping[str, str] | None = None,
+    engine: Engine | None = None,
+) -> pd.DataFrame:
+    """Carga una cohorte v2 acotada usando un intervalo UTC semiabierto y parámetros SQL."""
+
+    start_time = pd.Timestamp(start)
+    end_time = pd.Timestamp(end)
+    if start_time.tzinfo is None or end_time.tzinfo is None:
+        raise ValueError("Telemetry window bounds must be timezone-aware.")
+    if end_time <= start_time:
+        raise ValueError("Telemetry window end must be after start.")
+    if any(not isinstance(value, str) or not value.strip() for value in pipeline_run_ids):
+        raise ValueError("Pipeline run filters must be non-empty strings.")
+    if any(not isinstance(value, str) or not value.strip() for value in clip_ids):
+        raise ValueError("Clip filters must be non-empty strings.")
+
+    clauses = ["record_time >= :start", "record_time < :end"]
+    params: dict[str, object] = {"start": start_time, "end": end_time}
+    if pipeline_run_ids:
+        clauses.append("pipeline_run_id IN :pipeline_run_ids")
+        params["pipeline_run_ids"] = list(pipeline_run_ids)
+    if clip_ids:
+        clauses.append("clip_id IN :clip_ids")
+        params["clip_ids"] = list(clip_ids)
+    statement = text(
+        f"""
+SELECT id, pipeline_run_id, clip_id, record_time, avg_speed,
+       count_car, count_truck, count_bus, count_motorcycle, count_bicycle,
+       total_vehicles, near_zero_motion_count, stationary_confirmed_count,
+       rejected_speed_count, recovered_track_count, speed_sample_count,
+       speed_measurement_quality, optical_flow_tracking_ratio,
+       telemetry_schema_version
+FROM {RAW_TABLE}
+WHERE {' AND '.join(clauses)}
+ORDER BY clip_id, record_time
+"""
+    )
+    if pipeline_run_ids:
+        statement = statement.bindparams(bindparam("pipeline_run_ids", expanding=True))
+    if clip_ids:
+        statement = statement.bindparams(bindparam("clip_ids", expanding=True))
+
+    owns_engine = engine is None
+    active_engine = engine or get_engine(settings)
+    try:
+        return pd.read_sql(statement, active_engine, params=params)
+    finally:
+        if owns_engine:
+            active_engine.dispose()
+
+
+def load_human_ground_truth(
+    settings: DatabaseSettings | Mapping[str, str] | None = None,
+    engine: Engine | None = None,
+) -> pd.DataFrame:
+    """Carga sólo etiquetas humanas efectivas y sus 19 features, en modo read-only."""
+
+    owns_engine = engine is None
+    active_engine = engine or get_engine(settings)
+    try:
+        return pd.read_sql(text(HUMAN_GROUND_TRUTH_QUERY), active_engine)
+    finally:
+        if owns_engine:
+            active_engine.dispose()
+
+
+__all__ = [
+    "EFFECTIVE_LABELS_VIEW",
+    "HUMAN_GROUND_TRUTH_QUERY",
+    "LEGACY_TELEMETRY_QUERY",
+    "RAW_TABLE",
+    "TELEMETRY_QUERY",
+    "load_human_ground_truth",
+    "load_telemetry",
+    "load_telemetry_window",
+]

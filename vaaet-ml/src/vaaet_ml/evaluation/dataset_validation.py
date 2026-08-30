@@ -33,16 +33,24 @@ def audit_training_dataset(
     require_production_eligible: bool = False,
 ) -> DatasetAudit:
     """Return provenance/quality evidence and stop on structural corruption."""
+    _validate_dataset_source(df)
+    df = df.copy()
+    df["record_time"] = normalize_timestamp_series(df["record_time"])
+    _validate_dataset_records(df)
+    origins, real_mask = _resolve_data_origins(df)
+    evidence = _build_audit_evidence(df, origins, real_mask)
+    blockers = _production_blockers(evidence["coverage"], evidence["v2_coverage"])
+    report = _build_audit_report(df, origins, evidence, blockers)
+    audit = DatasetAudit(report, not blockers, tuple(blockers))
+    if require_production_eligible and blockers:
+        raise ValueError("Dataset is not production-eligible: " + "; ".join(blockers))
+    return audit
+
+
+def _validate_dataset_source(df: pd.DataFrame) -> None:
     required = {
-        "clip_id",
-        "record_time",
-        "avg_speed",
-        "total_vehicles",
-        "count_car",
-        "count_truck",
-        "count_bus",
-        "count_motorcycle",
-        "count_bicycle",
+        "clip_id", "record_time", "avg_speed", "total_vehicles", "count_car", "count_truck",
+        "count_bus", "count_motorcycle", "count_bicycle",
     }
     missing = sorted(required - set(df.columns))
     if missing:
@@ -50,11 +58,16 @@ def audit_training_dataset(
     if df.empty:
         raise ValueError("Dataset contract failed; no records were loaded.")
 
-    df = df.copy()
-    df["record_time"] = normalize_timestamp_series(df["record_time"])
-    timestamps = df["record_time"]
+
+def _validate_dataset_records(df: pd.DataFrame) -> None:
     if df.duplicated(["clip_id", "record_time"]).any():
         raise ValueError("Dataset contract failed; duplicate clip/time records found.")
+    _validate_vehicle_counts(df)
+    _validate_average_speed(df)
+    _validate_quality_ranges(df)
+
+
+def _validate_vehicle_counts(df: pd.DataFrame) -> None:
     counts = df[[
         "count_car",
         "count_truck",
@@ -67,14 +80,20 @@ def audit_training_dataset(
         raise ValueError("Dataset contract failed; vehicle counts must be numeric.")
     if (counts < 0).any().any() or (total < 0).any():
         raise ValueError("Dataset contract failed; negative vehicle counts found.")
-    speeds = pd.to_numeric(df["avg_speed"], errors="coerce")
-    if speeds.isna().any() or speeds.lt(0).any() or speeds.gt(200).any():
-        raise ValueError("Dataset contract failed; impossible avg_speed values found.")
     inconsistent_counts = int(counts.sum(axis=1).ne(total).sum())
     if inconsistent_counts:
         raise ValueError(
             f"Dataset contract failed; {inconsistent_counts} rows disagree with total_vehicles."
         )
+
+
+def _validate_average_speed(df: pd.DataFrame) -> None:
+    speeds = pd.to_numeric(df["avg_speed"], errors="coerce")
+    if speeds.isna().any() or speeds.lt(0).any() or speeds.gt(200).any():
+        raise ValueError("Dataset contract failed; impossible avg_speed values found.")
+
+
+def _validate_quality_ranges(df: pd.DataFrame) -> None:
     for ratio_column in ("speed_measurement_quality", "optical_flow_tracking_ratio"):
         if ratio_column in df:
             values = pd.to_numeric(df[ratio_column], errors="coerce").dropna()
@@ -92,11 +111,19 @@ def audit_training_dataset(
             if values.lt(0).any():
                 raise ValueError(f"Dataset contract failed; {counter_column} cannot be negative.")
 
+
+def _resolve_data_origins(df: pd.DataFrame) -> tuple[pd.Series, pd.Series]:
     origins = df.get("data_origin", pd.Series("real", index=df.index)).fillna("unknown")
     real_mask = ~origins.eq("synthetic")
-    real_frame = df.loc[real_mask]
-    if real_frame.empty:
+    if df.loc[real_mask].empty:
         raise ValueError("Dataset contract failed; no real telemetry is available.")
+    return origins, real_mask
+
+
+def _build_audit_evidence(
+    df: pd.DataFrame, origins: pd.Series, real_mask: pd.Series
+) -> dict[str, object]:
+    real_frame = df.loc[real_mask]
     modern_present = [column for column in TELEMETRY_QUALITY_COLUMNS if column in df]
     coverage = {
         column: round(float(real_frame[column].notna().mean()), 4) if column in df else 0.0
@@ -105,7 +132,7 @@ def audit_training_dataset(
     schema = df.get("telemetry_schema_version", pd.Series(pd.NA, index=df.index))
     v2_coverage = float(schema.loc[real_mask].eq(TELEMETRY_SCHEMA_VERSION).mean())
     groups = build_group_ids(df)
-    gaps = timestamps.groupby(groups).diff().dt.total_seconds().div(60)
+    gaps = df["record_time"].groupby(groups).diff().dt.total_seconds().div(60)
     numeric_columns = [
         column
         for column in dict.fromkeys(["avg_speed", "total_vehicles", *FEATURE_COLS])
@@ -121,7 +148,20 @@ def audit_training_dataset(
         }
         for column in numeric_columns
     }
+    return {
+        "coverage": coverage,
+        "gaps": gaps,
+        "groups": groups,
+        "modern_present": modern_present,
+        "numeric_summary": numeric_summary,
+        "schema": schema,
+        "v2_coverage": v2_coverage,
+    }
 
+
+def _production_blockers(coverage: object, v2_coverage: object) -> list[str]:
+    if not isinstance(coverage, dict) or not isinstance(v2_coverage, float):
+        raise TypeError("Dataset audit evidence is malformed.")
     blockers: list[str] = []
     if v2_coverage < 0.95:
         blockers.append(
@@ -136,34 +176,41 @@ def audit_training_dataset(
     incomplete = [field for field in quality_fields if coverage.get(field, 0.0) < 0.95]
     if incomplete:
         blockers.append(f"quality fields have insufficient coverage: {', '.join(incomplete)}")
+    return blockers
 
-    report: dict[str, object] = {
+
+def _build_audit_report(
+    df: pd.DataFrame, origins: pd.Series, evidence: dict[str, object], blockers: list[str]
+) -> dict[str, object]:
+    groups = evidence["groups"]
+    gaps = evidence["gaps"]
+    schema = evidence["schema"]
+    if not isinstance(groups, pd.Series) or not isinstance(gaps, pd.Series) or not isinstance(schema, pd.Series):
+        raise TypeError("Dataset audit evidence is malformed.")
+
+    return {
         "records": len(df),
         "clips": int(groups.nunique()),
-        "time_start": timestamps.min().isoformat(),
-        "time_end": timestamps.max().isoformat(),
+        "time_start": df["record_time"].min().isoformat(),
+        "time_end": df["record_time"].max().isoformat(),
         "timezone": CANONICAL_TIMEZONE,
         "traffic_local_timezone": TRAFFIC_LOCAL_TIMEZONE,
         "records_by_origin": origins.value_counts(dropna=False).to_dict(),
         "records_by_schema": schema.fillna("traffic-telemetry-v1").value_counts().to_dict(),
-        "modern_columns_present": modern_present,
-        "modern_column_coverage": coverage,
-        "telemetry_v2_coverage": round(v2_coverage, 4),
+        "modern_columns_present": evidence["modern_present"],
+        "modern_column_coverage": evidence["coverage"],
+        "telemetry_v2_coverage": round(float(evidence["v2_coverage"]), 4),
         "maximum_gap_minutes": None if gaps.dropna().empty else round(float(gaps.max()), 2),
         "median_frequency_minutes": None
         if gaps.dropna().empty
         else round(float(gaps.dropna().median()), 2),
-        "numeric_summary": numeric_summary,
+        "numeric_summary": evidence["numeric_summary"],
         "missing_feature_values": {
             column: int(df[column].isna().sum()) if column in df else len(df)
             for column in FEATURE_COLS
         },
         "production_blockers": blockers,
     }
-    audit = DatasetAudit(report, not blockers, tuple(blockers))
-    if require_production_eligible and blockers:
-        raise ValueError("Dataset is not production-eligible: " + "; ".join(blockers))
-    return audit
 
 
 def validate_training_partitions(

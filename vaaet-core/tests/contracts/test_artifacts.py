@@ -250,3 +250,147 @@ def test_rejects_invalid_holdout_fingerprint(valid_bundle: Path) -> None:
     _write_manifest(valid_bundle, payload)
     with pytest.raises(ArtifactValidationError, match="fingerprint"):
         validate_manifest(valid_bundle)
+
+
+def test_rejects_manifest_that_is_not_an_object(valid_bundle: Path) -> None:
+    _write_manifest(valid_bundle, [])
+    with pytest.raises(ArtifactValidationError, match="JSON object"):
+        validate_manifest(valid_bundle)
+
+
+@pytest.mark.parametrize(
+    ("value", "message"),
+    [
+        ("", "generated_at must be a non-empty"),
+        ("not-a-timestamp", "valid ISO-8601"),
+        ("2026-08-28T12:00:00", "must include a timezone"),
+    ],
+)
+def test_rejects_invalid_generated_at(valid_bundle: Path, value: str, message: str) -> None:
+    payload = _manifest(valid_bundle)
+    payload["generated_at"] = value
+    _write_manifest(valid_bundle, payload)
+    with pytest.raises(ArtifactValidationError, match=message):
+        validate_manifest(valid_bundle)
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "message"),
+    [
+        ("git_commit", "", "git_commit"),
+        ("feature_schema_version", "traffic-feature-v99", "feature schema version"),
+        ("model_version", "unknown", "model version"),
+    ],
+)
+def test_rejects_invalid_identity_value(
+    valid_bundle: Path, field: str, value: str, message: str
+) -> None:
+    payload = _manifest(valid_bundle)
+    payload[field] = value
+    _write_manifest(valid_bundle, payload)
+    with pytest.raises(ArtifactValidationError, match=message):
+        validate_manifest(valid_bundle)
+
+
+def test_rejects_missing_lifecycle_field(valid_bundle: Path) -> None:
+    payload = _manifest(valid_bundle)
+    del payload["training_lifecycle"]["supervision"]
+    _write_manifest(valid_bundle, payload)
+    with pytest.raises(ArtifactValidationError, match="Missing training lifecycle fields"):
+        validate_manifest(valid_bundle)
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "message"),
+    [
+        ("deployment_stage", "unknown", "Unsupported bundle deployment stage"),
+        ("supervision", "", "supervision must be non-empty"),
+        ("production_eligible", "false", "eligibility must be boolean"),
+    ],
+)
+def test_rejects_invalid_lifecycle_value(
+    valid_bundle: Path, field: str, value: object, message: str
+) -> None:
+    payload = _manifest(valid_bundle)
+    payload["training_lifecycle"][field] = value
+    _write_manifest(valid_bundle, payload)
+    with pytest.raises(ArtifactValidationError, match=message):
+        validate_manifest(valid_bundle)
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "message"),
+    [
+        ("automatic_accident_state_allowed", "false", "prohibit automatic Accident"),
+        ("human_confirmation_required_for_accident", False, "require human confirmation"),
+        ("class_thresholds", {"0": True, "1": 0.6, "2": 0.7}, "thresholds must be numeric"),
+        ("class_thresholds", {"0": 0.6}, "class thresholds are incompatible"),
+        ("class_thresholds", {"0": 1.1, "1": 0.6, "2": 0.7}, "between 0 and 1"),
+        ("temperature", 11.0, "outside the supported range"),
+        ("temperature", "1.0", "temperature must be numeric"),
+    ],
+)
+def test_rejects_invalid_decision_policy(
+    valid_bundle: Path, field: str, value: object, message: str
+) -> None:
+    payload = _manifest(valid_bundle)
+    payload["decision_policy"][field] = value
+    _write_manifest(valid_bundle, payload)
+    with pytest.raises(ArtifactValidationError, match=message):
+        validate_manifest(valid_bundle)
+
+
+def test_rejects_invalid_dependency_version(valid_bundle: Path) -> None:
+    payload = _manifest(valid_bundle)
+    payload["dependencies"]["joblib"] = ""
+    _write_manifest(valid_bundle, payload)
+    with pytest.raises(ArtifactValidationError, match="dependency version"):
+        validate_manifest(valid_bundle)
+
+
+def test_rejects_invalid_f1_metric(valid_bundle: Path) -> None:
+    payload = _manifest(valid_bundle)
+    payload["metrics"]["f1_macro"] = 2.0
+    _write_manifest(valid_bundle, payload)
+    with pytest.raises(ArtifactValidationError, match="f1_macro"):
+        validate_manifest(valid_bundle)
+
+
+def test_rejects_invalid_provenance_coverage(valid_bundle: Path) -> None:
+    payload = _manifest(valid_bundle)
+    payload["data_provenance"]["telemetry_v2_coverage"] = True
+    _write_manifest(valid_bundle, payload)
+    with pytest.raises(ArtifactValidationError, match="coverage must be numeric"):
+        validate_manifest(valid_bundle)
+
+
+def test_rejects_invalid_holdout_generation(valid_bundle: Path) -> None:
+    payload = _manifest(valid_bundle)
+    payload["human_holdout"]["generation"] = 0
+    _write_manifest(valid_bundle, payload)
+    with pytest.raises(ArtifactValidationError, match="generation must be positive"):
+        validate_manifest(valid_bundle)
+
+
+def test_rejects_incomplete_training_input_lock(valid_bundle: Path) -> None:
+    payload = _manifest(valid_bundle)
+    payload["training_input_lock"] = {"contract": "vaaet-training-input-lock-v1"}
+    _write_manifest(valid_bundle, payload)
+    with pytest.raises(ArtifactValidationError, match="Missing training input lock fields"):
+        validate_manifest(valid_bundle)
+
+
+def test_rejects_inconsistent_lifecycle_eligibility(valid_bundle: Path) -> None:
+    payload = _manifest(valid_bundle)
+    payload["training_lifecycle"]["production_eligible"] = False
+    _write_manifest(valid_bundle, payload)
+    with pytest.raises(ArtifactValidationError, match="lifecycle eligibility"):
+        validate_manifest(valid_bundle)
+
+
+def test_rejects_invalid_artifact_file_hash(valid_bundle: Path) -> None:
+    payload = _manifest(valid_bundle)
+    payload["files"][REQUIRED_FILES[0]]["sha256"] = "invalid"
+    _write_manifest(valid_bundle, payload)
+    with pytest.raises(ArtifactValidationError, match="Invalid SHA-256"):
+        validate_manifest(valid_bundle)

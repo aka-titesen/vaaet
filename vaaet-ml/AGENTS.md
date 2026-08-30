@@ -47,7 +47,8 @@ ADR-0021 gobierna esta frontera junto con los ADRs de datos, HITL y holdouts.
 
 - `../vaaet-core/src/vaaet/`: contratos, umbrales algorítmicos, percepción,
   features, política de estados e inferencia portable.
-- `settings.py`: rutas de laboratorio, DVC/Drive, configuración de datos y DB.
+- `settings.py`: rutas de laboratorio, configuración de datos y DB. DVC se
+  configura desde la raíz mediante `vaaet-registry` y nunca desde settings.
 - `data/`: datasets, conexión y persistencia.
 - `features/`: ingeniería, etiquetado y generación sintética de entrenamiento.
 - `evaluation/`: comparación, drift y reporting de laboratorio.

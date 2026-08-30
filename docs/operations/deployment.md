@@ -74,8 +74,9 @@ Pipeline definido en `.github/workflows/ci.yml`:
 4. **PostgreSQL**: instala core + ML local, aplica migraciones en el servicio de
    prueba y ejecuta las pruebas marcadas `postgres`.
 5. **Documentación**: verifica enlaces internos del monorepo desde la raíz.
-6. **DVC**: instala `./vaaet-ml[dvc]` sobre el core local, ejecuta `pip check`
-   e inspecciona DVC desde la raíz.
+6. **DVC**: instala `./vaaet-ml[dvc,dvc-gdrive,dvc-s3]` sobre el core local,
+   ejecuta `pip check`, `dvc doctor`, `dvc status` y `vaaet-registry --help`
+   desde la raíz; no autentica ni transfiere bundles.
 
 ### 3.2 Despliegue (Manual)
 
@@ -121,9 +122,10 @@ python -m pip install -e "./vaaet-ml[training,visualization,database,dev]"
 python -m pip check
 ```
 
-Para DVC local, instalá `python -m pip install -e "./vaaet-ml[dvc]"` después
-del core. No existe un paquete instalable en la raíz ni se usan
-`requirements.txt` o lockfiles.
+Para DVC local, instalá `python -m pip install -e
+"./vaaet-ml[dvc,dvc-gdrive]"` o reemplazá `dvc-gdrive` por `dvc-s3` después del
+core. Configurá el remoto local con `vaaet-registry configure ...`; no existe
+un paquete instalable en la raíz ni se usan `requirements.txt` o lockfiles.
 
 ### Configuración de BD (opcional)
 

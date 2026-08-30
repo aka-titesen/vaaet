@@ -28,4 +28,5 @@ manifiesto antes de deserializar.
 Desde el workspace, instalar primero core y luego los extras ML del workflow.
 Validar con Ruff, pytest, compileall, AST de los cuatro notebooks, enlaces y
 `git diff --check`. GPU, Drive, DVC remoto, YOLO y PostgreSQL se verifican
-manualmente en Colab. DVC se administra desde la raíz con `vaaet-ml[dvc]`.
+manualmente en Colab. DVC se administra desde la raíz: instalar `dvc` y sólo el
+plugin local necesario (`dvc-gdrive` o `dvc-s3`) y usar `vaaet-registry`.

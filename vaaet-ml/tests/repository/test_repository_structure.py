@@ -27,7 +27,6 @@ ALLOWED_SCRIPT_FILES = {
     "evaluate-telemetry-exports.py",
     "export-training-dataset.py",
     "notebook_bootstrap.py",
-    "setup-dvc.sh",
 }
 
 
@@ -276,12 +275,26 @@ def test_notebook_extras_match_workflows() -> None:
         assert f"ml_extras={ml_extras!r}" in code
 
 
-def test_dvc_ci_installs_the_declared_extra_from_the_workspace() -> None:
+def test_dvc_registry_uses_declared_provider_extras_and_neutral_configuration() -> None:
     workflow = (WORKSPACE_ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
+    pyproject = (REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8")
+    dvc_config = (WORKSPACE_ROOT / ".dvc" / "config").read_text(encoding="utf-8")
+    gitignore = (WORKSPACE_ROOT / ".gitignore").read_text(encoding="utf-8")
 
     assert 'python -m pip install "./vaaet-core"' in workflow
-    assert 'python -m pip install "./vaaet-ml[dvc]"' in workflow
-    assert 'pip install "dvc[gdrive]>=3.50.0"' not in workflow
+    assert 'python -m pip install "./vaaet-ml[dvc,dvc-gdrive,dvc-s3]"' in workflow
+    assert 'vaaet-registry --help' in workflow
+    assert 'dvc pull' not in workflow
+    assert 'dvc push' not in workflow
+    assert "dvc-gdrive" in pyproject
+    assert "dvc-s3" in pyproject
+    assert "remote =" not in dvc_config
+    assert "['remote" not in dvc_config
+    assert "gdrive://" not in dvc_config
+    assert "s3://" not in dvc_config
+    assert "endpointurl" not in dvc_config
+    assert ".dvc/config.local" in gitignore
+    assert not (SCRIPTS_DIR / "setup-dvc.sh").exists()
 
 
 def test_python_313_is_declared_and_exercised_by_ci() -> None:

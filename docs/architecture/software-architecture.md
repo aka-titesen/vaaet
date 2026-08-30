@@ -63,7 +63,9 @@ exacta en un input lock. El mismo `input_policy` del manifiesto se usa en servin
 
 - PostgreSQL es opcional y portable entre proveedores. `vaaet_raw`, `vaaet_ml` y `vaaet_feedback` separan adquisición, inferencia y ground truth; `vaaet_ops` registra ejecuciones redactadas y cuatro perfiles aplican mínimo privilegio.
 - Google Drive transporta el bundle y conserva semilla, sesiones HITL, input locks y holdouts humanos entre sesiones Colab.
-- DVC versiona el directorio `vaaet-ml/artifacts/traffic-state` como una unidad.
+- DVC versiona el directorio `vaaet-ml/artifacts/traffic-state` como una unidad;
+  Git identifica cada versión por commit o tag y cada entorno configura su
+  remoto lógico `vaaet-registry` sin versionar proveedor ni credenciales.
 - Los pesos YOLO se descargan en runtime y no pertenecen al repositorio.
 - La futura Web App vivirá en `vaaet-app/`, consumirá únicamente una API
   versionada y nunca accederá directamente a bundles, DVC, Drive, PostgreSQL ni
@@ -77,6 +79,6 @@ GitHub Actions cubre Python 3.10–3.13, instalación de los extras declarados,
 enlaces, DVC y ausencia de binarios ML en Git. GPU, Drive, videos reales y
 PostgreSQL se validan manualmente en Colab.
 
-Decisiones principales: [ADR-0009](decisions/0009-modular-three-stage-architecture.md), [ADR-0010](decisions/0010-mlops-pipeline-19-features.md), [ADR-0013](decisions/0013-on-demand-data-collection-workflow.md), [ADR-0014](decisions/0014-hierarchical-traffic-state-and-incident-policy.md), [ADR-0015](decisions/0015-postgresql-namespaces-security-and-hitl.md), [ADR-0016](decisions/0016-postgresql-hardening-and-pipeline-runs.md), [ADR-0017](decisions/0017-seed-bootstrap-and-hitl-retraining.md), [ADR-0018](decisions/0018-versioned-frozen-human-holdouts.md), [ADR-0019](decisions/0019-immutable-seed-and-hitl-datasets.md) y [ADR-0021](decisions/0021-portable-core-and-ml-laboratory-boundary.md).
+Decisiones principales: [ADR-0009](decisions/0009-modular-three-stage-architecture.md), [ADR-0010](decisions/0010-mlops-pipeline-19-features.md), [ADR-0013](decisions/0013-on-demand-data-collection-workflow.md), [ADR-0014](decisions/0014-hierarchical-traffic-state-and-incident-policy.md), [ADR-0015](decisions/0015-postgresql-namespaces-security-and-hitl.md), [ADR-0016](decisions/0016-postgresql-hardening-and-pipeline-runs.md), [ADR-0017](decisions/0017-seed-bootstrap-and-hitl-retraining.md), [ADR-0018](decisions/0018-versioned-frozen-human-holdouts.md), [ADR-0019](decisions/0019-immutable-seed-and-hitl-datasets.md), [ADR-0021](decisions/0021-portable-core-and-ml-laboratory-boundary.md) y [ADR-0023](decisions/0023-provider-neutral-dvc-registry.md).
 
 Los diagramas complementarios están en el [índice de diagramas](diagrams/index.md).

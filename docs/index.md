@@ -11,8 +11,8 @@ los límites vigentes están definidos por [ADR-0021](architecture/decisions/002
 - **Hipótesis futura**: Canvas, SOW y personas conservan ideas de producto sin
   prometer API, Web App, costos, plazos ni servicios disponibles.
 - **Histórico**: changelog y planes fechados registran su momento; los ADRs
-  conservan sus decisiones originales. ADR-0021 y ADR-0022 prevalecen para la
-  topología actual y el serving con YOLO.
+  conservan sus decisiones originales. ADR-0021, ADR-0022 y ADR-0023
+  prevalecen para la topología, serving con YOLO y registro DVC actuales.
 
 ## Inicio para agentes de código
 
@@ -29,7 +29,9 @@ y el [checklist AGPL](governance/agpl-demo-release-checklist.md).
 - [ADR-0020: monorepo ML y frontera de aplicación](architecture/decisions/0020-single-git-monorepo-and-application-boundary.md)
 - [ADR-0021: core portable y laboratorio ML](architecture/decisions/0021-portable-core-and-ml-laboratory-boundary.md)
 - [ADR-0022: vía AGPL-3.0 para demo web pública](architecture/decisions/0022-agpl-public-demo-path.md)
+- [ADR-0023: registro DVC portable por configuración local](architecture/decisions/0023-provider-neutral-dvc-registry.md)
 - [Contrato del bundle](ml/model-artifact-contract.md)
+- [Guía del registro DVC](ml/dvc-guide.md)
 - [ADR de inicio semilla y HITL](architecture/decisions/0017-seed-bootstrap-and-hitl-retraining.md)
 - [ADR de holdout humano congelado](architecture/decisions/0018-versioned-frozen-human-holdouts.md)
 - [ADR de datasets semilla/HITL inmutables](architecture/decisions/0019-immutable-seed-and-hitl-datasets.md)

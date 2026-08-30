@@ -1,6 +1,12 @@
 <!-- context: VAAET/docs/architecture/decisions/0011-dvc-model-registry.md
 Referenciado por AGENTS.md, docs/ml/dvc-guide.md y ADR-0012. -->
 
+> **Vigencia:** el uso de DVC continúa vigente, pero la configuración remota
+> versionada, Google Drive por defecto y los remotos alternativos de esta ADR
+> fueron sustituidos por [ADR-0023](0023-provider-neutral-dvc-registry.md).
+> El estado operativo actual usa un único remoto local `vaaet-registry` en
+> `.dvc/config.local` y Git identifica las versiones de bundle.
+
 # ADR-011: DVC como Model Registry
 
 | Campo | Valor |

@@ -1,8 +1,3 @@
-[core]
-    remote = gdrive
-['remote "gdrive"']
-    url = gdrive://VAAET-DVC-Storage
-['remote "s3"']
-    url = s3://vaaet-model-registry
-['remote "local"']
-    url = /tmp/vaaet-dvc-local
+# La selección del almacenamiento del registro es específica de cada entorno.
+# `vaaet-registry configure ...` escribe el remoto lógico `vaaet-registry` en
+# .dvc/config.local, que permanece fuera de Git junto con sus credenciales.

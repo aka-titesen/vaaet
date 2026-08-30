@@ -301,20 +301,19 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Instalar componentes y extra DVC declarado
+      - name: Instalar componentes y plugins DVC declarados
         run: |
           python -m pip install --upgrade pip
           python -m pip install "./vaaet-core"
-          python -m pip install "./vaaet-ml[dvc]"
+          python -m pip install "./vaaet-ml[dvc,dvc-gdrive,dvc-s3]"
           python -m pip check
 
-      - name: Verificar configuración de DVC
+      - name: Verificar CLI y configuración DVC sin red
         run: |
           echo "=== DVC Version ==="
           dvc version
           dvc doctor
-          echo "=== Remotes ==="
-          dvc remote list
           echo "=== Status ==="
           dvc status
+          vaaet-registry --help
           echo "✅ Configuración de DVC verificada"

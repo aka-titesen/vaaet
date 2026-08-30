@@ -65,8 +65,9 @@ resolver enlaces Markdown y ejecutar `git diff --check`.
 ## CI y evidencia manual
 
 GitHub Actions ejecuta jobs separados de core, ML, integración del workspace,
-PostgreSQL, enlaces y DVC. DVC se invoca desde la raíz y obtiene sus dependencias
-exclusivamente del extra `vaaet-ml[dvc]`.
+PostgreSQL, enlaces y DVC. DVC se invoca desde la raíz y obtiene la CLI base y
+plugins declarados de `vaaet-ml[dvc,dvc-gdrive,dvc-s3]`, sin autenticarse ni
+transferir datos.
 
 La evidencia local no sustituye las comprobaciones manuales en Colab: GPU,
 Google Drive, DVC remoto, descarga/ejecución YOLO y PostgreSQL con Secrets.

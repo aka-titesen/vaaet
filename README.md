@@ -15,8 +15,11 @@ Monorepo de VAAET para el análisis vehicular y su futura aplicación web.
 La arquitectura está gobernada por
 [ADR-0021](docs/architecture/decisions/0021-portable-core-and-ml-laboratory-boundary.md).
 La raíz conserva el único repositorio Git, la configuración DVC y la
-automatización CI. Para trabajar sobre ML, instalá primero `vaaet-core/` y luego
-`vaaet-ml/` desde sus `pyproject.toml` locales.
+automatización CI. DVC registra el bundle atómico mediante un remoto lógico
+local llamado `vaaet-registry`; la configuración de Drive, S3 o R2 no se
+versiona. Consultá la [guía del registro DVC](docs/ml/dvc-guide.md). Para
+trabajar sobre ML, instalá primero `vaaet-core/` y luego `vaaet-ml/` desde sus
+`pyproject.toml` locales.
 
 ## Contexto para agentes de código
 

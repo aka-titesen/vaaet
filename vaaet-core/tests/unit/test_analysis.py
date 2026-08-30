@@ -79,7 +79,8 @@ class _ReleasableWriter:
     def __init__(self) -> None:
         self.released = False
 
-    def isOpened(self) -> bool:
+    # Replica el nombre camelCase exigido por la API de ``cv2.VideoWriter``.
+    def isOpened(self) -> bool:  # noqa: N802
         return True
 
     def write(self, _frame: np.ndarray) -> None:

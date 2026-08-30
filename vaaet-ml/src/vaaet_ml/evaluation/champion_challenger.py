@@ -15,6 +15,7 @@ import pandas as pd
 from sklearn.metrics import f1_score
 from vaaet.artifacts import validate_manifest
 from vaaet.calibration import apply_temperature_scaling, multiclass_brier_score
+from vaaet.inference.protocols import FeatureScaler
 from vaaet.inference.traffic_state import classify_telemetry_dataframe
 from vaaet.settings import FEATURE_COLS, MODEL_STATE_LABELS
 
@@ -44,13 +45,6 @@ class PredictionModel(Protocol):
 
     def predict(self, values: np.ndarray, *, verbose: int = 0) -> np.ndarray:
         """Return one Normal/Reduced/Congested probability vector per record."""
-
-
-class FeatureScaler(Protocol):
-    """Minimal fitted scaler boundary used by the evaluator."""
-
-    def transform(self, values: np.ndarray) -> np.ndarray:
-        """Transform canonical feature rows without fitting."""
 
 
 @dataclass(frozen=True)

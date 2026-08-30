@@ -416,8 +416,10 @@ def test_future_product_documents_are_explicitly_non_normative() -> None:
         assert "GPU T4/V100" not in content
 
 
-def test_component_ruff_configuration_enforces_complexity_limit() -> None:
+def test_component_ruff_configuration_enforces_complexity_and_naming_rules() -> None:
     for component_root in (WORKSPACE_ROOT / "vaaet-core", ML_ROOT):
         pyproject = (component_root / "pyproject.toml").read_text(encoding="utf-8")
         assert '"C901"' in pyproject
+        assert '"N"' in pyproject
+        assert '"A"' in pyproject
         assert "max-complexity = 10" in pyproject

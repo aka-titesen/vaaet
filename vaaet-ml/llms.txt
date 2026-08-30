@@ -10,6 +10,12 @@ PostgreSQL, entrenamiento, evaluación y utilidades Colab. `../vaaet-core/src/va
 contiene percepción, telemetría, features, política de estados y bundle. ML no
 traslada esa lógica al notebook ni al paquete de laboratorio.
 
+PostgreSQL 14+ es portable por capacidades y sólo usa adaptadores estándar. Los
+perfiles de workflow cargan `VAAET_DB_*` y `VAAET_<PROFILE>_DB_*`; Alembic usa
+`VAAET_ADMIN_DB_USER/PASSWORD` desde local o CI, nunca Colab. ADR-0024 mantiene
+revisiones Alembic explícitas como única autoridad DDL: no usar ORM declarativo,
+`create_all`, `drop_all` ni autogeneración.
+
 Los cuatro notebooks son: adquisición opcional
 `notebooks/data-collection/collect_traffic_telemetry.ipynb`, entrenamiento
 `notebooks/training/train_traffic_state_classifier.ipynb`, inferencia
@@ -28,4 +34,5 @@ manifiesto antes de deserializar.
 Desde el workspace, instalar primero core y luego los extras ML del workflow.
 Validar con Ruff, pytest, compileall, AST de los cuatro notebooks, enlaces y
 `git diff --check`. GPU, Drive, DVC remoto, YOLO y PostgreSQL se verifican
-manualmente en Colab. DVC se administra desde la raíz con `vaaet-ml[dvc]`.
+manualmente en Colab. DVC se administra desde la raíz: instalar `dvc` y sólo el
+plugin local necesario (`dvc-gdrive` o `dvc-s3`) y usar `vaaet-registry`.

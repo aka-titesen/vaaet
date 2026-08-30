@@ -16,11 +16,15 @@
   fuera de Git. La vía AGPL exige completar el
   [`checklist de demo`](docs/governance/agpl-demo-release-checklist.md). El
   registro público no contiene contratos ni evidencia privada.
-- `docs/`, `.dvc/` y `.github/` pertenecen a la raíz compartida.
+- `docs/`, `.dvc/` y `.github/` pertenecen a la raíz compartida. `.dvc/config`
+  es neutral y versionado; cada entorno configura exclusivamente en
+  `.dvc/config.local` el remoto lógico `vaaet-registry`.
 
 ## Invariantes
 
-Conservar un único Git y DVC. La Web App futura sólo consumirá una API; no puede
+Conservar un único Git y DVC. Git identifica las versiones de bundle y DVC
+almacena su contenido; la guía y ADR-0023 gobiernan el registro portable. La Web
+App futura sólo consumirá una API; no puede
 leer PostgreSQL, DVC, Drive, artefactos binarios ni módulos Python. La API
 deberá validar el manifiesto v2 antes de deserializarlo y sus workers usarán
 `vaaet-core`, nunca `vaaet-ml` para serving.
@@ -31,4 +35,5 @@ de [`docs/`](docs/index.md) y
 Para cambios de componente, leer también
 [`vaaet-core/AGENTS.md`](vaaet-core/AGENTS.md) o
 [`vaaet-ml/AGENTS.md`](vaaet-ml/AGENTS.md); ADR-0022 gobierna cualquier
-serving futuro con YOLO.
+serving futuro con YOLO. Para PostgreSQL, ADR-0024 gobierna configuración
+portable, privilegios y migraciones administrativas.

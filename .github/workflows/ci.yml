@@ -227,7 +227,14 @@ jobs:
           --health-timeout 5s
           --health-retries 5
     env:
-      VAAET_DATABASE_ADMIN_URL: postgresql+psycopg2://postgres:postgres@localhost:5432/vaaet
+      VAAET_DB_HOST: localhost
+      VAAET_DB_PORT: "5432"
+      VAAET_DB_NAME: vaaet
+      VAAET_DB_SSLMODE: disable
+      VAAET_ADMIN_DB_USER: postgres
+      VAAET_ADMIN_DB_PASSWORD: postgres
+      VAAET_TRAINING_DB_USER: postgres
+      VAAET_TRAINING_DB_PASSWORD: postgres
       VAAET_EXPECT_LEGACY_FIXTURE: "1"
       VAAET_LEGACY_BACKUP_PATH: /tmp/vaaet-legacy.backup
       VAAET_MODERN_BACKUP_PATH: /tmp/vaaet-modern.backup
@@ -263,33 +270,26 @@ jobs:
 
       - name: Aplicar migración y roles
         run: |
-          python -c "import os, pathlib, psycopg2; c=psycopg2.connect(os.environ['VAAET_DATABASE_ADMIN_URL'].replace('postgresql+psycopg2://','postgresql://')); c.autocommit=True; c.cursor().execute(pathlib.Path('tests/fixtures/postgres-legacy.sql').read_text()); c.close()"
+          python -c "import pathlib, psycopg2; c=psycopg2.connect(); c.autocommit=True; c.cursor().execute(pathlib.Path('tests/fixtures/postgres-legacy.sql').read_text()); c.close()"
           /usr/lib/postgresql/17/bin/pg_dump --format=custom --data-only --table=public.traffic_data --file="$VAAET_LEGACY_BACKUP_PATH"
           alembic upgrade head
-          python -c "import os, pathlib, psycopg2; c=psycopg2.connect(os.environ['VAAET_DATABASE_ADMIN_URL'].replace('postgresql+psycopg2://','postgresql://')); c.autocommit=True; c.cursor().execute(pathlib.Path('migrations/provision-roles.sql').read_text()); c.close()"
+          /usr/lib/postgresql/17/bin/psql -v ON_ERROR_STOP=1 -f migrations/provision-roles.sql
           /usr/lib/postgresql/17/bin/pg_dump --format=custom --data-only --table=vaaet_raw.traffic_data --file="$VAAET_MODERN_BACKUP_PATH"
 
       - name: Probar schema, constraints y mínimo privilegio
         run: pytest tests/integration -v --tb=short -m postgres
 
       - name: Auditar PostgreSQL sin mutaciones
-        env:
-          VAAET_DB_HOST: localhost
-          VAAET_DB_PORT: "5432"
-          VAAET_DB_NAME: vaaet
-          VAAET_DB_SSLMODE: disable
-          VAAET_TRAINING_DB_USER: postgres
-          VAAET_TRAINING_DB_PASSWORD: postgres
         run: |
           python scripts/audit-postgres-database.py --output /tmp/postgres-audit.json
           python -c "import json; r=json.load(open('/tmp/postgres-audit.json')); assert r['alembic_revision']=='20260806_0002'; assert r['integrity']['automatic_accident_states']==0"
 
       - name: Probar migración desde base vacía
         run: |
-          python -c "import psycopg2; c=psycopg2.connect('postgresql://postgres:postgres@localhost:5432/vaaet'); c.autocommit=True; c.cursor().execute('CREATE DATABASE vaaet_fresh'); c.close()"
-          VAAET_DATABASE_ADMIN_URL=postgresql+psycopg2://postgres:postgres@localhost:5432/vaaet_fresh alembic upgrade head
-          VAAET_DATABASE_ADMIN_URL=postgresql+psycopg2://postgres:postgres@localhost:5432/vaaet_fresh python -c "import os, pathlib, psycopg2; c=psycopg2.connect(os.environ['VAAET_DATABASE_ADMIN_URL'].replace('postgresql+psycopg2://','postgresql://')); c.autocommit=True; c.cursor().execute(pathlib.Path('migrations/provision-roles.sql').read_text()); c.close()"
-          VAAET_EXPECT_LEGACY_FIXTURE=0 VAAET_DATABASE_ADMIN_URL=postgresql+psycopg2://postgres:postgres@localhost:5432/vaaet_fresh pytest tests/integration -v --tb=short -m postgres
+          PGDATABASE=postgres python -c "import psycopg2; c=psycopg2.connect(); c.autocommit=True; c.cursor().execute('CREATE DATABASE vaaet_fresh'); c.close()"
+          VAAET_DB_NAME=vaaet_fresh alembic upgrade head
+          PGDATABASE=vaaet_fresh /usr/lib/postgresql/17/bin/psql -v ON_ERROR_STOP=1 -f migrations/provision-roles.sql
+          VAAET_EXPECT_LEGACY_FIXTURE=0 VAAET_DB_NAME=vaaet_fresh pytest tests/integration -v --tb=short -m postgres
 
   dvc-check:
     runs-on: ubuntu-latest
@@ -301,20 +301,19 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Instalar componentes y extra DVC declarado
+      - name: Instalar componentes y plugins DVC declarados
         run: |
           python -m pip install --upgrade pip
           python -m pip install "./vaaet-core"
-          python -m pip install "./vaaet-ml[dvc]"
+          python -m pip install "./vaaet-ml[dvc,dvc-gdrive,dvc-s3]"
           python -m pip check
 
-      - name: Verificar configuración de DVC
+      - name: Verificar CLI y configuración DVC sin red
         run: |
           echo "=== DVC Version ==="
           dvc version
           dvc doctor
-          echo "=== Remotes ==="
-          dvc remote list
           echo "=== Status ==="
           dvc status
+          vaaet-registry --help
           echo "✅ Configuración de DVC verificada"

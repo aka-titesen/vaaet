@@ -59,16 +59,21 @@ ni promociona el artefacto.
 
 ## Versionado con DVC
 
-Después del primer entrenamiento se elimina `.gitkeep` y se registra el
-directorio completo:
+Después del primer entrenamiento se elimina `.gitkeep`, se configura el remoto
+local una única vez y se registra el directorio completo. `stage` valida el
+manifiesto antes de invocar DVC:
 
 ```bash
-dvc add vaaet-ml/artifacts/traffic-state
+vaaet-registry stage
 git add vaaet-ml/artifacts/traffic-state.dvc .gitignore
-dvc push
+git commit -m "feat(models): registrá bundle mlp-vX.Y"
+git tag model/mlp-vX.Y
+vaaet-registry push
 ```
 
-La infraestructura de publicación y descarga queda fuera de alcance. La futura
+La [guía del registro DVC](dvc-guide.md) describe la configuración local
+agnóstica de proveedor, recuperación por commit o tag y migración manual. La
+infraestructura de publicación y descarga queda fuera de alcance. La futura
 API y Web App pertenecerán al mismo monorepo, con los límites de
 [ADR-0021](../architecture/decisions/0021-portable-core-and-ml-laboratory-boundary.md);
 ADR-0012 conserva el antecedente histórico del contrato.

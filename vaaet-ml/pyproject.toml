@@ -60,8 +60,16 @@ dev = [
 ]
 dvc = [
     "dvc>=3.50.0",
+]
+dvc-gdrive = [
     "dvc-gdrive>=3.0.0",
 ]
+dvc-s3 = [
+    "dvc-s3>=3.0.0",
+]
+
+[project.scripts]
+vaaet-registry = "vaaet_ml.dvc_registry.cli:main"
 
 [project.urls]
 Repository = "https://github.com/zgfnicolas/vaaet"
@@ -82,7 +90,7 @@ target-version = "py310"
 line-length = 100
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "UP", "B", "C901"]
+select = ["E", "F", "I", "UP", "B", "C901", "N", "A"]
 ignore = ["E501"]
 
 [tool.ruff.lint.mccabe]

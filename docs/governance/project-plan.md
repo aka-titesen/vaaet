@@ -26,8 +26,9 @@ workers usarán core y validarán el manifiesto v2 antes de deserializar.
   públicos y la política humana exclusiva de `Accident`.
 - El laboratorio mantiene separación entre `SEED_BOOTSTRAP`, `HITL_RETRAINING`,
   snapshots, input locks y holdouts humanos inmutables.
-- DVC gobierna `vaaet-ml/artifacts/traffic-state/`; Git no almacena pesos,
-  bundles, videos, datos privados ni secretos.
+- DVC gobierna `vaaet-ml/artifacts/traffic-state/`; Git identifica sus
+  versiones por commit o tag y no almacena pesos, bundles, videos, datos
+  privados ni secretos. ADR-0023 define el remoto local `vaaet-registry`.
 - Toda futura demo con YOLO seguirá [ADR-0022](../architecture/decisions/0022-agpl-public-demo-path.md):
   vía pública AGPL con activos aprobados, o licencia Enterprise privada fuera
   de Git.

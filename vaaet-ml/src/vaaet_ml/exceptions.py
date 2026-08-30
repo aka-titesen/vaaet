@@ -25,3 +25,15 @@ class DatabaseOperationError(RuntimeError, LaboratoryError):
 
 class DatasetArtifactValidationError(ValueError, LaboratoryError):
     """Indica que un snapshot, catálogo o backup de laboratorio es inválido."""
+
+
+class DvcRegistryError(RuntimeError, LaboratoryError):
+    """Raíz de errores seguros del registro DVC del laboratorio."""
+
+
+class DvcRegistryConfigurationError(DvcRegistryError):
+    """Indica una configuración local de remoto DVC ausente o inválida."""
+
+
+class DvcRegistryOperationError(DvcRegistryError):
+    """Indica un fallo de Git o DVC sin exponer diagnósticos sensibles."""

@@ -8,6 +8,7 @@ import numpy as np
 import pandas as pd
 import pytest
 from vaaet.artifacts import FEATURE_SCHEMA_VERSION
+from vaaet.inference.protocols import FeatureScaler as CoreFeatureScaler
 
 from vaaet_ml.evaluation.champion_challenger import (
     EvaluationBundle,
@@ -15,6 +16,7 @@ from vaaet_ml.evaluation.champion_challenger import (
     paired_bootstrap_intervals,
     validate_evaluation_pair,
 )
+from vaaet_ml.evaluation.champion_challenger import FeatureScaler as EvaluationFeatureScaler
 from vaaet_ml.settings import FEATURE_COLS
 from vaaet_ml.training.holdout import HumanHoldoutConfig, resolve_human_holdout
 
@@ -32,6 +34,12 @@ class _FeatureStateModel:
         del verbose
         states = (np.rint(values[:, 0]).astype(int) + self.offset) % 3
         return np.eye(3)[states]
+
+
+def test_evaluation_reuses_the_portable_feature_scaler_protocol() -> None:
+    """La evaluación conserva el alias público del contrato portable compartido."""
+
+    assert EvaluationFeatureScaler is CoreFeatureScaler
 
 
 def _feedback(*, feature_offset: float = 0.0) -> pd.DataFrame:

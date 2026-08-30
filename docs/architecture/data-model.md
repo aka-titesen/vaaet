@@ -1,7 +1,9 @@
 # Modelo PostgreSQL — `vaaet-db-v2`
 
-VAAET ML 4.5.3 usa PostgreSQL 14+ y Alembic como única autoridad DDL. Los
-notebooks nunca crean ni alteran tablas. La revisión vigente encadena la
+VAAET ML 4.5.3 usa PostgreSQL 14+ y Alembic como única autoridad DDL. La
+portabilidad por capacidades y la configuración administrativa se rigen por
+[ADR-0024](decisions/0024-provider-neutral-postgresql-and-schema-as-code.md).
+Los notebooks nunca crean ni alteran tablas. La revisión vigente encadena la
 [migración base](../../vaaet-ml/migrations/versions/20260804_0001_postgres_schemas_hitl.py)
 y el [hardening 4.2](../../vaaet-ml/migrations/versions/20260806_0002_postgres_hardening_pipeline_runs.py).
 
@@ -121,8 +123,12 @@ Backup canónico:
 ```bash
 pg_dump --format=custom --no-owner --no-acl \
   --schema=vaaet_raw --schema=vaaet_ml --schema=vaaet_feedback --schema=vaaet_ops \
-  --file=vaaet-db-v2.backup "$DATABASE_URL"
+  --file=vaaet-db-v2.backup
 ```
+
+El cliente toma endpoint, TLS y credenciales desde variables `PG*` temporales
+preparadas por la identidad administrativa; la guía operativa muestra esa
+conversión sin guardar un DSN en Git.
 
 El importador inspecciona primero `pg_restore -l`, restaura únicamente tablas
 VAAET explícitas a SQL temporal y nunca aplica roles ni DDL del backup contra una

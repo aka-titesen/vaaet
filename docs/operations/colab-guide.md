@@ -88,7 +88,11 @@ psql 'postgresql://admin:...@host:5432/vaaet' -f vaaet-ml/migrations/provision-r
 
 El entrenamiento genera cuatro archivos bajo `vaaet-ml/artifacts/traffic-state/` y puede copiarlos juntos a `MyDrive/vaaet-ml/artifacts/traffic-state`. Inferencia intenta, en orden: bundle local, Drive y upload manual. El manifiesto se valida antes de cargar Keras o joblib. `ALLOW_PILOT_BUNDLE=True` permite ejecutar conscientemente el bootstrap; `ALLOW_EXPERIMENTAL_BUNDLE=True` queda reservado para candidatos HITL no aprobados. Ninguno promociona el artefacto.
 
-Después de aprobar un modelo, ejecutá localmente `dvc add vaaet-ml/artifacts/traffic-state` y `dvc push`. Los pesos YOLO se descargan desde Ultralytics en runtime y nunca se versionan.
+Después de aprobar un modelo, registralo desde una máquina local con
+`vaaet-registry stage`, commit/tag Git y `vaaet-registry push`. La configuración
+del remoto vive sólo en `.dvc/config.local`; los notebooks no autentican ni
+configuran DVC. Los pesos YOLO se descargan desde Ultralytics en runtime y nunca
+se versionan. Consultá la [guía del registro DVC](../ml/dvc-guide.md).
 
 ## Entradas y salidas
 

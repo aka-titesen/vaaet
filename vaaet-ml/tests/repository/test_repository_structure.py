@@ -27,7 +27,6 @@ ALLOWED_SCRIPT_FILES = {
     "evaluate-telemetry-exports.py",
     "export-training-dataset.py",
     "notebook_bootstrap.py",
-    "setup-dvc.sh",
 }
 
 
@@ -103,6 +102,34 @@ def test_database_review_and_reporting_keep_presentation_at_the_edge() -> None:
     assert "ipywidgets" in review_widgets
     assert "from vaaet_ml.data.database_backup import" in database_facade
     assert "from vaaet_ml.data.database_queries import" in database_facade
+
+
+def test_postgresql_configuration_is_portable_and_keeps_alembic_as_ddl_authority() -> None:
+    settings = REPO_ROOT.joinpath("src", "vaaet_ml", "data", "database_settings.py").read_text(
+        encoding="utf-8"
+    )
+    migration_environment = REPO_ROOT.joinpath("migrations", "env.py").read_text(encoding="utf-8")
+    workflow = WORKSPACE_ROOT.joinpath(".github", "workflows", "ci.yml").read_text(encoding="utf-8")
+    guide = WORKSPACE_ROOT.joinpath("docs", "operations", "postgresql-guide.md").read_text(
+        encoding="utf-8"
+    )
+
+    for contract in (
+        "DatabaseEndpointSettings",
+        "DatabasePoolSettings",
+        "DatabaseRetrySettings",
+        "DatabaseAdminSettings",
+    ):
+        assert contract in settings
+    assert "load_database_admin_settings" in migration_environment
+    assert 'config.attributes.get("connection")' in migration_environment
+    assert "VAAET_DATABASE_ADMIN_URL" not in migration_environment
+    assert "VAAET_DATABASE_ADMIN_URL" not in workflow
+    assert "VAAET_ADMIN_DB_USER" in workflow
+    assert "VAAET_DB_SSLMODE" in workflow
+    assert "alembic upgrade head" in guide
+    assert "endpoint administrativo directo" in guide
+    assert "create_all" in guide
 
 
 def test_pyright_strict_profile_and_ci_job_cover_both_source_roots() -> None:
@@ -276,12 +303,26 @@ def test_notebook_extras_match_workflows() -> None:
         assert f"ml_extras={ml_extras!r}" in code
 
 
-def test_dvc_ci_installs_the_declared_extra_from_the_workspace() -> None:
+def test_dvc_registry_uses_declared_provider_extras_and_neutral_configuration() -> None:
     workflow = (WORKSPACE_ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
+    pyproject = (REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8")
+    dvc_config = (WORKSPACE_ROOT / ".dvc" / "config").read_text(encoding="utf-8")
+    gitignore = (WORKSPACE_ROOT / ".gitignore").read_text(encoding="utf-8")
 
     assert 'python -m pip install "./vaaet-core"' in workflow
-    assert 'python -m pip install "./vaaet-ml[dvc]"' in workflow
-    assert 'pip install "dvc[gdrive]>=3.50.0"' not in workflow
+    assert 'python -m pip install "./vaaet-ml[dvc,dvc-gdrive,dvc-s3]"' in workflow
+    assert 'vaaet-registry --help' in workflow
+    assert 'dvc pull' not in workflow
+    assert 'dvc push' not in workflow
+    assert "dvc-gdrive" in pyproject
+    assert "dvc-s3" in pyproject
+    assert "remote =" not in dvc_config
+    assert "['remote" not in dvc_config
+    assert "gdrive://" not in dvc_config
+    assert "s3://" not in dvc_config
+    assert "endpointurl" not in dvc_config
+    assert ".dvc/config.local" in gitignore
+    assert not (SCRIPTS_DIR / "setup-dvc.sh").exists()
 
 
 def test_python_313_is_declared_and_exercised_by_ci() -> None:
@@ -416,8 +457,10 @@ def test_future_product_documents_are_explicitly_non_normative() -> None:
         assert "GPU T4/V100" not in content
 
 
-def test_component_ruff_configuration_enforces_complexity_limit() -> None:
+def test_component_ruff_configuration_enforces_complexity_and_naming_rules() -> None:
     for component_root in (WORKSPACE_ROOT / "vaaet-core", ML_ROOT):
         pyproject = (component_root / "pyproject.toml").read_text(encoding="utf-8")
         assert '"C901"' in pyproject
+        assert '"N"' in pyproject
+        assert '"A"' in pyproject
         assert "max-complexity = 10" in pyproject

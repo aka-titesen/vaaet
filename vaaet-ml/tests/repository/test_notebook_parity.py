@@ -108,7 +108,9 @@ def test_collection_uses_shared_analysis_and_data_contracts() -> None:
 def test_notebooks_handle_clips_without_complete_minutes() -> None:
     collection = _code(NOTEBOOKS["collection"])
     inference = _code(NOTEBOOKS["inference"])
-    review_module = (ML_ROOT / "src/vaaet_ml/data/review.py").read_text(encoding="utf-8")
+    review_module = (ML_ROOT / "src/vaaet_ml/data/review_orchestration.py").read_text(
+        encoding="utf-8"
+    )
 
     assert "mínimo: 60.0s" in collection
     assert "mínimo: 60.0s" in inference
@@ -168,6 +170,19 @@ def test_training_uses_shared_feature_contracts() -> None:
     assert 'feedback_policy=FeedbackPolicy.VALIDATED_ONLY' in code
     assert "USE_HUMAN_VALIDATED_FEEDBACK" not in code
     assert "persist_traffic_analysis" not in code
+
+
+def test_training_delegates_grouped_cross_validation() -> None:
+    code = _code(NOTEBOOKS["training"])
+    cross_validation = (ML_ROOT / "src/vaaet_ml/training/cross_validation.py").read_text(
+        encoding="utf-8"
+    )
+
+    assert "run_grouped_cross_validation(" in code
+    assert "StratifiedGroupKFold" not in code
+    assert "fold_model.fit(" not in code
+    assert "StratifiedGroupKFold" in cross_validation
+    assert "apply_model_input_policy" in cross_validation
 
 
 def test_training_prepares_postgres_backup_reader_in_colab() -> None:

@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 from __future__ import annotations
 
+from collections.abc import Callable
+
 import pandas as pd
 import pytest
 
@@ -62,3 +64,22 @@ def test_partition_validator_rejects_synthetic_test(raw_telemetry_df: pd.DataFra
     test["data_origin"] = "synthetic"
     with pytest.raises(ValueError, match="forbidden in test"):
         validate_training_partitions(train, validation, test)
+
+
+@pytest.mark.parametrize(
+    ("transform", "message"),
+    [
+        (lambda frame: frame.iloc[0:0], "no records"),
+        (lambda frame: frame.drop(columns=["clip_id"]), "missing columns"),
+        (lambda frame: frame.assign(avg_speed=-1), "impossible avg_speed"),
+        (lambda frame: frame.assign(speed_measurement_quality=1.2), r"within \[0,1\]"),
+        (lambda frame: frame.assign(data_origin="synthetic"), "no real telemetry"),
+    ],
+)
+def test_dataset_audit_rejects_invalid_source_contracts(
+    raw_telemetry_df: pd.DataFrame,
+    transform: Callable[[pd.DataFrame], pd.DataFrame],
+    message: str,
+) -> None:
+    with pytest.raises(ValueError, match=message):
+        audit_training_dataset(transform(raw_telemetry_df))

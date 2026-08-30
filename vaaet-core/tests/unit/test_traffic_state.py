@@ -179,6 +179,16 @@ class TestApplyConservativeAccidentGate:
 
 
 class TestClassifyTelemetryDataFrame:
+    def test_empty_features_return_the_contractual_empty_result(self) -> None:
+        result = classify_telemetry_dataframe(
+            pd.DataFrame(columns=FEATURE_COLS),
+            _DummyModel(np.array([0.9, 0.08, 0.02])),
+            _DummyScaler(len(FEATURE_COLS)),
+        )
+
+        assert result.empty
+        assert set(CLASSIFICATION_RESULT_COLUMNS).issubset(result.columns)
+
     def test_classifies_with_shared_schema(self) -> None:
         df = _feature_rows()
         scaler = _DummyScaler(len(FEATURE_COLS))
@@ -197,6 +207,33 @@ class TestClassifyTelemetryDataFrame:
 
         with pytest.raises(ValueError, match="Scaler feature count does not match"):
             classify_telemetry_dataframe(df, model, scaler)
+
+    def test_custom_feature_order_is_rejected(self) -> None:
+        active_features = FEATURE_COLS[:-1]
+        with pytest.raises(ValueError, match="Custom feature order"):
+            classify_telemetry_dataframe(
+                _feature_rows(),
+                _DummyModel(np.array([0.34, 0.33, 0.33])),
+                _DummyScaler(len(active_features)),
+                feature_cols=active_features,
+            )
+
+    @pytest.mark.parametrize(
+        "predictions, message",
+        [
+            (np.zeros((3, 2)), "exactly three probabilities"),
+            (np.array([[-0.1, 0.5, 0.6]] * 3), "invalid values"),
+        ],
+    )
+    def test_invalid_model_probabilities_are_rejected(
+        self, predictions: np.ndarray, message: str
+    ) -> None:
+        with pytest.raises(ValueError, match=message):
+            classify_telemetry_dataframe(
+                _feature_rows(),
+                _DummyModel(predictions),
+                _DummyScaler(len(FEATURE_COLS)),
+            )
 
     def test_legacy_bundle_neutralizes_missing_quality_features(self) -> None:
         df = _feature_rows()
@@ -221,6 +258,28 @@ class TestClassifyTelemetryDataFrame:
 
 
 class TestClassifyRawTelemetry:
+    def test_empty_raw_telemetry_returns_the_contractual_empty_result(self) -> None:
+        result = classify_raw_telemetry(
+            pd.DataFrame(),
+            _DummyModel(np.array([0.9, 0.08, 0.02])),
+            _DummyScaler(len(FEATURE_COLS)),
+        )
+
+        assert result.empty
+        assert set(CLASSIFICATION_RESULT_COLUMNS).issubset(result.columns)
+
+    def test_sprint_mode_uses_the_explicit_non_production_heuristic(self) -> None:
+        result = classify_raw_telemetry(
+            _raw_minutes(2),
+            _DummyModel(np.array([0.9, 0.08, 0.02])),
+            _DummyScaler(len(FEATURE_COLS)),
+            inference_mode="sprint",
+        )
+
+        assert result["model_version"].eq("sprint_heuristic_non_production").all()
+        assert result["confidence"].eq(0.0).all()
+        assert not result["accident_rule_triggered"].any()
+
     def test_one_complete_minute_returns_contractual_empty_result(self) -> None:
         scaler = _DummyScaler(len(FEATURE_COLS))
         model = _DummyModel(np.array([0.9, 0.08, 0.02]))

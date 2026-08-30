@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: 2026 VAAET Contributors
 # SPDX-License-Identifier: AGPL-3.0-only
-"""Portable model-bundle contract shared with downstream serving systems."""
+"""Contrato portable de bundles de modelos compartido con sistemas posteriores."""
 
 from __future__ import annotations
 
@@ -9,17 +9,12 @@ import importlib.metadata
 import json
 import re
 import subprocess
-import uuid
 from collections.abc import Mapping
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import TypedDict, cast
+from typing import TypedDict
 
-from vaaet.exceptions import ArtifactNotFoundError, ArtifactValidationError
-from vaaet.lifecycle import (
-    ModelInputPolicy,
-    TrainingMode,
-)
+from vaaet.exceptions import ArtifactNotFoundError
 from vaaet.settings import (
     DEFAULT_CLASS_THRESHOLDS,
     DEFAULT_MIN_PROBABILITY_MARGIN,
@@ -123,23 +118,6 @@ def _git_commit(path: Path) -> str:
     return result.stdout.strip() or "unknown"
 
 
-def _require_object_section(
-    manifest: Mapping[str, object],
-    field_name: str,
-) -> dict[str, object]:
-    """Devuelve una sección JSON objeto o informa el contrato incumplido.
-
-    El manifiesto llega desde JSON como datos no confiables. Este único límite
-    reduce el estrechamiento repetido de tipos y evita que los validadores de
-    dominio operen sobre objetos arbitrarios.
-    """
-
-    value = manifest[field_name]
-    if not isinstance(value, dict):
-        raise ArtifactValidationError(f"Manifest field '{field_name}' must be an object.")
-    return cast(dict[str, object], value)
-
-
 def create_manifest(
     bundle_dir: str | Path,
     *,
@@ -203,221 +181,8 @@ def create_manifest(
 
 def validate_manifest(bundle_dir: str | Path) -> TrafficBundleManifest:
     """Valida compatibilidad e integridad antes de cargar un bundle v2."""
-    directory = Path(bundle_dir).resolve()
-    manifest_path = directory / MANIFEST_FILE
-    if not manifest_path.is_file():
-        raise ArtifactNotFoundError(f"Missing artifact manifest: {MANIFEST_FILE}")
+    # La importación diferida mantiene la fachada pública libre de un ciclo de
+    # importación: los validadores sólo necesitan el contrato ya definido arriba.
+    from vaaet.artifact_validation import validate_manifest as _validate_manifest
 
-    try:
-        raw_manifest: object = json.loads(manifest_path.read_text(encoding="utf-8"))
-    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
-        raise ArtifactValidationError(f"Invalid artifact manifest: {exc}") from exc
-    if not isinstance(raw_manifest, dict):
-        raise ArtifactValidationError("Artifact manifest must be a JSON object.")
-    manifest = cast(dict[str, object], raw_manifest)
-
-    missing_fields = sorted(REQUIRED_FIELDS - manifest.keys())
-    if missing_fields:
-        raise ArtifactValidationError(f"Missing manifest fields: {', '.join(missing_fields)}")
-    if type(manifest["contract_version"]) is not int or manifest["contract_version"] != CONTRACT_VERSION:
-        raise ArtifactValidationError("Unsupported artifact contract version.")
-    if manifest["feature_schema_version"] != FEATURE_SCHEMA_VERSION:
-        raise ArtifactValidationError("Unsupported feature schema version.")
-    if manifest["model_version"] != MODEL_VERSION:
-        raise ArtifactValidationError("Artifact model version is incompatible with VAAET.")
-    if not isinstance(manifest["generated_at"], str) or not manifest["generated_at"]:
-        raise ArtifactValidationError("Manifest generated_at must be a non-empty string.")
-    try:
-        generated_at = datetime.fromisoformat(manifest["generated_at"].replace("Z", "+00:00"))
-    except ValueError as exc:
-        raise ArtifactValidationError("Manifest generated_at must be a valid ISO-8601 timestamp.") from exc
-    if generated_at.tzinfo is None:
-        raise ArtifactValidationError("Manifest generated_at must include a timezone.")
-    if not isinstance(manifest["git_commit"], str) or not manifest["git_commit"]:
-        raise ArtifactValidationError("Manifest git_commit must be a non-empty string.")
-    if manifest["feature_columns"] != list(FEATURE_COLS):
-        raise ArtifactValidationError("Artifact feature schema does not match FEATURE_COLS.")
-    if manifest["class_mapping"] != {str(key): value for key, value in STATE_LABELS.items()}:
-        raise ArtifactValidationError("Artifact class mapping is incompatible with VAAET.")
-    expected_outputs = {str(key): value for key, value in MODEL_STATE_LABELS.items()}
-    if manifest["model_output_mapping"] != expected_outputs:
-        raise ArtifactValidationError("Artifact MLP output mapping is incompatible with VAAET.")
-    lifecycle = _require_object_section(manifest, "training_lifecycle")
-    lifecycle_fields = {
-        "training_mode",
-        "supervision",
-        "deployment_stage",
-        "input_policy",
-        "production_eligible",
-    }
-    if missing_lifecycle := sorted(lifecycle_fields - lifecycle.keys()):
-        raise ArtifactValidationError(
-            f"Missing training lifecycle fields: {', '.join(missing_lifecycle)}"
-        )
-    try:
-        training_mode = TrainingMode(lifecycle["training_mode"])
-        input_policy = ModelInputPolicy(lifecycle["input_policy"])
-    except (TypeError, ValueError) as exc:
-        raise ArtifactValidationError("Unsupported training lifecycle mode or input policy.") from exc
-    if lifecycle["deployment_stage"] not in {"pilot", "candidate", "production"}:
-        raise ArtifactValidationError("Unsupported bundle deployment stage.")
-    if not isinstance(lifecycle["supervision"], str) or not lifecycle["supervision"]:
-        raise ArtifactValidationError("Training lifecycle supervision must be non-empty.")
-    if type(lifecycle["production_eligible"]) is not bool:
-        raise ArtifactValidationError("Training lifecycle eligibility must be boolean.")
-    if training_mode is TrainingMode.SEED_BOOTSTRAP and (
-        lifecycle["deployment_stage"] != "pilot"
-        or lifecycle["production_eligible"]
-        or lifecycle["supervision"] != "weak-proxy"
-        or input_policy is not ModelInputPolicy.LEGACY_V1_BOOTSTRAP
-    ):
-        raise ArtifactValidationError(
-            "Seed bootstrap bundles must remain legacy-policy weak-proxy pilots."
-        )
-    if training_mode is TrainingMode.HITL_RETRAINING and (
-        lifecycle["deployment_stage"] not in {"candidate", "production"}
-        or lifecycle["supervision"] != "human-validated-with-proxy-memory"
-    ):
-        raise ArtifactValidationError("HITL bundles must be human-validated candidates or production.")
-    policy = _require_object_section(manifest, "decision_policy")
-    missing_policy = sorted(REQUIRED_POLICY_FIELDS - policy.keys())
-    if missing_policy:
-        raise ArtifactValidationError(
-            f"Missing decision policy fields: {', '.join(missing_policy)}"
-        )
-    if policy["automatic_accident_state_allowed"] is not False:
-        raise ArtifactValidationError("Bundle v2 must prohibit automatic Accident states.")
-    if policy["human_confirmation_required_for_accident"] is not True:
-        raise ArtifactValidationError("Bundle v2 must require human confirmation for Accident.")
-    expected_threshold_keys = {str(key) for key in MODEL_STATE_LABELS}
-    thresholds = policy["class_thresholds"]
-    if not isinstance(thresholds, dict) or set(thresholds) != expected_threshold_keys:
-        raise ArtifactValidationError("Decision policy class thresholds are incompatible.")
-    for threshold in thresholds.values():
-        if isinstance(threshold, bool) or not isinstance(threshold, (int, float)):
-            raise ArtifactValidationError("Decision thresholds must be numeric.")
-        if not 0.0 <= float(threshold) <= 1.0:
-            raise ArtifactValidationError("Decision thresholds must be between 0 and 1.")
-    temperature = policy["temperature"]
-    if isinstance(temperature, bool) or not isinstance(temperature, (int, float)):
-        raise ArtifactValidationError("Decision policy temperature must be numeric.")
-    if not 0.0 < float(temperature) <= 10.0:
-        raise ArtifactValidationError("Decision policy temperature is outside the supported range.")
-    files = _require_object_section(manifest, "files")
-    dependencies = _require_object_section(manifest, "dependencies")
-    metrics = _require_object_section(manifest, "metrics")
-    provenance = _require_object_section(manifest, "data_provenance")
-    for name in REQUIRED_DEPENDENCIES:
-        version = dependencies.get(name)
-        if not isinstance(version, str) or not version:
-            raise ArtifactValidationError(f"Missing or invalid dependency version: {name}")
-    f1_macro = metrics.get("f1_macro")
-    if isinstance(f1_macro, bool) or not isinstance(f1_macro, (int, float)) or not 0 <= f1_macro <= 1:
-        raise ArtifactValidationError("Manifest metrics.f1_macro must be a number between 0 and 1.")
-    missing_provenance = sorted(REQUIRED_PROVENANCE_FIELDS - provenance.keys())
-    if missing_provenance:
-        raise ArtifactValidationError(
-            f"Missing data provenance fields: {', '.join(missing_provenance)}"
-        )
-    if not isinstance(provenance["origin"], str) or not provenance["origin"]:
-        raise ArtifactValidationError("Manifest data_provenance.origin must be a non-empty string.")
-    if type(provenance["record_count"]) is not int or provenance["record_count"] < 0:
-        raise ArtifactValidationError("Manifest data_provenance.record_count must be non-negative.")
-    if type(provenance["synthetic_data_included"]) is not bool:
-        raise ArtifactValidationError(
-            "Manifest data_provenance.synthetic_data_included must be a boolean."
-        )
-    if isinstance(provenance["telemetry_v2_coverage"], bool) or not isinstance(
-        provenance["telemetry_v2_coverage"], (int, float)
-    ):
-        raise ArtifactValidationError("telemetry_v2_coverage must be numeric.")
-    if not 0.0 <= float(provenance["telemetry_v2_coverage"]) <= 1.0:
-        raise ArtifactValidationError("telemetry_v2_coverage must be between 0 and 1.")
-    for name in ("human_holdout", "production_eligible"):
-        if type(provenance[name]) is not bool:
-            raise ArtifactValidationError(f"Manifest data_provenance.{name} must be boolean.")
-    holdout = manifest.get("human_holdout")
-    if provenance["human_holdout"]:
-        if not isinstance(holdout, dict):
-            raise ArtifactValidationError(
-                "A frozen human holdout requires its versioned snapshot descriptor."
-            )
-        holdout = cast(dict[str, object], holdout)
-        required_holdout = {
-            "contract",
-            "snapshot_id",
-            "generation",
-            "fingerprint",
-            "validation_rows",
-            "test_rows",
-        }
-        if missing_holdout := sorted(required_holdout - holdout.keys()):
-            raise ArtifactValidationError(
-                f"Missing human holdout descriptor fields: {', '.join(missing_holdout)}"
-            )
-        if holdout["contract"] != "vaaet-human-holdout-v1":
-            raise ArtifactValidationError("Unsupported human holdout contract.")
-        try:
-            uuid.UUID(str(holdout["snapshot_id"]))
-        except ValueError as exc:
-            raise ArtifactValidationError("Human holdout snapshot_id must be a UUID.") from exc
-        if type(holdout["generation"]) is not int or holdout["generation"] < 1:
-            raise ArtifactValidationError("Human holdout generation must be positive.")
-        fingerprint = holdout["fingerprint"]
-        if not isinstance(fingerprint, str) or not _SHA256_PATTERN.fullmatch(fingerprint):
-            raise ArtifactValidationError("Human holdout fingerprint must be SHA-256.")
-        for count_field in ("validation_rows", "test_rows"):
-            if type(holdout[count_field]) is not int or holdout[count_field] < 1:
-                raise ArtifactValidationError(
-                    f"Human holdout {count_field} must be a positive integer."
-                )
-    elif holdout is not None:
-        raise ArtifactValidationError(
-            "A model without a frozen benchmark must not declare a human holdout descriptor."
-        )
-    input_lock = manifest.get("training_input_lock")
-    if input_lock is not None:
-        if not isinstance(input_lock, dict):
-            raise ArtifactValidationError("training_input_lock must be an object or null.")
-        input_lock = cast(dict[str, object], input_lock)
-        required_lock = {"contract", "lock_id", "fingerprint"}
-        if missing_lock := sorted(required_lock - input_lock.keys()):
-            raise ArtifactValidationError(
-                f"Missing training input lock fields: {', '.join(missing_lock)}"
-            )
-        if input_lock["contract"] != "vaaet-training-input-lock-v1":
-            raise ArtifactValidationError("Unsupported training input lock contract.")
-        try:
-            uuid.UUID(str(input_lock["lock_id"]))
-        except ValueError as exc:
-            raise ArtifactValidationError("Training input lock ID must be a UUID.") from exc
-        if not isinstance(input_lock["fingerprint"], str) or not _SHA256_PATTERN.fullmatch(
-            input_lock["fingerprint"]
-        ):
-            raise ArtifactValidationError("Training input lock fingerprint must be SHA-256.")
-    if not isinstance(provenance["promotion_blockers"], list) or not all(
-        isinstance(item, str) for item in provenance["promotion_blockers"]
-    ):
-        raise ArtifactValidationError("promotion_blockers must be a list of strings.")
-    metric_eligibility = metrics.get("production_eligible")
-    if type(metric_eligibility) is not bool or metric_eligibility != provenance["production_eligible"]:
-        raise ArtifactValidationError("Production eligibility must be explicit and consistent.")
-    if lifecycle["production_eligible"] != metric_eligibility:
-        raise ArtifactValidationError("Training lifecycle eligibility must match bundle metrics.")
-    if lifecycle["deployment_stage"] == "production" and not metric_eligibility:
-        raise ArtifactValidationError("Only eligible bundles may use the production stage.")
-
-    for name in REQUIRED_FILES:
-        path = directory / name
-        file_entry = files.get(name)
-        if not isinstance(file_entry, dict):
-            raise ArtifactValidationError(f"Missing or invalid manifest file entry: {name}")
-        file_entry = cast(dict[str, object], file_entry)
-        expected = file_entry.get("sha256")
-        if not path.is_file():
-            raise ArtifactNotFoundError(f"Missing artifact file: {name}")
-        if not isinstance(expected, str) or not _SHA256_PATTERN.fullmatch(expected):
-            raise ArtifactValidationError(f"Invalid SHA-256 entry for artifact file: {name}")
-        if _sha256(path) != expected:
-            raise ArtifactValidationError(f"Checksum mismatch for artifact file: {name}")
-    return cast(TrafficBundleManifest, manifest)
+    return _validate_manifest(bundle_dir)

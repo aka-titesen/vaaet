@@ -134,37 +134,53 @@ def load_dataset_package(
             root = Path(temporary_directory)
             with zipfile.ZipFile(package) as archive:
                 _safe_extract(archive, root)
-            manifest_path = root / "dataset-manifest.json"
-            if not manifest_path.is_file():
-                raise DatasetArtifactValidationError("Falta el manifiesto del paquete de datos.")
-            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-            if not isinstance(manifest, dict):
-                raise DatasetArtifactValidationError("El manifiesto del paquete debe ser un objeto.")
-            contract_version = manifest.get("contract_version")
-            if contract_version not in accepted_contracts:
-                raise DatasetArtifactValidationError("Versión de contrato de paquete no admitida.")
-            manifest_files = manifest.get("files")
-            if not isinstance(manifest_files, dict):
-                raise DatasetArtifactValidationError("El manifiesto no declara archivos válidos.")
-            frames: dict[str, pd.DataFrame] = {}
-            for component, metadata in manifest_files.items():
-                if component not in PACKAGE_FILES or not isinstance(metadata, dict):
-                    raise DatasetArtifactValidationError("El paquete declara un componente desconocido.")
-                filename = metadata.get("filename")
-                if filename != PACKAGE_FILES[component]:
-                    raise DatasetArtifactValidationError("El paquete declara un nombre de archivo inesperado.")
-                table_path = root / str(filename)
-                if not table_path.is_file() or _sha256(table_path) != metadata.get("sha256"):
-                    raise DatasetArtifactValidationError("El checksum de una tabla del paquete no coincide.")
-                frame = pd.read_csv(table_path, float_precision="round_trip")
-                if len(frame) != int(metadata.get("rows", -1)):
-                    raise DatasetArtifactValidationError("La cantidad de filas del paquete no coincide.")
-                if list(frame.columns) != metadata.get("columns"):
-                    raise DatasetArtifactValidationError("Las columnas del paquete no coinciden.")
-                frame.attrs["vaaet_package_provenance"] = manifest.get("provenance", {})
-                frame.attrs["vaaet_package_metadata"] = manifest.get("package_metadata", {})
-                frame.attrs["vaaet_package_contract"] = contract_version
-                frames[component] = frame
-            return frames
+            manifest = _read_dataset_manifest(root, accepted_contracts)
+            return _load_dataset_components(root, manifest)
     except (zipfile.BadZipFile, UnicodeError, json.JSONDecodeError) as error:
         raise DatasetArtifactValidationError("El paquete de datos no puede leerse.") from error
+
+
+def _read_dataset_manifest(root: Path, accepted_contracts: tuple[str, ...]) -> dict[str, object]:
+    manifest_path = root / "dataset-manifest.json"
+    if not manifest_path.is_file():
+        raise DatasetArtifactValidationError("Falta el manifiesto del paquete de datos.")
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    if not isinstance(manifest, dict):
+        raise DatasetArtifactValidationError("El manifiesto del paquete debe ser un objeto.")
+    if manifest.get("contract_version") not in accepted_contracts:
+        raise DatasetArtifactValidationError("Versión de contrato de paquete no admitida.")
+    if not isinstance(manifest.get("files"), dict):
+        raise DatasetArtifactValidationError("El manifiesto no declara archivos válidos.")
+    return manifest
+
+
+def _load_dataset_components(root: Path, manifest: Mapping[str, object]) -> dict[str, pd.DataFrame]:
+    files = manifest["files"]
+    if not isinstance(files, Mapping):
+        raise DatasetArtifactValidationError("El manifiesto no declara archivos válidos.")
+    return {
+        component: _load_dataset_component(root, component, metadata, manifest)
+        for component, metadata in files.items()
+    }
+
+
+def _load_dataset_component(
+    root: Path, component: object, metadata: object, manifest: Mapping[str, object]
+) -> pd.DataFrame:
+    if not isinstance(component, str) or component not in PACKAGE_FILES or not isinstance(metadata, Mapping):
+        raise DatasetArtifactValidationError("El paquete declara un componente desconocido.")
+    filename = metadata.get("filename")
+    if filename != PACKAGE_FILES[component]:
+        raise DatasetArtifactValidationError("El paquete declara un nombre de archivo inesperado.")
+    table_path = root / str(filename)
+    if not table_path.is_file() or _sha256(table_path) != metadata.get("sha256"):
+        raise DatasetArtifactValidationError("El checksum de una tabla del paquete no coincide.")
+    frame = pd.read_csv(table_path, float_precision="round_trip")
+    if len(frame) != int(metadata.get("rows", -1)):
+        raise DatasetArtifactValidationError("La cantidad de filas del paquete no coincide.")
+    if list(frame.columns) != metadata.get("columns"):
+        raise DatasetArtifactValidationError("Las columnas del paquete no coinciden.")
+    frame.attrs["vaaet_package_provenance"] = manifest.get("provenance", {})
+    frame.attrs["vaaet_package_metadata"] = manifest.get("package_metadata", {})
+    frame.attrs["vaaet_package_contract"] = manifest["contract_version"]
+    return frame

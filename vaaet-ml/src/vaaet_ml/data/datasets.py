@@ -278,36 +278,12 @@ def merge_raw_telemetry_csv(
     """
     destination = Path(destination)
     if telemetry.empty:
-        if not destination.is_file():
-            return pd.DataFrame(columns=CANONICAL_RAW_TELEMETRY_COLUMNS)
+        return _existing_telemetry_or_empty(destination)
 
-        existing = pd.read_csv(destination, float_precision="round_trip")
-        missing_existing = set(BASE_RAW_TELEMETRY_COLUMNS) - set(existing.columns)
-        if missing_existing:
-            raise ValueError(
-                "Existing raw telemetry is missing required columns: "
-                f"{sorted(missing_existing)}"
-            )
-        for column in (*TELEMETRY_QUALITY_COLUMNS, *TELEMETRY_METADATA_COLUMNS):
-            if column not in existing:
-                existing[column] = pd.NA
-        return existing
-
-    missing = set(BASE_RAW_TELEMETRY_COLUMNS) - set(telemetry.columns)
-    if missing:
-        raise ValueError(f"Raw telemetry is missing required columns: {sorted(missing)}")
-
-    incoming = telemetry.copy()
-    for column in (*TELEMETRY_QUALITY_COLUMNS, *TELEMETRY_METADATA_COLUMNS):
-        if column not in incoming:
-            incoming[column] = pd.NA
-    frames = [incoming]
+    _require_raw_telemetry_columns(telemetry, source="Raw telemetry")
+    frames = [_with_optional_telemetry_columns(telemetry.copy())]
     if destination.is_file():
-        existing = pd.read_csv(destination, float_precision="round_trip")
-        for column in (*TELEMETRY_QUALITY_COLUMNS, *TELEMETRY_METADATA_COLUMNS):
-            if column not in existing:
-                existing[column] = pd.NA
-        frames.insert(0, existing)
+        frames.insert(0, _read_existing_telemetry(destination))
 
     merged = pd.concat(frames, ignore_index=True)
     merged["record_time"] = normalize_timestamp_series(merged["record_time"])
@@ -319,3 +295,28 @@ def merge_raw_telemetry_csv(
     destination.parent.mkdir(parents=True, exist_ok=True)
     merged.to_csv(destination, index=False)
     return merged
+
+
+def _existing_telemetry_or_empty(destination: Path) -> pd.DataFrame:
+    if not destination.is_file():
+        return pd.DataFrame(columns=CANONICAL_RAW_TELEMETRY_COLUMNS)
+    return _read_existing_telemetry(destination)
+
+
+def _read_existing_telemetry(destination: Path) -> pd.DataFrame:
+    existing = pd.read_csv(destination, float_precision="round_trip")
+    _require_raw_telemetry_columns(existing, source="Existing raw telemetry")
+    return _with_optional_telemetry_columns(existing)
+
+
+def _require_raw_telemetry_columns(telemetry: pd.DataFrame, *, source: str) -> None:
+    missing = sorted(set(BASE_RAW_TELEMETRY_COLUMNS) - set(telemetry.columns))
+    if missing:
+        raise ValueError(f"{source} is missing required columns: {missing}")
+
+
+def _with_optional_telemetry_columns(telemetry: pd.DataFrame) -> pd.DataFrame:
+    for column in (*TELEMETRY_QUALITY_COLUMNS, *TELEMETRY_METADATA_COLUMNS):
+        if column not in telemetry:
+            telemetry[column] = pd.NA
+    return telemetry

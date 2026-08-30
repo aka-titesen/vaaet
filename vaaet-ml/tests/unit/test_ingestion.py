@@ -276,6 +276,17 @@ def test_rejects_wrong_package_contract(tmp_path: Path) -> None:
         load_dataset_package(rewritten)
 
 
+def test_dataset_package_rejects_missing_and_unsafe_archives(tmp_path: Path) -> None:
+    with pytest.raises(FileNotFoundError, match="No se encontró"):
+        load_dataset_package(tmp_path / "missing.zip")
+
+    unsafe = tmp_path / "unsafe.zip"
+    with zipfile.ZipFile(unsafe, "w") as archive:
+        archive.writestr("../escape.csv", "unsafe")
+    with pytest.raises(ValueError, match="ruta insegura"):
+        load_dataset_package(unsafe)
+
+
 def test_human_label_precedes_proxy_for_same_minute() -> None:
     proxy = _features(state=0)
     proxy["is_human_validated"] = False

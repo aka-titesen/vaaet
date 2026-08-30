@@ -14,15 +14,16 @@ componente, leé también `vaaet-core/AGENTS.md` o `vaaet-ml/AGENTS.md`; ADR-002
 gobierna sus límites y ADR-0022 cualquier serving futuro con YOLO.
 
 VAAET usa actualmente `main` como rama principal y `feature/*` para trabajo
-aislado. No hay una rama `develop`, Git Flow completo, plantilla de pull request,
-protección de ramas, firma de commits, commitlint ni hooks configurados como
-política vigente. No los presentes como capacidades existentes ni los agregues
-sin autorización explícita.
+aislado. La plantilla versionada `.git-commit-template.txt` es una guía local
+opt-in, no una configuración aplicada automáticamente. No hay una rama
+`develop`, Git Flow completo, plantilla de pull request, protección de ramas,
+firma de commits, commitlint ni hooks configurados como política vigente. No los
+presentes como capacidades existentes ni los agregues sin autorización explícita.
 
 No crees ramas, hagas staging, commits, rebase, push, pull requests, merges,
-tags ni cambios de configuración global sin la autorización que corresponda. No
-reescribas historial compartido ni uses `--force` o `--force-with-lease` salvo
-instrucción expresa y análisis de impacto.
+tags ni cambios de configuración local o global sin la autorización que
+corresponda. No reescribas historial compartido ni uses `--force` o
+`--force-with-lease` salvo instrucción expresa y análisis de impacto.
 
 ## Escribí commits en español argentino rioplatense formal
 
@@ -63,6 +64,28 @@ datos sensibles o excepciones sin redactar.
 No reescribas commits históricos en inglés sólo para traducirlos. Aplicá esta
 convención a nuevos commits y a mensajes aún locales que el responsable haya
 autorizado limpiar antes de compartir.
+
+## Ofrecé la plantilla local sólo cuando corresponda
+
+La raíz contiene `.git-commit-template.txt`, una ayuda versionada para redactar
+la convención vigente. Mantenela alineada con los tipos, scopes y español
+rioplatense de esta skill; no la conviertas en una política de Git Flow, una
+obligación de ticket ni una regla de Gitmoji.
+
+Un desarrollador puede activarla para este clon con:
+
+```text
+git config --local commit.template .git-commit-template.txt
+```
+
+Ese comando modifica `.git/config`, no se propaga al clonar y requiere
+autorización explícita antes de ejecutarse. No configures `--global` ni crees
+scripts, hooks o configuración compartida para forzarla. `git commit` sin
+`-m` abre la plantilla en el editor; un mensaje pasado con `-m` no la utiliza.
+
+Las líneas que comienzan con `#` funcionan como guía y Git las ignora al crear
+el mensaje. El pie `BREAKING CHANGE:` sólo corresponde a una incompatibilidad
+real y no reemplaza el ADR, el plan ni la autorización que exija el cambio.
 
 ## Prepará cambios atómicos y verificables
 

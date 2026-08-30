@@ -1,0 +1,26 @@
+# Formato: tipo(scope): verbo en voseo formal + resultado concreto
+# Ejemplo: feat(vision): incorporá telemetría ordenada por minuto
+#
+# Tipos permitidos:
+#   feat     nueva funcionalidad
+#   fix      corrección de error
+#   docs     documentación
+#   style    formato sin cambio de comportamiento
+#   refactor reorganización interna sin cambio de comportamiento
+#   perf     mejora de rendimiento medida
+#   test     pruebas añadidas o corregidas
+#   chore    mantenimiento o configuración sin cambio funcional
+#
+# Scopes de VAAET cuando aclaren el cambio:
+#   core, ml, vision, features, inference, data, training, evaluation,
+#   artifacts, notebooks, docs, ci, dvc
+#
+# Cuerpo opcional: explicá qué cambió, por qué, riesgos, limitaciones,
+# migración o impacto operativo. Separalo del asunto con una línea en blanco.
+#
+# Pie opcional: referenciá sólo tickets o issues existentes.
+# Refs: #123
+# BREAKING CHANGE: describí la incompatibilidad y la migración requerida.
+#
+# No incluyas secretos, rutas privadas, datos sensibles ni Gitmoji.
+# Las líneas que comienzan con '#' se ignoran al crear el commit.

@@ -10,7 +10,7 @@ Complementa BIAS_AND_LIMITATIONS.md y FEASIBILITY.md. -->
 | **Nombre del Proyecto** | VAAET — Video Advanced Analysis of Traffic |
 | **Versión** | 4.5.3 |
 | **Responsable Técnico** | Facundo Nicolás González |
-| **Última Revisión** | 2026-08-27 |
+| **Última Revisión** | 2026-08-30 |
 
 ---
 
@@ -21,7 +21,7 @@ Complementa BIAS_AND_LIMITATIONS.md y FEASIBILITY.md. -->
 | R-001 | **Desconexión de Google Colab** durante procesamiento de video largo | Infraestructura | Alta | Serio | 🔴 Crítico | Procesar clips acotados, descargar outputs y conservar snapshots/paquetes en Drive cuando corresponda | Reanudar desde el último output materializado; no asumir checkpoint frame a frame |
 | R-002 | **GPU no disponible** en Colab Free/Pro | Infraestructura | Media | Moderado | 🟡 Alto | Preflight tipado antes de tareas costosas; elegir otro runtime GPU gestionado | Detener el workflow de visión sin fallback CPU y reintentar cuando haya GPU |
 | R-003 | **Fallo de conexión PostgreSQL** | Infraestructura | Media | Bajo | 🟢 Medio | Error redactado y outputs locales preservados | Reintentar operaciones idempotentes; exportar paquete local |
-| R-004 | **Cambio de zoom/ángulo de cámara SISE** durante un clip | Dominio | Alta | Moderado | 🟡 Alto | Corrección de perspectiva adaptativa por zona Y; compensación de flujo óptico | Recalibrar `pixels_per_meter` si el error supera MAE > 10 km/h |
+| R-004 | **Cambio de zoom/ángulo de cámara SISE** durante un clip | Dominio | Alta | Moderado | 🟡 Alto | `VideoViewPlan` explícito, perfiles locales por vista y descarte de minutos mixtos | Corregir el plan y reprocesar; no publicar MAE sin ground truth |
 | R-005 | **Accidente/Congested con soporte real insuficiente** | ML/Datos | Alta | Serio | 🔴 Crítico | Accident fuera del MLP; sintéticos sólo en train/estrés | Holdout humano, shadow mode y gates mínimos de episodios/exposición |
 | R-006 | **Drift del modelo** por cambios en patrones de tráfico | ML/Datos | Baja | Moderado | 🟢 Medio | Monitoreo de distribución de features en producción (futuro) | Re-entrenar con datos recientes cuando F1-macro caiga < 0.80 |
 | R-007 | **Auto-etiquetado circular** introduce sesgo sistémico | ML/Datos | Alta | Moderado | 🟡 Alto | Umbrales calibrados a percentiles del puente; HITL para validación | Migrar progresivamente a ground truth humano |
@@ -52,4 +52,4 @@ Baja     │  R-003     │  R-006       │  R-011       │  R-009      │
 ---
 
 Responsable del documento: Facundo Nicolás González
-Fecha de revisión: 2026-08-27
+Fecha de revisión: 2026-08-30

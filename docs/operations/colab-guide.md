@@ -39,6 +39,14 @@ El desarrollo local sí conserva `pip install -e` para ambos componentes.
 
 Antes de tareas costosas, la misma celda informa commit, versión de Python, origen instalado, RAM, disco libre en `/content`, GPU del framework y `nvidia-smi` si existe. Colección, entrenamiento e inferencia se detienen si Colab no tiene GPU; evaluación continúa read-only sin exigirla.
 
+Colección e inferencia incluyen `VIEW_PLAN_PATH = None` en su única celda de
+configuración. Conservá `None` para el análisis histórico de una vista. Para un
+clip con cambios declarados de cámara o zoom estable, indicá un JSON privado
+`vaaet-view-plan-v1`: el adaptador de ML lo valida antes de pasarlo al core,
+reinicia el tracking por transición y descarta cualquier minuto mixto. No subas
+ni versionés el plan real, sus referencias métricas o el video; seguí la
+[guía de calibración multi-vista](multi-view-calibration-guide.md).
+
 La instalación captura la salida de `pip`. Si falla, la celda muestra stdout y
 stderr completos, la versión de Python y los extras solicitados antes de
 detenerse. No continúes con las celdas siguientes: actualizá el repositorio y
@@ -101,6 +109,11 @@ se versionan. Consultá la [guía del registro DVC](../ml/dvc-guide.md).
 - Reentrenamiento HITL: paquete semilla + features validadas → bundle candidato.
 - Evaluación: Champion + Challenger + holdout humano exacto → evidencia comparativa manual.
 - Inferencia: MP4 + bundle → MP4 anotado + features/predicciones PostgreSQL opcionales.
+
+Con un plan de vistas, las velocidades se estiman sólo dentro de la calibración
+local declarada; cada segmento expone un reporte lateral y el tramo que cruza
+una transición no genera telemetría ni clasificación. Esto no equivale a una
+calibración por radar/GPS ni habilita streaming o cámaras simultáneas.
 
 El clasificador sólo consume minutos completos. Durante una ventana parcial se muestra el último estado estable. `Accident` nunca es automático: una evidencia persistente produce `Congested + accident_rule_triggered`; el código 3 exige feedback humano validado.
 

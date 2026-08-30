@@ -47,6 +47,7 @@ from vaaet.settings import (
     STATIONARY_STD_MAX,
     STATIONARY_TOTAL_DISP_MAX,
 )
+from vaaet.vision.view_plan import CameraCalibration
 
 logger = get_logger(__name__)
 
@@ -162,8 +163,9 @@ def estimate_speed(
     min_track_length: int = SPEED_MIN_TRACK_LENGTH,
     window_frames: int = SPEED_ESTIMATION_WINDOW,
     noise_floor: float = SPEED_DISPLACEMENT_NOISE_FLOOR,
+    calibration: CameraCalibration | None = None,
 ) -> float | None:
-    """Estimate vehicle speed in km/h from its centroid history."""
+    """Estima velocidad desde un historial temporal y una calibración local opcional."""
     if len(history) < max(2, min_track_length):
         return None
 
@@ -174,7 +176,8 @@ def estimate_speed(
     if global_motion is not None:
         displacements = displacements - global_motion
 
-    norms = np.linalg.norm(displacements, axis=1)
+    raw_norms = np.linalg.norm(displacements, axis=1)
+    norms = raw_norms.copy()
     norms[norms < noise_floor] = 0.0
 
     if len(norms) >= 3:
@@ -182,12 +185,24 @@ def estimate_speed(
         if med > 0:
             norms = np.minimum(norms, 3.0 * med)
 
-    total_px = float(np.sum(norms))
-    avg_y = float(positions[:, 1].mean())
-    pf = get_perspective_factor(avg_y, frame_height)
-    total_px *= pf
-
-    distance_m = total_px / pixels_per_meter
+    if calibration is None:
+        total_px = float(np.sum(norms))
+        avg_y = float(positions[:, 1].mean())
+        pf = get_perspective_factor(avg_y, frame_height)
+        distance_m = (total_px * pf) / pixels_per_meter
+    else:
+        # Mantiene el filtro robusto previo a convertir cada desplazamiento a metros.
+        scale_factors = np.divide(
+            norms,
+            raw_norms,
+            out=np.zeros_like(norms),
+            where=raw_norms > 0.0,
+        )
+        calibrated_displacements = displacements * scale_factors[:, np.newaxis]
+        distance_m = calibration.distance_meters(
+            tuple((float(x), float(y)) for x, y in positions),
+            tuple((float(dx), float(dy)) for dx, dy in calibrated_displacements),
+        )
     n_frames = len(positions) - 1
     time_s = n_frames / max(fps, 1)
     if time_s <= 0:
@@ -362,6 +377,10 @@ class SmoothedSpeedTracker:
         """Remove speed history for a track that has been pruned."""
         self._speeds.pop(track_id, None)
 
+    def reset(self) -> None:
+        """Descarta el suavizado al iniciar una vista sin identidad compartida."""
+        self._speeds.clear()
+
 
 class TrackMotionStateTracker:
     """Hysteresis-based stationary state tracker per vehicle track."""
@@ -413,3 +432,9 @@ class TrackMotionStateTracker:
         self._stationary.pop(track_id, None)
         self._enter_votes.pop(track_id, None)
         self._exit_votes.pop(track_id, None)
+
+    def reset(self) -> None:
+        """Descarta votos e historial de inmovilidad entre vistas distintas."""
+        self._stationary.clear()
+        self._enter_votes.clear()
+        self._exit_votes.clear()

@@ -24,6 +24,12 @@ Los cuatro notebooks son: adquisición opcional
 ML, importan `vaaet` para operaciones y `vaaet_ml` para laboratorio, y nunca
 modifican `sys.path`.
 
+Colección e inferencia aceptan `VIEW_PLAN_PATH` sólo como ruta local privada a
+un `vaaet-view-plan-v1`; `None` conserva la vista única. El adaptador
+`vaaet_ml.view_plan` carga el JSON y el core recibe un contrato ya validado. No
+versionar perfiles reales, referencias geométricas ni videos; ADR-0025 y la
+guía multi-vista gobiernan el flujo.
+
 Invariantes: 19 `FEATURE_COLS` v2 en orden exacto; tres salidas aprendidas y
 cuatro estados públicos; `Accident` sólo mediante validación humana append-only.
 `SEED_BOOTSTRAP` y `HITL_RETRAINING` aceptan fuentes explícitas; predicciones no

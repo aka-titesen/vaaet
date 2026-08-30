@@ -61,6 +61,10 @@ vaaet-ml/data/processed/*.zip
 vaaet-ml/data/processed/pipeline-runs/
 vaaet-ml/data/processed/holdouts/
 
+# Private camera geometry and video-specific calibration plans
+vaaet-ml/data/private/
+*.vaaet-view-plan.private.json
+
 # DVC
 .dvc/cache
 .dvc/tmp

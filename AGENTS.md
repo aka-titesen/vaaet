@@ -19,6 +19,10 @@
 - `docs/`, `.dvc/` y `.github/` pertenecen a la raíz compartida. `.dvc/config`
   es neutral y versionado; cada entorno configura exclusivamente en
   `.dvc/config.local` el remoto lógico `vaaet-registry`.
+- La visión admite opcionalmente `VideoViewPlan` para segmentos offline
+  declarados y calibrados por vista. Los perfiles reales, referencias métricas
+  y videos son privados: no se infieren ni se versionan. Cada transición
+  reinicia el estado temporal y descarta el minuto mixto.
 
 ## Invariantes
 

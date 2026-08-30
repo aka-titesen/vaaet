@@ -47,11 +47,14 @@ class Detection:
     vehicle_type: str
     confidence: float
     centroid: tuple[int, int] = field(init=False)
+    road_contact: tuple[int, int] = field(init=False)
 
     def __post_init__(self) -> None:
         cx = (self.bbox[0] + self.bbox[2]) // 2
         cy = (self.bbox[1] + self.bbox[3]) // 2
         object.__setattr__(self, "centroid", (cx, cy))
+        # El borde inferior aproxima el contacto con la calzada para la métrica local.
+        object.__setattr__(self, "road_contact", (cx, self.bbox[3]))
 
 
 class _YOLOModel(Protocol):

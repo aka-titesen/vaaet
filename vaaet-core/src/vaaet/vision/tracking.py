@@ -21,8 +21,18 @@ from vaaet.settings import (
 
 __all__ = [
     "Track",
+    "TrackObservation",
     "SORTTracker",
 ]
+
+
+@dataclass(frozen=True)
+class TrackObservation:
+    """Detección normalizada que conserva centroide y contacto con la calzada."""
+
+    centroid: tuple[int, int]
+    vehicle_type: str
+    road_contact: tuple[int, int] | None = None
 
 
 @dataclass
@@ -35,16 +45,24 @@ class Track:
     history: deque = field(
         default_factory=lambda: deque(maxlen=TRACKER_HISTORY_MAXLEN),
     )
+    road_contact_history: deque = field(
+        default_factory=lambda: deque(maxlen=TRACKER_HISTORY_MAXLEN),
+    )
     frames_since_seen: int = 0
     recovered_after_gap: int = 0
     total_frames: int = 0
     counted: bool = False  # Se activa después del único conteo permitido.
 
-    def update(self, centroid: tuple[int, int]) -> None:
-        """Actualiza el track con la posición de su nuevo centroide."""
+    def update(
+        self,
+        centroid: tuple[int, int],
+        road_contact: tuple[int, int] | None = None,
+    ) -> None:
+        """Actualiza el centroide y, cuando existe, el contacto con la calzada."""
         gap = self.frames_since_seen
         self.centroid = centroid
         self.history.append(centroid)
+        self.road_contact_history.append(road_contact or centroid)
         self.frames_since_seen = 0
         self.recovered_after_gap = gap if gap > 0 else 0
         self.total_frames += 1
@@ -94,17 +112,18 @@ class SORTTracker:
 
     def update(
         self,
-        detections: list[tuple[tuple[int, int], str]],
+        detections: list[tuple[tuple[int, int], str] | TrackObservation],
     ) -> list[Track]:
         """Asocia detecciones nuevas y conserva la identidad ordenada de cada track."""
-        matched_tracks, matched_detections = self._match_existing_tracks(detections)
+        observations = [_normalize_detection(detection) for detection in detections]
+        matched_tracks, matched_detections = self._match_existing_tracks(observations)
         self._mark_unmatched_tracks(matched_tracks)
-        self._append_unmatched_detections(detections, matched_detections)
+        self._append_unmatched_detections(observations, matched_detections)
         self._prune()
         return self.active_tracks
 
     def _match_existing_tracks(
-        self, detections: list[tuple[tuple[int, int], str]]
+        self, detections: list[TrackObservation]
     ) -> tuple[set[int], set[int]]:
         if not detections or not self._tracks:
             return set(), set()
@@ -118,16 +137,17 @@ class SORTTracker:
                 continue
             if distances[track_index, detection_index] > self.max_distance:
                 break
-            if self._tracks[track_index].vehicle_type != detections[detection_index][1]:
+            detection = detections[detection_index]
+            if self._tracks[track_index].vehicle_type != detection.vehicle_type:
                 continue
-            self._tracks[track_index].update(detections[detection_index][0])
+            self._tracks[track_index].update(detection.centroid, detection.road_contact)
             matched_tracks.add(track_index)
             matched_detections.add(detection_index)
         return matched_tracks, matched_detections
 
-    def _distance_matrix(self, detections: list[tuple[tuple[int, int], str]]) -> np.ndarray:
+    def _distance_matrix(self, detections: list[TrackObservation]) -> np.ndarray:
         track_centroids = np.array([track.centroid for track in self._tracks], dtype=float)
-        detection_centroids = np.array([centroid for centroid, _ in detections], dtype=float)
+        detection_centroids = np.array([detection.centroid for detection in detections], dtype=float)
         differences = track_centroids[:, None, :] - detection_centroids[None, :, :]
         return np.linalg.norm(differences, axis=2)
 
@@ -138,14 +158,15 @@ class SORTTracker:
 
     def _append_unmatched_detections(
         self,
-        detections: list[tuple[tuple[int, int], str]],
+        detections: list[TrackObservation],
         matched_detections: set[int],
     ) -> None:
-        for index, (centroid, vehicle_type) in enumerate(detections):
+        for index, detection in enumerate(detections):
             if index in matched_detections:
                 continue
-            track = Track(self._next_id, vehicle_type, centroid)
-            track.history.append(centroid)
+            track = Track(self._next_id, detection.vehicle_type, detection.centroid)
+            track.history.append(detection.centroid)
+            track.road_contact_history.append(detection.road_contact or detection.centroid)
             track.total_frames = 1
             self._tracks.append(track)
             self._next_id += 1
@@ -155,3 +176,13 @@ class SORTTracker:
         pruned = [t.track_id for t in self._tracks if t.frames_since_seen > self.max_lost]
         self.last_pruned_track_ids = pruned
         self._tracks = [t for t in self._tracks if t.frames_since_seen <= self.max_lost]
+
+
+def _normalize_detection(
+    detection: tuple[tuple[int, int], str] | TrackObservation,
+) -> TrackObservation:
+    """Preserva la entrada histórica del tracker y normaliza el nuevo contrato interno."""
+    if isinstance(detection, TrackObservation):
+        return detection
+    centroid, vehicle_type = detection
+    return TrackObservation(centroid=centroid, vehicle_type=vehicle_type)

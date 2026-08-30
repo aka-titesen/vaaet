@@ -13,6 +13,9 @@ bundles o licencias.
 
 - Preservar los contratos del core: visión, telemetría, 19 features, estados,
   bundle v2 e inferencia manifest-first.
+- Verificar el modo opcional de vistas calibradas: plan continuo, referencias
+  geométricas válidas, reinicio por transición y descarte de minutos mixtos,
+  sin alterar el modo legado de una vista.
 - Mantener aislado el laboratorio: datos, entrenamiento, evaluación, Colab,
   PostgreSQL, DVC y utilidades bajo `vaaet_ml`.
 - Comprobar que los cuatro notebooks sean orquestadores delgados y sintácticamente
@@ -71,6 +74,10 @@ transferir datos.
 
 La evidencia local no sustituye las comprobaciones manuales en Colab: GPU,
 Google Drive, DVC remoto, descarga/ejecución YOLO y PostgreSQL con Secrets.
+Antes de usar cinemática calibrada fuera del laboratorio, medir referencias
+conocidas en cada perfil y registrar el error de un clip con transición
+planificada; sólo una comparación posterior con radar o GPS puede cuantificar
+un MAE de velocidad.
 Una futura demo web debe completar además los requisitos de
 [ADR-0022](../architecture/decisions/0022-agpl-public-demo-path.md) y el
 [checklist AGPL](../governance/agpl-demo-release-checklist.md).

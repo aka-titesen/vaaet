@@ -44,9 +44,9 @@ El sistema NO ha sido evaluado sistemáticamente bajo:
 ### 1.3 Sesgo de Geometría de Cámara
 
 - Las cámaras SISE son dinámicas (pan/tilt/zoom), introduciendo variabilidad de perspectiva
-- La corrección de perspectiva usa un modelo simplificado (factor por zona Y), no una homografía completa
-- Los vehículos en los extremos laterales del frame tienen corrección de perspectiva menos precisa
-- El zoom variable puede alterar la relación `pixels_per_meter` durante el video
+- Un `VideoViewPlan` puede separar vistas estables declaradas y aplicar una escala local por profundidad; no detecta cámaras ni zoom automáticamente
+- La corrección continúa sin ser una homografía completa; los extremos laterales del frame y el zoom continuo no planificado conservan error geométrico
+- Un cambio de vista dentro de un minuto descarta ese minuto de telemetría y clasificación para no mezclar escalas ni IDs
 
 ---
 
@@ -54,7 +54,7 @@ El sistema NO ha sido evaluado sistemáticamente bajo:
 
 ### 2.1 Velocidad sin Ground Truth
 
-- La conversión píxel-a-metro depende de la calibración manual de `pixels_per_meter`
+- La conversión píxel-a-metro depende de referencias manuales por vista; sin plan se conserva la escala global histórica
 - NO existe un dataset de velocidades reales para el Puente Belgrano
 - El MAE real es desconocido — el objetivo de "< 5 km/h" es una meta sin benchmark
 - La calibración se estimó a partir de dimensiones conocidas del puente (8,3m de ancho, cámaras a 60m)
@@ -75,7 +75,7 @@ El sistema NO ha sido evaluado sistemáticamente bajo:
 
 ### 2.4 Detección de Estacionarios
 
-- Requiere 200 frames (~6,5s) mínimo de observación — no hay detección temprana
+- Usa la política conservadora vigente de umbrales píxel e histéresis por track; no identifica parking físico
 - Vehículos con micro-movimientos (vibración del motor, viento) pueden no detectarse como estacionarios
 - Umbrales en píxeles fijos — no se adaptan a resolución ni zoom
 - Ver [ADR-0006](../architecture/decisions/0006-conservative-stationary-detection.md)

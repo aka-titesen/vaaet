@@ -70,4 +70,4 @@ Los notebooks instalan primero `vaaet-core` y luego `vaaet-ml`: importan
 
 GPU, Drive, PostgreSQL, descarga de YOLO y DVC remoto se validan manualmente en Colab.
 
-No agregar, quitar ni reordenar las 19 `FEATURE_COLS`; no cambiar los cuatro estados públicos ni el esquema PostgreSQL sin autorización y un ADR. ADR-0021 gobierna el core/laboratorio; ADR-0013 el workflow de adquisición, ADR-0014 la arquitectura jerárquica, ADR-0015 los namespaces/HITL, ADR-0016 el hardening y linaje operacional, ADR-0017 los modos semilla/HITL, ADR-0018 el benchmark humano versionado y ADR-0019 los datasets inmutables.
+No agregar, quitar ni reordenar las 19 `FEATURE_COLS`; no cambiar los cuatro estados públicos ni el esquema PostgreSQL sin autorización y un ADR. ADR-0021 gobierna el core/laboratorio; ADR-0013 el workflow de adquisición, ADR-0014 la arquitectura jerárquica, ADR-0015 los namespaces/HITL, ADR-0016 el hardening y linaje operacional, ADR-0017 los modos semilla/HITL, ADR-0018 el benchmark humano versionado, ADR-0019 los datasets inmutables y ADR-0024 la configuración PostgreSQL portable y las migraciones como código.

@@ -104,6 +104,34 @@ def test_database_review_and_reporting_keep_presentation_at_the_edge() -> None:
     assert "from vaaet_ml.data.database_queries import" in database_facade
 
 
+def test_postgresql_configuration_is_portable_and_keeps_alembic_as_ddl_authority() -> None:
+    settings = REPO_ROOT.joinpath("src", "vaaet_ml", "data", "database_settings.py").read_text(
+        encoding="utf-8"
+    )
+    migration_environment = REPO_ROOT.joinpath("migrations", "env.py").read_text(encoding="utf-8")
+    workflow = WORKSPACE_ROOT.joinpath(".github", "workflows", "ci.yml").read_text(encoding="utf-8")
+    guide = WORKSPACE_ROOT.joinpath("docs", "operations", "postgresql-guide.md").read_text(
+        encoding="utf-8"
+    )
+
+    for contract in (
+        "DatabaseEndpointSettings",
+        "DatabasePoolSettings",
+        "DatabaseRetrySettings",
+        "DatabaseAdminSettings",
+    ):
+        assert contract in settings
+    assert "load_database_admin_settings" in migration_environment
+    assert 'config.attributes.get("connection")' in migration_environment
+    assert "VAAET_DATABASE_ADMIN_URL" not in migration_environment
+    assert "VAAET_DATABASE_ADMIN_URL" not in workflow
+    assert "VAAET_ADMIN_DB_USER" in workflow
+    assert "VAAET_DB_SSLMODE" in workflow
+    assert "alembic upgrade head" in guide
+    assert "endpoint administrativo directo" in guide
+    assert "create_all" in guide
+
+
 def test_pyright_strict_profile_and_ci_job_cover_both_source_roots() -> None:
     configuration = (WORKSPACE_ROOT / "pyrightconfig.json").read_text(encoding="utf-8")
     workflow = (WORKSPACE_ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")

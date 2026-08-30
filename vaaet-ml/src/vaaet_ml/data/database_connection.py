@@ -9,17 +9,18 @@ import warnings
 from collections.abc import Callable, Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass
-from pathlib import Path
 
 from sqlalchemy import URL, create_engine, text
 from sqlalchemy.engine import Engine
 from sqlalchemy.exc import OperationalError
-from sqlalchemy.pool import QueuePool
+from sqlalchemy.pool import NullPool, QueuePool
 from vaaet.logging import get_logger
 
 from vaaet_ml.data.database_settings import (
+    DatabaseAdminSettings,
     DatabaseProfile,
     DatabaseSettings,
+    cleanup_temporary_root_certificate,
     load_database_settings,
 )
 from vaaet_ml.exceptions import DatabaseOperationError
@@ -44,7 +45,10 @@ class DatabaseHealth:
     available_schemas: tuple[str, ...]
 
 
-def _settings_url(settings: DatabaseSettings) -> URL:
+DatabaseConnectionSettings = DatabaseSettings | DatabaseAdminSettings
+
+
+def _settings_url(settings: DatabaseConnectionSettings) -> URL:
     """Construye una URL SQLAlchemy sin convertir credenciales en texto plano."""
 
     return URL.create(
@@ -55,6 +59,19 @@ def _settings_url(settings: DatabaseSettings) -> URL:
         port=settings.port,
         database=settings.database,
     )
+
+
+def _connect_args(settings: DatabaseConnectionSettings) -> dict[str, object]:
+    """Construye parámetros de conexión comunes sin serializar credenciales."""
+
+    connect_args: dict[str, object] = {
+        "connect_timeout": settings.connect_timeout_seconds,
+        "application_name": settings.application,
+        "sslmode": settings.sslmode,
+    }
+    if settings.sslrootcert:
+        connect_args["sslrootcert"] = settings.sslrootcert
+    return connect_args
 
 
 def get_engine(settings: DatabaseSettings | Mapping[str, str] | None = None) -> Engine:
@@ -80,21 +97,25 @@ def get_engine(settings: DatabaseSettings | Mapping[str, str] | None = None) -> 
             sslmode=sslmode,
             sslrootcert=settings.get("sslrootcert"),
         )
-    connect_args: dict[str, object] = {
-        "connect_timeout": settings.connect_timeout_seconds,
-        "application_name": settings.application,
-        "sslmode": settings.sslmode,
-    }
-    if settings.sslrootcert:
-        connect_args["sslrootcert"] = settings.sslrootcert
     return create_engine(
         _settings_url(settings),
-        connect_args=connect_args,
+        connect_args=_connect_args(settings),
         poolclass=QueuePool,
-        pool_size=2,
-        max_overflow=0,
+        pool_size=settings.pool.pool_size,
+        max_overflow=settings.pool.max_overflow,
         pool_pre_ping=True,
-        pool_recycle=300,
+        pool_recycle=settings.pool.recycle_seconds,
+        hide_parameters=True,
+    )
+
+
+def create_admin_engine(settings: DatabaseAdminSettings) -> Engine:
+    """Crea una conexión administrativa efímera para Alembic fuera de notebooks."""
+
+    return create_engine(
+        _settings_url(settings),
+        connect_args=_connect_args(settings),
+        poolclass=NullPool,
         hide_parameters=True,
     )
 
@@ -105,12 +126,15 @@ def database_engine(settings: DatabaseSettings) -> Iterator[Engine]:
 
     engine = get_engine(settings)
     try:
-        execute_with_retry(lambda: _probe_connection(engine))
+        execute_with_retry(
+            lambda: _probe_connection(engine),
+            attempts=settings.retry.attempts,
+            initial_delay_seconds=settings.retry.base_delay_seconds,
+        )
         yield engine
     finally:
         engine.dispose()
-        if settings._temporary_root_cert and settings.sslrootcert:
-            Path(settings.sslrootcert).unlink(missing_ok=True)
+        cleanup_temporary_root_certificate(settings)
 
 
 def _probe_connection(engine: Engine) -> None:
@@ -160,11 +184,18 @@ def test_connection(engine: Engine) -> bool:
         return False
 
 
-def execute_with_retry(operation: Callable[[], object], *, attempts: int = 3) -> object:
+def execute_with_retry(
+    operation: Callable[[], object],
+    *,
+    attempts: int = 3,
+    initial_delay_seconds: float = 0.5,
+) -> object:
     """Reintenta sólo fallos operativos transitorios y redacta su causa externa."""
 
     if attempts < 1:
         raise ValueError("Database retry attempts must be positive.")
+    if initial_delay_seconds < 0:
+        raise ValueError("Database retry delay must be non-negative.")
     for attempt in range(1, attempts + 1):
         try:
             return operation()
@@ -173,12 +204,13 @@ def execute_with_retry(operation: Callable[[], object], *, attempts: int = 3) ->
                 raise DatabaseOperationError(
                     "PostgreSQL operation failed after bounded retries."
                 ) from exc
-            time.sleep(0.5 * (2 ** (attempt - 1)))
+            time.sleep(initial_delay_seconds * (2 ** (attempt - 1)))
     raise AssertionError("unreachable")
 
 
 __all__ = [
     "DatabaseHealth",
+    "create_admin_engine",
     "database_engine",
     "execute_with_retry",
     "get_engine",

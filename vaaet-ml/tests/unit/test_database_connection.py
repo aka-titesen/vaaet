@@ -84,6 +84,8 @@ def test_execute_with_retry_retries_only_operational_errors(monkeypatch: pytest.
     assert attempts["count"] == 2
     with pytest.raises(ValueError, match="positive"):
         execute_with_retry(lambda: None, attempts=0)
+    with pytest.raises(ValueError, match="non-negative"):
+        execute_with_retry(lambda: None, initial_delay_seconds=-0.1)
     with pytest.raises(DatabaseOperationError, match="bounded retries"):
         execute_with_retry(lambda: (_ for _ in ()).throw(_operational_error()), attempts=1)
 
@@ -126,7 +128,9 @@ class _FakeEngine:
 def test_database_engine_and_inspection_release_resources(monkeypatch: pytest.MonkeyPatch) -> None:
     engine = _FakeEngine()
     monkeypatch.setattr("vaaet_ml.data.database_connection.get_engine", lambda _: engine)
-    monkeypatch.setattr("vaaet_ml.data.database_connection._probe_connection", lambda _: None)
+    monkeypatch.setattr(
+        "vaaet_ml.data.database_connection._probe_connection", lambda *_args, **_kwargs: None
+    )
 
     with database_engine(_settings()) as active_engine:
         health = inspect_database(active_engine, DatabaseProfile.TRAINING)

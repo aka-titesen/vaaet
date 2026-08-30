@@ -35,4 +35,5 @@ de [`docs/`](docs/index.md) y
 Para cambios de componente, leer también
 [`vaaet-core/AGENTS.md`](vaaet-core/AGENTS.md) o
 [`vaaet-ml/AGENTS.md`](vaaet-ml/AGENTS.md); ADR-0022 gobierna cualquier
-serving futuro con YOLO.
+serving futuro con YOLO. Para PostgreSQL, ADR-0024 gobierna configuración
+portable, privilegios y migraciones administrativas.

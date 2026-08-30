@@ -9,9 +9,14 @@ from pathlib import Path
 
 import pandas as pd
 import pytest
-from sqlalchemy import create_engine, text
+from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 
+from vaaet_ml.data.database_connection import create_admin_engine
+from vaaet_ml.data.database_settings import (
+    cleanup_temporary_root_certificate,
+    load_database_admin_settings,
+)
 from vaaet_ml.data.ingestion import (
     PostgresBackupSource,
     TrainingIngestionPlan,
@@ -21,19 +26,21 @@ from vaaet_ml.data.persistence import persist_classified_telemetry
 from vaaet_ml.data.review import HumanValidation, persist_human_validation
 from vaaet_ml.training.lifecycle import TrainingMode
 
-ADMIN_URL = os.getenv("VAAET_DATABASE_ADMIN_URL")
 pytestmark = pytest.mark.postgres
 
 
 @pytest.fixture(scope="module")
 def engine():
-    if not ADMIN_URL:
-        pytest.skip("VAAET_DATABASE_ADMIN_URL is not configured")
-    active = create_engine(ADMIN_URL)
+    try:
+        settings = load_database_admin_settings(allow_legacy=False)
+    except RuntimeError:
+        pytest.skip("Typed PostgreSQL administrator settings are not configured")
+    active = create_admin_engine(settings)
     try:
         yield active
     finally:
         active.dispose()
+        cleanup_temporary_root_certificate(settings)
 
 
 @pytest.mark.parametrize(

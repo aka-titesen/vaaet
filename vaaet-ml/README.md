@@ -106,12 +106,21 @@ Una única base PostgreSQL 14+ usa `vaaet_raw`, `vaaet_ml`, `vaaet_feedback` y
 `vaaet_ops`. Cada notebook carga un perfil de mínimo privilegio desde Colab
 Secrets o variables locales; las URLs se construyen con SQLAlchemy y TLS
 `verify-full` es el valor recomendado. Alembic y el rol administrador quedan fuera
-de Colab. Aplicación inicial:
+de Colab. La configuración administrativa reutiliza `VAAET_DB_*` para endpoint
+y TLS, más `VAAET_ADMIN_DB_USER/PASSWORD`; no usa URLs manuales. Aplicación
+inicial desde una máquina local o CI:
 
 ```bash
-export VAAET_DATABASE_ADMIN_URL='postgresql+psycopg2://...'
+export VAAET_DB_HOST="postgres.example"
+export VAAET_DB_NAME="vaaet"
+export VAAET_DB_SSLMODE="verify-full"
+export VAAET_DB_SSLROOTCERT="/ruta/privada/proveedor-ca.pem"
+export VAAET_ADMIN_DB_USER="vaaet_admin"
+export VAAET_ADMIN_DB_PASSWORD="<secreto-fuera-de-git>"
 alembic upgrade head
-psql 'postgresql://admin:...@host:5432/vaaet' -f migrations/provision-roles.sql
+# Exportá PGHOST, PGPORT, PGDATABASE, PGUSER, PGPASSWORD, PGSSLMODE y
+# PGSSLROOTCERT sólo para este comando, como indica la guía PostgreSQL.
+psql -v ON_ERROR_STOP=1 -f migrations/provision-roles.sql
 ```
 
 El entrenamiento declara `TrainingMode.SEED_BOOTSTRAP` o
@@ -123,5 +132,7 @@ escribe un `vaaet-training-input-lock-v1` con los fingerprints exactos utilizado
 Consultá [ADR-0015](../docs/architecture/decisions/0015-postgresql-namespaces-security-and-hitl.md),
 [ADR-0016](../docs/architecture/decisions/0016-postgresql-hardening-and-pipeline-runs.md) y
 [ADR-0019](../docs/architecture/decisions/0019-immutable-seed-and-hitl-datasets.md).
+La portabilidad por capacidades y las migraciones como código se rigen por
+[ADR-0024](../docs/architecture/decisions/0024-provider-neutral-postgresql-and-schema-as-code.md).
 El provisionamiento, backup, rotación y recuperación están en la
 [guía PostgreSQL](../docs/operations/postgresql-guide.md).

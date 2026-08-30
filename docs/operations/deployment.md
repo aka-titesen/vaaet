@@ -130,9 +130,12 @@ un paquete instalable en la raíz ni se usan `requirements.txt` o lockfiles.
 ### Configuración de BD (opcional)
 
 Definí el endpoint `VAAET_DB_*` y la credencial específica de cada perfil en
-Colab Secrets, según la [guía de Colab](colab-guide.md). No uses `getpass`, celdas
-con `os.environ` ni un usuario compartido. El administrador aplica Alembic y
-grants fuera de Colab.
+Colab Secrets, según la [guía de Colab](colab-guide.md). La identidad
+administrativa local o CI usa el mismo endpoint más
+`VAAET_ADMIN_DB_USER/PASSWORD`. No uses `getpass`, celdas con `os.environ` ni
+un usuario compartido. El administrador aplica Alembic y grants fuera de Colab;
+la [guía PostgreSQL](postgresql-guide.md) define las capacidades mínimas del
+proveedor.
 
 ---
 
@@ -154,9 +157,10 @@ grants fuera de Colab.
 
 ### Migraciones
 
-Alembic es la única autoridad DDL. Ejecutá `alembic upgrade head` con el perfil
-administrador y después `vaaet-ml/migrations/provision-roles.sql`. Los notebooks sólo
-comprueban el contrato y fallan con un mensaje claro si la migración falta.
+Alembic es la única autoridad DDL. Ejecutá `alembic upgrade head` con
+`VAAET_ADMIN_DB_USER/PASSWORD` y después
+`vaaet-ml/migrations/provision-roles.sql`. Los notebooks sólo comprueban el
+contrato y fallan con un mensaje claro si la migración falta.
 
 ### Backups
 

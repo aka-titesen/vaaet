@@ -27,6 +27,12 @@ entrenamiento, inferencia y evaluación Champion--Challenger; evaluación es
 read-only. Los notebooks importan `vaaet` para operaciones y `vaaet_ml` para
 laboratorio, no modifican `sys.path` e instalan primero core y luego ML.
 
+PostgreSQL pertenece sólo a `vaaet-ml`: es portable por capacidades PostgreSQL
+14+, TLS, schemas, roles, grants y funciones de seguridad, no por proveedor.
+Los workflows usan `VAAET_DB_*` y una credencial por perfil; Alembic usa
+`VAAET_ADMIN_DB_USER/PASSWORD` fuera de Colab. ADR-0024 mantiene Alembic como
+única autoridad DDL y no adopta ORM declarativo ni `create_all`.
+
 Invariantes: las 19 `FEATURE_COLS` v2 mantienen orden exacto; el MLP aprende
 `Normal`, `Reduced` y `Congested`; `Accident` sólo se publica tras validación
 humana; validar el manifiesto del bundle v2 antes de deserializar. No versionar

@@ -369,6 +369,17 @@ def test_monorepo_keeps_single_shared_workspace_roots() -> None:
     assert (ML_ROOT / "artifacts" / "traffic-state").is_dir()
 
 
+def test_video_view_plans_remain_portable_and_private_to_the_consumer() -> None:
+    core_plan = WORKSPACE_ROOT / "vaaet-core" / "src" / "vaaet" / "vision" / "view_plan.py"
+    ml_adapter = ML_ROOT / "src" / "vaaet_ml" / "view_plan.py"
+    gitignore = (WORKSPACE_ROOT / ".gitignore").read_text(encoding="utf-8")
+
+    assert core_plan.is_file()
+    assert ml_adapter.is_file()
+    assert "vaaet_ml" not in core_plan.read_text(encoding="utf-8")
+    assert "*.vaaet-view-plan.private.json" in gitignore
+
+
 def test_portable_agent_context_describes_the_active_monorepo() -> None:
     root_context = (WORKSPACE_ROOT / "llms.txt").read_text(encoding="utf-8")
     core_rules = (WORKSPACE_ROOT / "vaaet-core" / "AGENTS.md").read_text(encoding="utf-8")
@@ -381,6 +392,7 @@ def test_portable_agent_context_describes_the_active_monorepo() -> None:
     assert "cuatro notebooks" in root_context
     assert "No puede importar `vaaet_ml`, PostgreSQL, DVC, Google Drive" in normalized_core_rules
     assert "Pipe-and-Filter síncrono" in core_rules
+    assert "ADR-0025" in root_context
     assert "con import `vaaet_ml`" in ml_context
     assert "`src/vaaet_ml/`" in ml_context
     assert "Los cuatro notebooks" in ml_context
@@ -398,6 +410,7 @@ def test_normative_documentation_matches_the_active_monorepo() -> None:
         "docs/ml/model-artifact-contract.md",
         "docs/ml/bias-and-limitations.md",
         "docs/operations/colab-guide.md",
+        "docs/operations/multi-view-calibration-guide.md",
         "docs/operations/deployment.md",
         "docs/operations/user-guide.md",
         "docs/product/product-requirements.md",
@@ -440,6 +453,8 @@ def test_normative_documentation_matches_the_active_monorepo() -> None:
         "docs/operations/colab-guide.md"
     ]
     assert "mismo monorepo" in documents["docs/ml/model-artifact-contract.md"]
+    assert "VIEW_PLAN_PATH = None" in documents["docs/operations/colab-guide.md"]
+    assert "vaaet-view-plan-v1" in documents["docs/operations/multi-view-calibration-guide.md"]
     assert "GitHub Private Vulnerability Reporting" in documents["SECURITY.md"]
     assert "No se promete un SLA" in documents["SUPPORT.md"]
 

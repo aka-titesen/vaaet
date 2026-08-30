@@ -12,8 +12,8 @@ los límites vigentes están definidos por [ADR-0021](architecture/decisions/002
   prometer API, Web App, costos, plazos ni servicios disponibles.
 - **Histórico**: changelog y planes fechados registran su momento; los ADRs
   conservan sus decisiones originales. ADR-0021, ADR-0022, ADR-0023 y ADR-0024
-  prevalecen para la topología, serving con YOLO, registro DVC y operación
-  PostgreSQL actuales.
+  prevalecen para la topología, serving con YOLO, registro DVC, operación
+  PostgreSQL y segmentos de video calibrados actuales.
 
 ## Inicio para agentes de código
 
@@ -32,6 +32,7 @@ y el [checklist AGPL](governance/agpl-demo-release-checklist.md).
 - [ADR-0022: vía AGPL-3.0 para demo web pública](architecture/decisions/0022-agpl-public-demo-path.md)
 - [ADR-0023: registro DVC portable por configuración local](architecture/decisions/0023-provider-neutral-dvc-registry.md)
 - [ADR-0024: PostgreSQL portable y migraciones como código](architecture/decisions/0024-provider-neutral-postgresql-and-schema-as-code.md)
+- [ADR-0025: segmentos multi-vista con calibración explícita](architecture/decisions/0025-calibrated-multi-view-video-segments.md)
 - [Contrato del bundle](ml/model-artifact-contract.md)
 - [Guía del registro DVC](ml/dvc-guide.md)
 - [ADR de inicio semilla y HITL](architecture/decisions/0017-seed-bootstrap-and-hitl-retraining.md)
@@ -41,6 +42,7 @@ y el [checklist AGPL](governance/agpl-demo-release-checklist.md).
 - [Protocolo de anotación humana](ml/human-annotation-protocol.md)
 - [Guía de usuario](operations/user-guide.md)
 - [Guía de Google Colab](operations/colab-guide.md)
+- [Guía de calibración multi-vista](operations/multi-view-calibration-guide.md)
 - [Notebook de evaluación Champion--Challenger](../vaaet-ml/notebooks/evaluation/evaluate_models_and_eda.ipynb)
 - [Operación PostgreSQL](operations/postgresql-guide.md)
 - [Requisitos de producto](product/product-requirements.md)

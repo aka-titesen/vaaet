@@ -53,6 +53,22 @@ procesados, tiempo total, FPS end-to-end y acumulados por etapa con reloj
 monotónico. El core no mide RAM ni VRAM; cualquier benchmark de Colab debe
 registrarlas fuera del contrato portable.
 
+### Vistas y calibración local
+
+Un `VideoViewPlan` opcional permite que un video offline declare tramos estables
+de cámara o zoom mediante rangos de frames y perfiles `CameraCalibration`
+versionados. Cada perfil usa referencias métricas conocidas a distintas
+profundidades y el core interpola la escala sobre el contacto inferior de cada
+vehículo. El plan no se lee desde el core: notebooks y futuros adaptadores lo
+cargan localmente y fuera de Git/DVC.
+
+Una transición reinicia flujo óptico, SORT, velocidad, estacionario y contexto
+de clasificación. No hay reidentificación entre vistas. Un minuto que cruza una
+transición se descarta en lugar de mezclar conteos o geometrías; los reportes de
+segmento quedan en `VideoAnalysisResult.view_segments` sin alterar telemetría
+v2 ni las 19 features. La guía operativa está en
+[calibración multi-vista](../operations/multi-view-calibration-guide.md).
+
 El notebook de entrenamiento expone dos entradas explícitas que convergen antes
 del split: `SEED_BOOTSTRAP` calcula features desde raw y produce un piloto;
 `HITL_RETRAINING` consume el snapshot semilla vigente y todos los paquetes activos
@@ -79,6 +95,6 @@ GitHub Actions cubre Python 3.10–3.13, instalación de los extras declarados,
 enlaces, DVC y ausencia de binarios ML en Git. GPU, Drive, videos reales y
 PostgreSQL se validan manualmente en Colab.
 
-Decisiones principales: [ADR-0009](decisions/0009-modular-three-stage-architecture.md), [ADR-0010](decisions/0010-mlops-pipeline-19-features.md), [ADR-0013](decisions/0013-on-demand-data-collection-workflow.md), [ADR-0014](decisions/0014-hierarchical-traffic-state-and-incident-policy.md), [ADR-0015](decisions/0015-postgresql-namespaces-security-and-hitl.md), [ADR-0016](decisions/0016-postgresql-hardening-and-pipeline-runs.md), [ADR-0017](decisions/0017-seed-bootstrap-and-hitl-retraining.md), [ADR-0018](decisions/0018-versioned-frozen-human-holdouts.md), [ADR-0019](decisions/0019-immutable-seed-and-hitl-datasets.md), [ADR-0021](decisions/0021-portable-core-and-ml-laboratory-boundary.md) y [ADR-0023](decisions/0023-provider-neutral-dvc-registry.md).
+Decisiones principales: [ADR-0009](decisions/0009-modular-three-stage-architecture.md), [ADR-0010](decisions/0010-mlops-pipeline-19-features.md), [ADR-0013](decisions/0013-on-demand-data-collection-workflow.md), [ADR-0014](decisions/0014-hierarchical-traffic-state-and-incident-policy.md), [ADR-0015](decisions/0015-postgresql-namespaces-security-and-hitl.md), [ADR-0016](decisions/0016-postgresql-hardening-and-pipeline-runs.md), [ADR-0017](decisions/0017-seed-bootstrap-and-hitl-retraining.md), [ADR-0018](decisions/0018-versioned-frozen-human-holdouts.md), [ADR-0019](decisions/0019-immutable-seed-and-hitl-datasets.md), [ADR-0021](decisions/0021-portable-core-and-ml-laboratory-boundary.md), [ADR-0023](decisions/0023-provider-neutral-dvc-registry.md) y [ADR-0025](decisions/0025-calibrated-multi-view-video-segments.md).
 
 Los diagramas complementarios están en el [índice de diagramas](diagrams/index.md).

@@ -8,4 +8,7 @@
 - [Modelo relacional resumido](erd.md)
 - [Modelo relacional completo](erd-phase2.md)
 
-El diagrama multi-cámara fue retirado porque describía una capacidad no implementada.
+El diagrama multi-cámara simultánea fue retirado porque describe una capacidad
+no implementada. El soporte actual es un plan offline y secuencial de vistas
+calibradas; consultá el [diagrama de velocidad](speed-calculation.md) y
+[ADR-0025](../decisions/0025-calibrated-multi-view-video-segments.md).

@@ -7,12 +7,14 @@
 **Normativo y vigente.** Define el producto de laboratorio actual; no autoriza
 una API, frontend ni despliegue web. Para decisiones de arquitectura prevalecen
 [ADR-0021](../architecture/decisions/0021-portable-core-and-ml-laboratory-boundary.md)
-y [ADR-0022](../architecture/decisions/0022-agpl-public-demo-path.md).
+y [ADR-0022](../architecture/decisions/0022-agpl-public-demo-path.md), y para
+cinemática multi-vista
+[ADR-0025](../architecture/decisions/0025-calibrated-multi-view-video-segments.md).
 
 | Campo | Detalle |
 |---|---|
 | Versión del laboratorio | 4.5.3 |
-| Última revisión | 2026-08-27 |
+| Última revisión | 2026-08-30 |
 | Responsable técnico | Facundo Nicolás González |
 
 ## Producto actual
@@ -31,6 +33,8 @@ hasta una revisión explícita.
 
 - Detección YOLO, tracking SORT, velocidad physics-first y estado estacionario
   conservador sobre videos finitos y ordenados.
+- Plan opcional de segmentos multi-vista offline, con calibración local por
+  referencias medidas, reinicio temporal y descarte de minutos mixtos.
 - Telemetría v2 por minutos completos, video anotado y métricas de pipeline.
 - Ingeniería de 19 features, MLP de tres salidas, política temporal y bundle v2
   validado antes de deserializar.
@@ -39,9 +43,10 @@ hasta una revisión explícita.
 - PostgreSQL e HITL opcionales, con perfiles de mínimo privilegio y persistencia
   visible sólo si el usuario la habilita.
 
-Quedan fuera de alcance la API, el frontend, serving web, multi-cámara, lectura
-de patentes, predicción de tráfico futuro, alertas push y cualquier cola o
-worker de aplicación. `vaaet-app/` sigue reservado.
+Quedan fuera de alcance la API, el frontend, serving web, multi-cámara
+simultánea, detección automática de cambios de vista, lectura de patentes,
+predicción de tráfico futuro, alertas push y cualquier cola o worker de
+aplicación. `vaaet-app/` sigue reservado.
 
 ## Historias de usuario vigentes
 

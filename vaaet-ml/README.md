@@ -66,6 +66,12 @@ Cada notebook tiene una sola celda de preparación: clona o actualiza
 instala ambos componentes con los extras del workflow y ejecuta el preflight
 tipado. Los imports operativos usan `vaaet`; los de laboratorio, `vaaet_ml`.
 No se usan `requirements.txt`, `sys.path` ni instaladores ad hoc.
+
+Colección e inferencia permiten `VIEW_PLAN_PATH` como JSON privado opcional para
+un video con vistas o zooms estables. `None` conserva la vista única. El plan se
+valida antes del análisis, no se guarda en Git/DVC y no mezcla telemetría entre
+vistas; consultá la [guía multi-vista](../docs/operations/multi-view-calibration-guide.md).
+
 Para administrar el bundle DVC desde una máquina local, instalá `dvc` junto con
 el plugin del proveedor elegido (`dvc-gdrive` o `dvc-s3`) y seguí la
 [guía del registro DVC](../docs/ml/dvc-guide.md). Los notebooks no instalan DVC

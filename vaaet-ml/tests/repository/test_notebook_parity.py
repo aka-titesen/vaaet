@@ -97,6 +97,11 @@ def test_notebooks_keep_workflow_smoke_imports() -> None:
 def test_collection_uses_shared_analysis_and_data_contracts() -> None:
     code = _code(NOTEBOOKS["collection"])
     assert "from vaaet.vision.analysis import analyze_video" in code
+    assert "from vaaet_ml.view_plan import load_video_view_plan" in code
+    assert "VIEW_PLAN_PATH = None" in code
+    assert "view_plan_path=VIEW_PLAN_PATH" in code
+    assert "VIEW_PLAN = load_video_view_plan(WORKFLOW_CONFIG.view_plan_path)" in code
+    assert "view_plan=VIEW_PLAN" in code
     assert "merge_raw_telemetry_csv" in code
     assert "persist_raw_telemetry" in code
     assert "class VAAET" not in code
@@ -453,6 +458,11 @@ def test_inference_uses_shared_analysis_and_validates_bundle() -> None:
     code = _code(NOTEBOOKS["inference"])
     bundle_module = (CORE_ROOT / "src/vaaet/inference/bundle.py").read_text(encoding="utf-8")
     assert "from vaaet.vision.analysis import analyze_video" in code
+    assert "from vaaet_ml.view_plan import load_video_view_plan" in code
+    assert "VIEW_PLAN_PATH = None" in code
+    assert "view_plan_path=VIEW_PLAN_PATH" in code
+    assert "VIEW_PLAN = load_video_view_plan(WORKFLOW_CONFIG.view_plan_path)" in code
+    assert "view_plan=VIEW_PLAN" in code
     assert "TrafficStateEngine" in code
     assert "load_traffic_bundle(" in code
     assert "prediction_provider=traffic_engine.predict_latest" in code

@@ -19,16 +19,23 @@ def _require_bool(name: str, value: bool) -> None:
         raise RuntimeConfigurationError(f"{name} must be a boolean.")
 
 
+def _optional_path(name: str, value: str | None) -> None:
+    if value is not None and (not isinstance(value, str) or not value.strip()):
+        raise RuntimeConfigurationError(f"{name} must be a non-empty path or None.")
+
+
 @dataclass(frozen=True)
 class CollectionWorkflowConfig:
     """Safe, explicit controls for annotated telemetry collection."""
 
     persist_to_database: bool
     hud_debug: bool
+    view_plan_path: str | None = None
 
     def __post_init__(self) -> None:
         _require_bool("persist_to_database", self.persist_to_database)
         _require_bool("hud_debug", self.hud_debug)
+        _optional_path("view_plan_path", self.view_plan_path)
 
 
 @dataclass(frozen=True)
@@ -43,6 +50,7 @@ class InferenceWorkflowConfig:
     download_annotated_video: bool
     show_dashboard: bool
     hud_debug: bool
+    view_plan_path: str | None = None
 
     def __post_init__(self) -> None:
         for name in (
@@ -57,6 +65,7 @@ class InferenceWorkflowConfig:
             _require_bool(name, getattr(self, name))
         if self.review_mode not in {"priority", "all"}:
             raise RuntimeConfigurationError("review_mode must be 'priority' or 'all'.")
+        _optional_path("view_plan_path", self.view_plan_path)
 
 
 @dataclass(frozen=True)

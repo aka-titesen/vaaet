@@ -6,10 +6,16 @@ import pytest
 
 from vaaet_ml.exceptions import RuntimeConfigurationError
 from vaaet_ml.workflow_config import (
+    CollectionWorkflowConfig,
     EvaluationWorkflowConfig,
     InferenceWorkflowConfig,
     TrainingWorkflowConfig,
 )
+
+
+def test_view_plan_path_requires_a_non_empty_string_when_configured() -> None:
+    with pytest.raises(RuntimeConfigurationError, match="view_plan_path"):
+        CollectionWorkflowConfig(False, False, "")
 
 
 def test_inference_config_rejects_unknown_review_mode() -> None:

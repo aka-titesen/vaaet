@@ -10,7 +10,7 @@ contratos y ADRs vigentes prevalecen ante cualquier resumen.
 | Campo | Detalle |
 |---|---|
 | Versión del laboratorio | 4.5.3 |
-| Última revisión | 2026-08-27 |
+| Última revisión | 2026-08-30 |
 | Responsable técnico | Facundo Nicolás González |
 
 ## Arquitectura y restricciones
@@ -45,9 +45,12 @@ tiene código y sólo podrá usar una API HTTP versionada.
 | RF-009 | Persistir opt-in mediante el laboratorio con upserts idempotentes y estado visible de persistencia. | P1 |
 | RF-010 | Generar video anotado con HUD, tracks, tipos y velocidad cuando corresponda. | P1 |
 | RF-011 | Registrar datos sintéticos y entrenamiento HITL conforme a los contratos de procedencia y holdout. | P1 |
+| RF-012 | Procesar segmentos offline de vistas declaradas con calibración local, reinicio de estado y descarte de minutos mixtos. | P1 |
 
-El soporte multi-cámara, los ROI múltiples y el procesamiento de streaming no
-están implementados y quedan fuera de alcance.
+La simultaneidad multi-cámara, la detección automática de vista, los ROI de
+parking y el procesamiento de streaming no están implementados y quedan fuera de alcance.
+Los cambios de cámara o zoom sólo se admiten offline mediante un plan explícito
+y calibrado conforme a ADR-0025.
 
 ## Requisitos no funcionales
 

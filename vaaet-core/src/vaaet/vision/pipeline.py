@@ -34,7 +34,13 @@ from vaaet.vision.speed import (
     robust_speed_summary,
 )
 from vaaet.vision.telemetry import MinuteTelemetryAccumulator
-from vaaet.vision.tracking import SORTTracker, Track
+from vaaet.vision.tracking import SORTTracker, Track, TrackObservation
+from vaaet.vision.view_plan import (
+    CameraCalibration,
+    VideoViewPlan,
+    VideoViewSegment,
+    ViewSegmentReport,
+)
 
 __all__ = [
     "PipelineMetrics",
@@ -256,6 +262,31 @@ class PipelineRunOutput:
     classification_records: tuple[dict[str, object], ...]
     frames_processed: int
     metrics: PipelineMetrics
+    view_segments: tuple[ViewSegmentReport, ...] = ()
+
+
+@dataclass
+class _ViewSegmentProgress:
+    """Estado interno mínimo para materializar un segmento de vista procesado."""
+
+    segment: VideoViewSegment
+    calibration: CameraCalibration
+    end_frame: int
+    valid_minutes: int = 0
+    discarded_minutes: int = 0
+    discard_reason: str | None = None
+
+    def report(self) -> ViewSegmentReport:
+        """Convierte el estado mutable de sesión en un reporte portable e inmutable."""
+        return ViewSegmentReport(
+            profile_id=self.calibration.profile_id,
+            profile_revision=self.calibration.revision,
+            start_frame=self.segment.start_frame,
+            end_frame=self.end_frame,
+            valid_minutes=self.valid_minutes,
+            discarded_minutes=self.discarded_minutes,
+            discard_reason=self.discard_reason,
+        )
 
 
 @dataclass
@@ -279,10 +310,20 @@ class VisionPipelineSession:
     accumulator: MinuteTelemetryAccumulator
     prediction_provider: PredictionProvider | None
     hud_config: HudConfig
+    view_plan: VideoViewPlan | None = None
     clock: Callable[[], float] = perf_counter
     _latest_prediction: TrafficStatePrediction | None = field(default=None, init=False)
     _records: list[dict[str, object]] = field(default_factory=list, init=False)
     _classification_records: list[dict[str, object]] = field(default_factory=list, init=False)
+    _prediction_context_records: list[dict[str, object]] = field(
+        default_factory=list,
+        init=False,
+    )
+    _view_progress: list[_ViewSegmentProgress] = field(default_factory=list, init=False)
+    _active_view_index: int | None = field(default=None, init=False)
+    _active_calibration: CameraCalibration | None = field(default=None, init=False)
+    _skip_current_minute: bool = field(default=False, init=False)
+    _discarding_progress: _ViewSegmentProgress | None = field(default=None, init=False)
     _next_frame_index: int = field(default=1, init=False)
     _metrics: PipelineMetricsCollector = field(init=False)
 
@@ -333,6 +374,7 @@ class VisionPipelineSession:
             classification_records=tuple(self._classification_records),
             frames_processed=frames_processed,
             metrics=self._metrics.finish(frames_processed=frames_processed),
+            view_segments=tuple(progress.report() for progress in self._view_progress),
         )
 
     def process_frame(self, packet: FramePacket) -> RenderedFramePacket:
@@ -341,6 +383,7 @@ class VisionPipelineSession:
             raise VideoValidationError(
                 "vision.frame_order: frame_index is not the next ordered frame"
             )
+        self._apply_view_plan(packet)
         perception = self._metrics.measure("perception", lambda: self._perceive(packet))
         tracking = self._metrics.measure("tracking", lambda: self._track(perception))
         motion = self._metrics.measure("motion_telemetry", lambda: self._measure_motion(tracking))
@@ -365,7 +408,14 @@ class VisionPipelineSession:
 
     def _track(self, packet: PerceptionPacket) -> TrackingPacket:
         tracks = self.tracker.update(
-            [(detection.centroid, detection.vehicle_type) for detection in packet.detections]
+            [
+                TrackObservation(
+                    centroid=detection.centroid,
+                    vehicle_type=detection.vehicle_type,
+                    road_contact=detection.road_contact,
+                )
+                for detection in packet.detections
+            ]
         )
         return TrackingPacket(
             perception=packet,
@@ -382,18 +432,22 @@ class VisionPipelineSession:
         annotations: list[TrackAnnotation] = []
         for track in packet.tracks:
             recovered_gap = track.recovered_after_gap
+            speed_history = (
+                track.road_contact_history if self._active_calibration is not None else track.history
+            )
             reliable = is_speed_measurement_reliable(
-                track.history,
+                speed_history,
                 flow_tracking_ratio=packet.perception.flow_tracking_ratio,
                 recovered_after_gap=recovered_gap,
             )
             speed = (
                 estimate_speed(
-                    track.history,
+                    speed_history,
                     fps=self.fps,
                     frame_height=self.frame_height,
                     global_motion=packet.perception.global_motion,
                     vehicle_type=track.vehicle_type,
+                    calibration=self._active_calibration,
                 )
                 if reliable
                 else None
@@ -409,15 +463,16 @@ class VisionPipelineSession:
             else:
                 smoothed_speed = self.speed_tracker.update(track.track_id, speed)
 
-            self.accumulator.observe_track(
-                track,
-                smoothed_speed=smoothed_speed,
-                reliable=reliable,
-                near_zero_motion=is_near_zero_motion(track.history),
-                stationary_confirmed=stationary,
-                recovered_gap=recovered_gap,
-                flow_tracking_ratio=packet.perception.flow_tracking_ratio,
-            )
+            if not self._skip_current_minute:
+                self.accumulator.observe_track(
+                    track,
+                    smoothed_speed=smoothed_speed,
+                    reliable=reliable,
+                    near_zero_motion=is_near_zero_motion(track.history),
+                    stationary_confirmed=stationary,
+                    recovered_gap=recovered_gap,
+                    flow_tracking_ratio=packet.perception.flow_tracking_ratio,
+                )
             annotations.append(
                 TrackAnnotation(
                     bbox=_nearest_detection_bbox(track, packet.perception.detections),
@@ -455,13 +510,81 @@ class VisionPipelineSession:
         return RenderedFramePacket(motion=packet)
 
     def _complete_minute(self, packet: RenderedFramePacket) -> None:
+        if self._skip_current_minute:
+            self.accumulator.discard_minute()
+            self._skip_current_minute = False
+            if self._discarding_progress is not None:
+                self._discarding_progress.discarded_minutes += 1
+                self._discarding_progress.discard_reason = "transition_crossed_minute"
+                self._discarding_progress = None
+            return
         record = self.accumulator.build_record(packet.motion.tracking.perception.frame.capture_time)
         self._records.append(record)
-        prediction = _request_prediction(self.prediction_provider, self._records[:-1], record)
+        if self._view_progress:
+            self._view_progress[-1].valid_minutes += 1
+        prediction = self._request_minute_prediction(record)
         self._latest_prediction = prediction
         if prediction is not None:
             self._classification_records.append(_prediction_record(prediction, record))
         self.accumulator.rollover_minute()
+
+    def _apply_view_plan(self, packet: FramePacket) -> None:
+        """Activa el perfil de la vista actual y aísla cualquier transición declarada."""
+        if self.view_plan is None:
+            return
+        height, width = packet.frame.shape[:2]
+        view_index = self.view_plan.segment_index(packet.frame_index)
+        calibration = self.view_plan.resolve(packet.frame_index, width=width, height=height)
+        if self._active_view_index == view_index:
+            if self._view_progress:
+                self._view_progress[-1].end_frame = packet.frame_index
+            return
+
+        segment = self.view_plan.segments[view_index]
+        if self._active_view_index is not None:
+            self._reset_for_view_transition()
+            if not self._starts_minute(packet.frame_index):
+                self.accumulator.discard_minute()
+                self._skip_current_minute = True
+        self._active_view_index = view_index
+        self._active_calibration = calibration
+        progress = _ViewSegmentProgress(
+            segment=segment,
+            calibration=calibration,
+            end_frame=packet.frame_index,
+        )
+        self._view_progress.append(progress)
+        if self._skip_current_minute:
+            self._discarding_progress = progress
+
+    def _reset_for_view_transition(self) -> None:
+        """Evita transportar identidad, cinemática o contexto temporal entre cámaras."""
+        self.flow_estimator.reset()
+        self.tracker.reset()
+        self.speed_tracker.reset()
+        self.motion_tracker.reset()
+        self._latest_prediction = None
+        self._prediction_context_records.clear()
+
+    def _request_minute_prediction(
+        self,
+        record: dict[str, object],
+    ) -> TrafficStatePrediction | None:
+        """Aísla el historial de inferencia entre vistas sin alterar el modo legado."""
+        if self.view_plan is None:
+            return _request_prediction(self.prediction_provider, self._records[:-1], record)
+        self._prediction_context_records.append(record)
+        if len(self._prediction_context_records) < 2:
+            return None
+        return _request_prediction(
+            self.prediction_provider,
+            self._prediction_context_records[:-1],
+            record,
+        )
+
+    def _starts_minute(self, frame_index: int) -> bool:
+        """Indica si el frame abre un bucket temporal nuevo de la fuente."""
+        return (frame_index - 1) % self.frames_per_minute == 0
 
 
 def _nearest_detection_bbox(

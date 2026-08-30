@@ -27,6 +27,7 @@ from vaaet.vision.speed import SmoothedSpeedTracker, TrackMotionStateTracker
 from vaaet.vision.telemetry import MinuteTelemetryAccumulator
 from vaaet.vision.tracking import SORTTracker
 from vaaet.vision.video import extract_duration, extract_recording_start, open_video
+from vaaet.vision.view_plan import VideoViewPlan, ViewSegmentReport
 
 logger = get_logger(__name__)
 
@@ -35,6 +36,8 @@ __all__ = [
     "PredictionProvider",
     "TrafficStatePrediction",
     "VideoAnalysisResult",
+    "VideoViewPlan",
+    "ViewSegmentReport",
     "analyze_video",
 ]
 
@@ -59,6 +62,7 @@ class VideoAnalysisResult:
     processed_duration_seconds: float = 0.0
     discarded_partial_seconds: float = 0.0
     metrics: PipelineMetrics = field(default_factory=PipelineMetrics.empty)
+    view_segments: tuple[ViewSegmentReport, ...] = ()
 
 
 def analyze_video(
@@ -68,14 +72,16 @@ def analyze_video(
     model_variant: str | None = None,
     prediction_provider: PredictionProvider | None = None,
     hud_config: HudConfig | None = None,
+    view_plan: VideoViewPlan | None = None,
     max_frames: int | None = None,
     status_every_seconds: float = 2.0,
 ) -> VideoAnalysisResult:
-    """Analyze one finite video and produce annotations plus minute telemetry.
+    """Analiza un video finito y produce telemetría por minuto más anotaciones.
 
-    The filters remain synchronous and ordered. The optional provider adds
-    traffic-state overlays without coupling vision to TensorFlow or artifact
-    loading.
+    Los filtros permanecen síncronos y ordenados. El proveedor opcional agrega
+    estado de tráfico al HUD sin acoplar visión a TensorFlow ni a la carga de
+    artefactos. El plan de vistas es opt-in y reinicia el estado temporal ante
+    cada transición declarada de cámara o encuadre.
     """
     import cv2
 
@@ -133,6 +139,7 @@ def analyze_video(
         accumulator=MinuteTelemetryAccumulator(clip_id=source.stem),
         prediction_provider=prediction_provider,
         hud_config=hud_config or HudConfig(),
+        view_plan=view_plan,
     )
 
     logger.info("Analyzing %s with %s", source.name, selected_variant)
@@ -144,9 +151,10 @@ def analyze_video(
 
     processed_duration_seconds = output.frames_processed / fps
     complete_minutes = len(output.telemetry_records)
-    discarded_partial_seconds = max(
-        processed_duration_seconds - complete_minutes * 60.0,
-        0.0,
+    discarded_partial_seconds = (
+        processed_duration_seconds % 60.0
+        if view_plan is not None
+        else max(processed_duration_seconds - complete_minutes * 60.0, 0.0)
     )
     telemetry = pd.DataFrame.from_records(
         output.telemetry_records,
@@ -175,4 +183,5 @@ def analyze_video(
         processed_duration_seconds=processed_duration_seconds,
         discarded_partial_seconds=discarded_partial_seconds,
         metrics=output.metrics,
+        view_segments=output.view_segments,
     )

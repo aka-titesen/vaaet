@@ -119,6 +119,14 @@ class MinuteTelemetryAccumulator:
             self.cumulative_counts[vehicle_type] = (
                 self.cumulative_counts.get(vehicle_type, 0) + count
             )
+        self._clear_minute()
+
+    def discard_minute(self) -> None:
+        """Descarta un minuto mezclado entre vistas sin afectar acumulados del HUD."""
+        self._clear_minute()
+
+    def _clear_minute(self) -> None:
+        """Restablece exclusivamente las señales locales del minuto en curso."""
         self.minute_counts = _empty_vehicle_counts()
         self.minute_speeds.clear()
         self.flow_tracking_ratios.clear()

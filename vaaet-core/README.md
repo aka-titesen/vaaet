@@ -30,3 +30,11 @@ una demo web pública que use este extra debe publicar su código correspondient
 y cumplir el gate de activos; una aplicación privada o comercial requiere una
 licencia Ultralytics Enterprise fuera de Git. Consultá el
 [registro de licencias de terceros](../docs/governance/third-party-licenses.md).
+
+## Video multi-vista opcional
+
+`analyze_video(..., view_plan=...)` acepta un plan portable de segmentos
+offline con referencias métricas por vista. El consumidor carga el JSON privado
+y el core reinicia tracking y cinemática ante cada transición; los minutos
+mixtos se descartan. Consultá la [guía de calibración](../docs/operations/multi-view-calibration-guide.md)
+y ADR-0025. Sin plan se conserva el análisis histórico de una sola vista.

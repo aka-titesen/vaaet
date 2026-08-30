@@ -21,6 +21,9 @@ persistencia ni rutas remotas.
 - Visión procesa clips finitos con Pipe-and-Filter síncrono, ordenado y una
   única sesión mutable por video. No agregar `Queue`, threads, procesos ni
   Producer--Consumer sin medición comparable en Colab y aprobación explícita.
+- `VideoViewPlan` es opt-in para segmentos offline ya calibrados. No leer planes
+  desde rutas remotas, inferir perfiles, transferir IDs entre vistas ni emitir
+  telemetría de un minuto que cruza una transición.
 
 ## Calidad
 

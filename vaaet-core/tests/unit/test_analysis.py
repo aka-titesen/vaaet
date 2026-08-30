@@ -17,6 +17,12 @@ from vaaet.vision import analysis
 from vaaet.vision.analysis import TrafficStatePrediction, analyze_video
 from vaaet.vision.detector import Detection
 from vaaet.vision.hud import HudConfig
+from vaaet.vision.view_plan import (
+    CalibrationReference,
+    CameraCalibration,
+    VideoViewPlan,
+    VideoViewSegment,
+)
 
 
 class _FakeDetector:
@@ -38,6 +44,9 @@ class _FakeFlow:
 
     def update(self, _frame: object) -> np.ndarray:
         return np.zeros(2, dtype=float)
+
+    def reset(self) -> None:
+        """Replica el reinicio del estimador cuando cambia la vista."""
 
 
 class _FailingDetector:
@@ -246,6 +255,39 @@ def test_analyze_video_discards_only_the_partial_tail(tmp_path, monkeypatch) -> 
     )
     engineered = engineer_features(result.telemetry)
     assert engineered.iloc[0]["hour_of_day"] == 8
+
+
+def test_view_plan_reports_a_full_discard_without_calling_it_partial(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    source = tmp_path / "bridge_2025-05-01_08-00-00_to_08-02-00.mp4"
+    _make_video(source, frames=120)
+    monkeypatch.setattr(analysis, "YOLODetector", _FakeDetector)
+    monkeypatch.setattr(analysis, "OpticalFlowEstimator", _FakeFlow)
+    calibration = CameraCalibration(
+        profile_id="synthetic-camera",
+        revision="v1",
+        frame_size=(96, 64),
+        references=(
+            CalibrationReference("far", (0.0, 12.0), (20.0, 12.0), 2.0),
+            CalibrationReference("near", (0.0, 52.0), (40.0, 52.0), 2.0),
+        ),
+    )
+    plan = VideoViewPlan(
+        profiles=(calibration,),
+        segments=(
+            VideoViewSegment(1, 30, "synthetic-camera"),
+            VideoViewSegment(30, None, "synthetic-camera"),
+        ),
+    )
+
+    result = analyze_video(source, tmp_path / "segmented.mp4", view_plan=plan)
+
+    assert result.complete_minutes == 1
+    assert result.discarded_partial_seconds == 0.0
+    assert len(result.view_segments) == 2
+    assert result.view_segments[1].discarded_minutes == 1
 
 
 def test_analyze_video_releases_capture_and_writer_after_filter_error(monkeypatch) -> None:

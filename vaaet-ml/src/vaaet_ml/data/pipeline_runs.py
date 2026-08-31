@@ -129,9 +129,11 @@ def start_pipeline_run(
     *,
     engine: Engine | None = None,
     local_manifest_directory: str | Path | None = None,
+    run_id: UUID | str | None = None,
 ) -> tuple[PipelineRunHandle, str]:
-    """Start a database-backed run or prepare its redacted local fallback."""
-    handle = PipelineRunHandle(uuid4(), metadata)
+    """Inicia una corrida con ID opcional para sellar inputs antes del cómputo."""
+
+    handle = PipelineRunHandle(UUID(str(run_id)) if run_id is not None else uuid4(), metadata)
     started_at = _utc_now()
     if engine is not None:
         payload = {
@@ -198,12 +200,14 @@ def pipeline_run(
     *,
     engine: Engine | None = None,
     local_manifest_directory: str | Path | None = None,
+    run_id: UUID | str | None = None,
 ) -> Iterator[PipelineRunHandle]:
     """Record a complete workflow lifecycle and re-raise the original failure."""
     handle, started_at = start_pipeline_run(
         metadata,
         engine=engine,
         local_manifest_directory=local_manifest_directory,
+        run_id=run_id,
     )
     try:
         yield handle

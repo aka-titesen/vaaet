@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import json
+from uuid import uuid4
 
 import pytest
 
@@ -34,6 +35,20 @@ def test_local_pipeline_run_records_success_without_arbitrary_metadata(tmp_path)
     assert payload["workflow"] == "collection"
     assert payload["output_rows"] == 12
     assert "password" not in json.dumps(payload).lower()
+
+
+def test_pipeline_run_preserves_a_preallocated_training_identifier(tmp_path) -> None:
+    run_id = uuid4()
+
+    with pipeline_run(
+        PipelineRunMetadata(workflow=PipelineWorkflow.TRAINING),
+        local_manifest_directory=tmp_path,
+        run_id=run_id,
+    ) as run:
+        pass
+
+    assert run.id == run_id
+    assert (tmp_path / f"{run_id}.json").is_file()
 
 
 def test_local_pipeline_run_records_only_exception_category(tmp_path) -> None:

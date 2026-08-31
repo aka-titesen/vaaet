@@ -76,6 +76,13 @@ correcciones, y holdout utilizado. Repetir un entrenamiento con el mismo lock
 reproduce la selección de datos, aunque los pesos dependan también de las semillas
 y del runtime declarado.
 
+Cada corrida válida puede conservar además un informe
+`vaaet-training-observability-report-v1` con curvas, calidad/calibración y
+progreso de supervisión agregado. Es evidencia para revisión humana; sus KPIs no
+añaden gates ni promocionan candidatos. Los deltas sólo se muestran ante
+holdouts, features y salidas compatibles. Consultá la
+[guía de observabilidad](training-observability.md).
+
 ## Limitaciones
 
 - Datos históricos de un único puente, período y configuración de cámara.

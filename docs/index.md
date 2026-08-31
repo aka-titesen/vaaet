@@ -39,6 +39,7 @@ y el [checklist AGPL](governance/agpl-demo-release-checklist.md).
 - [ADR de holdout humano congelado](architecture/decisions/0018-versioned-frozen-human-holdouts.md)
 - [ADR de datasets semilla/HITL inmutables](architecture/decisions/0019-immutable-seed-and-hitl-datasets.md)
 - [Model card y gates de promoción](ml/model-card.md)
+- [Observabilidad de entrenamiento y ciclo HITL](ml/training-observability.md)
 - [Protocolo de anotación humana](ml/human-annotation-protocol.md)
 - [Guía de usuario](operations/user-guide.md)
 - [Guía de Google Colab](operations/colab-guide.md)

@@ -10,11 +10,13 @@ import pytest
 from vaaet_ml import runtime
 from vaaet_ml.exceptions import RuntimeConfigurationError
 from vaaet_ml.runtime import (
+    RuntimeDiagnostics,
     _framework_gpu_available,
     _nvidia_smi,
     _pip_check,
     _validate_package_origin,
     _validate_python_version,
+    build_training_runtime_evidence,
 )
 
 
@@ -69,3 +71,33 @@ def test_pip_check_keeps_diagnostics_non_blocking(monkeypatch: pytest.MonkeyPatc
     )
 
     assert _pip_check() == "resolver warning\nconflict"
+
+
+def test_training_runtime_evidence_redacts_paths_and_normalizes_gpu_lines(tmp_path: Path) -> None:
+    diagnostics = RuntimeDiagnostics(
+        in_colab=True,
+        workspace_root=tmp_path,
+        core_root=tmp_path / "core",
+        ml_root=tmp_path / "ml",
+        package_file=tmp_path / "site-packages" / "vaaet" / "__init__.py",
+        ml_package_file=tmp_path / "site-packages" / "vaaet_ml" / "__init__.py",
+        git_commit="1234abc",
+        python_version="3.12.0",
+        framework="tensorflow",
+        framework_gpu_available=True,
+        nvidia_smi="T4, 15360, 42\nT4, 15360, 41",
+        total_ram_gib=12.0,
+        available_ram_gib=8.0,
+        content_free_gib=40.0,
+        pip_check_output=None,
+    )
+
+    evidence = build_training_runtime_evidence(
+        diagnostics,
+        tensorflow_version="2.20.0",
+        keras_version="3.12.0",
+        declared_extras=("training", "visualization"),
+    )
+
+    assert "workspace_root" not in evidence
+    assert evidence["nvidia_smi"] == "T4, 15360, 42 | T4, 15360, 41"

@@ -25,12 +25,21 @@ class _IdentityScaler:
 class _PredictingModel:
     def fit(self, *args: object, **kwargs: object) -> object:
         del args, kwargs
-        return object()
+        return _History()
 
     def predict(self, features: np.ndarray, *, verbose: int) -> np.ndarray:
         del verbose
         states = features[:, 0].astype(int)
         return np.eye(3, dtype=float)[states]
+
+
+class _History:
+    history = {
+        "loss": [0.4],
+        "val_loss": [0.4],
+        "accuracy": [1.0],
+        "val_accuracy": [1.0],
+    }
 
 
 def _frame(groups: int = 6) -> pd.DataFrame:
@@ -66,6 +75,7 @@ def test_cross_validation_is_grouped_and_reports_each_fold() -> None:
     assert all(not fold.missing_labels for fold in result.folds)
     assert result.mean_f1_macro == pytest.approx(1.0)
     assert result.std_f1_macro == pytest.approx(0.0)
+    assert result.report_evidence()["requested"] is True
 
 
 def test_cross_validation_requires_multiple_real_groups() -> None:

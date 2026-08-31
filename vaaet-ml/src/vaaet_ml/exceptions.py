@@ -27,6 +27,10 @@ class DatasetArtifactValidationError(ValueError, LaboratoryError):
     """Indica que un snapshot, catálogo o backup de laboratorio es inválido."""
 
 
+class TrainingStabilityError(ValueError, LaboratoryError):
+    """Indica que un ajuste Keras no produjo evidencia numérica utilizable."""
+
+
 class DvcRegistryError(RuntimeError, LaboratoryError):
     """Raíz de errores seguros del registro DVC del laboratorio."""
 

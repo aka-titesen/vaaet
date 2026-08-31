@@ -19,6 +19,7 @@ from vaaet_ml.evaluation.reporting_visuals import (
     plot_training_history,
     show_inference_dashboard,
 )
+from vaaet_ml.evaluation.training_observability_visuals import save_training_run_diagnostics
 
 __all__ = [
     "build_class_support_notes",
@@ -28,6 +29,7 @@ __all__ = [
     "plot_training_evaluation",
     "plot_training_history",
     "select_validation_decision_policy",
+    "save_training_run_diagnostics",
     "show_inference_dashboard",
     "summarize_data_origin",
     "summarize_resampled_balance",

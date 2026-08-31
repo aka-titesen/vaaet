@@ -31,6 +31,14 @@ def test_training_config_requires_reason_for_versioned_holdout() -> None:
         )
 
 
+def test_training_config_requires_an_immutable_reference_run_id() -> None:
+    with pytest.raises(RuntimeConfigurationError, match="reference_training_run_id"):
+        TrainingWorkflowConfig(
+            "seed_bootstrap", False, True, False, "reuse_or_create", None,
+            "reuse_or_create", None, reference_training_run_id="latest",
+        )
+
+
 def test_evaluation_config_requires_exact_holdout() -> None:
     with pytest.raises(RuntimeConfigurationError, match="must not be current.json"):
         EvaluationWorkflowConfig(

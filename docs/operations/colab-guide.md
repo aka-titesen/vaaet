@@ -153,6 +153,15 @@ el snapshot semilla, revisión del catálogo, IDs y fingerprints de paquetes HIT
 holdout humano y filas finales. El manifiesto del modelo incluye su descriptor;
 dos ejecuciones sólo son reproducibles si seleccionan los mismos fingerprints.
 
+El notebook sella ese lock antes de ejecutar entrenamiento o validación cruzada
+costosos. Si `WRITE_TRAINING_REPORT=True`, luego de validar gates y manifiesto
+persiste también `training-observability-report.json`, `training-summary.md` y
+tres gráficos de diagnóstico en el mismo directorio. `REFERENCE_TRAINING_RUN_ID`
+permite una comparación sólo si el holdout, el schema de features y las salidas
+son compatibles. `RUN_GROUPED_CROSS_VALIDATION` agrega evidencia antes del
+entrenamiento final; no cambia umbrales ni promueve un bundle. Véase la
+[guía de observabilidad](../ml/training-observability.md).
+
 `HUMAN_HOLDOUT_FROZEN` permanece `False` por defecto porque el Inicio Semilla no
 tiene ground truth humano. En `TrainingMode.HITL_RETRAINING`, configurá:
 

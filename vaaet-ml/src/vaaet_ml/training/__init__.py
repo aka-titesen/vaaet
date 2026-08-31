@@ -17,7 +17,10 @@ if TYPE_CHECKING:
         build_balance_candidates,
         compute_capped_balanced_weights,
     )
+    from vaaet_ml.training.eligibility import CandidateEligibility, evaluate_candidate_eligibility
+    from vaaet_ml.training.execution import TrainingFitConfig, build_training_callbacks
     from vaaet_ml.training.lifecycle import (
+        HUMAN_SUPPORT_TARGETS,
         LEGACY_NEUTRAL_FEATURES,
         ModelInputPolicy,
         TrainingMode,
@@ -27,20 +30,39 @@ if TYPE_CHECKING:
         cap_synthetic_congested_weight,
         proxy_memory_weight,
     )
+    from vaaet_ml.training.observability import (
+        TrainingRunReport,
+        build_training_run_report,
+        compare_training_run_reports,
+        list_training_run_reports,
+        load_training_run_report,
+        write_training_run_report,
+    )
 
 __all__ = [
     "BalanceCandidate",
     "BalanceStrategy",
+    "CandidateEligibility",
+    "HUMAN_SUPPORT_TARGETS",
     "LEGACY_NEUTRAL_FEATURES",
     "ModelInputPolicy",
     "TrainingMode",
+    "TrainingFitConfig",
+    "TrainingRunReport",
     "apply_model_input_policy",
     "build_balance_candidates",
+    "build_training_callbacks",
     "build_supervision_weights",
     "build_training_lifecycle",
+    "build_training_run_report",
     "cap_synthetic_congested_weight",
+    "compare_training_run_reports",
     "compute_capped_balanced_weights",
+    "evaluate_candidate_eligibility",
+    "list_training_run_reports",
+    "load_training_run_report",
     "proxy_memory_weight",
+    "write_training_run_report",
 ]
 
 
@@ -67,6 +89,52 @@ def __getattr__(name: str) -> object:
             "compute_capped_balanced_weights": compute_capped_balanced_weights,
         }[name]
     if name in {
+        "TrainingFitConfig",
+        "build_training_callbacks",
+    }:
+        from vaaet_ml.training.execution import TrainingFitConfig, build_training_callbacks
+
+        return {
+            "TrainingFitConfig": TrainingFitConfig,
+            "build_training_callbacks": build_training_callbacks,
+        }[name]
+    if name in {"CandidateEligibility", "evaluate_candidate_eligibility"}:
+        from vaaet_ml.training.eligibility import (
+            CandidateEligibility,
+            evaluate_candidate_eligibility,
+        )
+
+        return {
+            "CandidateEligibility": CandidateEligibility,
+            "evaluate_candidate_eligibility": evaluate_candidate_eligibility,
+        }[name]
+    if name in {
+        "TrainingRunReport",
+        "build_training_run_report",
+        "compare_training_run_reports",
+        "list_training_run_reports",
+        "load_training_run_report",
+        "write_training_run_report",
+    }:
+        from vaaet_ml.training.observability import (
+            TrainingRunReport,
+            build_training_run_report,
+            compare_training_run_reports,
+            list_training_run_reports,
+            load_training_run_report,
+            write_training_run_report,
+        )
+
+        return {
+            "TrainingRunReport": TrainingRunReport,
+            "build_training_run_report": build_training_run_report,
+            "compare_training_run_reports": compare_training_run_reports,
+            "list_training_run_reports": list_training_run_reports,
+            "load_training_run_report": load_training_run_report,
+            "write_training_run_report": write_training_run_report,
+        }[name]
+    if name in {
+        "HUMAN_SUPPORT_TARGETS",
         "LEGACY_NEUTRAL_FEATURES",
         "ModelInputPolicy",
         "TrainingMode",
@@ -77,6 +145,7 @@ def __getattr__(name: str) -> object:
         "proxy_memory_weight",
     }:
         from vaaet_ml.training.lifecycle import (
+            HUMAN_SUPPORT_TARGETS,
             LEGACY_NEUTRAL_FEATURES,
             ModelInputPolicy,
             TrainingMode,
@@ -88,6 +157,7 @@ def __getattr__(name: str) -> object:
         )
 
         return {
+            "HUMAN_SUPPORT_TARGETS": HUMAN_SUPPORT_TARGETS,
             "LEGACY_NEUTRAL_FEATURES": LEGACY_NEUTRAL_FEATURES,
             "ModelInputPolicy": ModelInputPolicy,
             "TrainingMode": TrainingMode,

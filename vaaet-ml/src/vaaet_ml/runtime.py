@@ -227,3 +227,30 @@ def print_runtime_diagnostics(diagnostics: RuntimeDiagnostics) -> None:
     if diagnostics.pip_check_output:
         print("⚠️ pip check reported managed-runtime conflicts; workflow imports remain explicit.")
         print(diagnostics.pip_check_output)
+
+
+def build_training_runtime_evidence(
+    diagnostics: RuntimeDiagnostics,
+    *,
+    tensorflow_version: str,
+    keras_version: str,
+    declared_extras: tuple[str, ...],
+) -> dict[str, object]:
+    """Reduce el preflight a evidencia portable sin roots, paths ni secretos."""
+
+    evidence: dict[str, object] = {
+        "git_commit": diagnostics.git_commit,
+        "python_version": diagnostics.python_version,
+        "tensorflow_version": tensorflow_version,
+        "keras_version": keras_version,
+        "framework_gpu_available": diagnostics.framework_gpu_available,
+        "total_ram_gib": diagnostics.total_ram_gib,
+        "available_ram_gib": diagnostics.available_ram_gib,
+        "content_free_gib": diagnostics.content_free_gib,
+        "declared_extras": declared_extras,
+    }
+    if diagnostics.nvidia_smi:
+        evidence["nvidia_smi"] = " | ".join(
+            line.strip() for line in diagnostics.nvidia_smi.splitlines() if line.strip()
+        )
+    return evidence

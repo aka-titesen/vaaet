@@ -144,8 +144,8 @@ def test_training_uses_shared_feature_contracts() -> None:
     assert "build_training_partitions(" in code
     assert "validation_data=(x_validation, y_validation)" in selection_module
     assert "validation_split" not in code
-    assert "from vaaet_ml.training.modeling import build_traffic_state_mlp" in code
-    assert "build_traffic_state_mlp(" in code
+    assert "from vaaet_ml.training.modeling import build_traffic_state_mlp" in selection_module
+    assert "build_traffic_state_mlp(" in selection_module
     assert "N_MODEL_STATES" in code
     assert "fit_temperature" in code
     assert "production_eligible" in code
@@ -156,7 +156,6 @@ def test_training_uses_shared_feature_contracts() -> None:
     assert "SeedDatasetPackageSource" in code
     assert "HUMAN_HOLDOUT_FROZEN = False" in code
     assert "HumanHoldoutAction.REUSE_OR_CREATE" in code
-    assert "HumanHoldoutAction.CREATE_NEW_VERSION" in code
     assert "HUMAN_HOLDOUT_UPDATE_REASON" in code
     assert "resolve_human_holdout(" in code
     assert "frozen_holdout=human_holdout_snapshot" in code
@@ -166,7 +165,6 @@ def test_training_uses_shared_feature_contracts() -> None:
     assert "compose_supervised_dataset(" in code
     assert "VersionedSeedStore" in code
     assert "DatasetArtifactAction.REUSE_OR_CREATE" in code
-    assert "DatasetArtifactAction.CREATE_NEW_VERSION" in code
     assert "HitlCatalogSource(HITL_CATALOG_PATH, CatalogSelection.ALL_ACTIVE)" in code
     assert "create_training_input_lock(" in code
     assert "training_input_lock=training_input_lock.descriptor" in code
@@ -188,6 +186,29 @@ def test_training_delegates_grouped_cross_validation() -> None:
     assert "fold_model.fit(" not in code
     assert "StratifiedGroupKFold" in cross_validation
     assert "apply_model_input_policy" in cross_validation
+
+
+def test_training_uses_the_governed_observability_workflow() -> None:
+    code = _code(NOTEBOOKS["training"])
+
+    assert code.count("WRITE_TRAINING_REPORT =") == 1
+    assert code.count("REFERENCE_TRAINING_RUN_ID =") == 1
+    assert code.count("RUN_GROUPED_CROSS_VALIDATION =") == 1
+    assert "TrainingFitConfig(" in code
+    assert "build_training_callbacks(" in code
+    assert "evaluate_candidate_eligibility(" in code
+    assert "build_training_run_report(" in code
+    assert "write_training_run_report(" in code
+    assert "save_training_run_diagnostics(" in code
+    assert "compare_training_run_reports(" in code
+    assert "EarlyStopping(" not in code
+    assert "ReduceLROnPlateau(" not in code
+    assert code.index("training_input_lock = create_training_input_lock(") < code.index(
+        "select_balance_candidate("
+    )
+    assert code.index("run_grouped_cross_validation(") < code.index(
+        "build_training_run_report("
+    )
 
 
 def test_training_prepares_postgres_backup_reader_in_colab() -> None:

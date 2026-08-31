@@ -18,6 +18,7 @@ from vaaet.lifecycle import (
 )
 
 __all__ = [
+    "HUMAN_SUPPORT_TARGETS",
     "LEGACY_NEUTRAL_FEATURES",
     "ModelInputPolicy",
     "TrainingMode",
@@ -85,12 +86,27 @@ def build_supervision_weights(
     report: dict[str, object] = {
         "training_mode": active_mode.value,
         "human_support": support,
+        "human_support_targets": dict(HUMAN_SUPPORT_TARGETS),
+        "human_support_progress": {
+            state: min(1.0, support[state] / HUMAN_SUPPORT_TARGETS[state])
+            for state in HUMAN_SUPPORT_TARGETS
+        },
+        "human_support_deficit": {
+            state: max(HUMAN_SUPPORT_TARGETS[state] - support[state], 0)
+            for state in HUMAN_SUPPORT_TARGETS
+        },
         "proxy_memory_weight": {
             state: 1.0
             if active_mode is TrainingMode.SEED_BOOTSTRAP
             else proxy_memory_weight(state, support)
             for state in HUMAN_SUPPORT_TARGETS
         },
+        "effective_weight_by_class": _effective_weight_by_class(
+            labels=labels,
+            human=human,
+            synthetic=synthetic,
+            weights=weights,
+        ),
         "synthetic_multiplier": float(synthetic_multiplier),
         "synthetic_congested_effective_weight": float(
             weights[congested_synthetic.to_numpy()].sum()
@@ -98,6 +114,29 @@ def build_supervision_weights(
         "synthetic_congested_limit": synthetic_limit,
     }
     return weights, report
+
+
+def _effective_weight_by_class(
+    *,
+    labels: pd.Series,
+    human: pd.Series,
+    synthetic: pd.Series,
+    weights: np.ndarray,
+) -> dict[int, dict[str, float]]:
+    """Separa el aporte efectivo sin usar el holdout para alterar la memoria."""
+
+    result: dict[int, dict[str, float]] = {}
+    for state in HUMAN_SUPPORT_TARGETS:
+        state_mask = labels.eq(state)
+        source_masks = {
+            "human": state_mask & human,
+            "synthetic": state_mask & ~human & synthetic,
+            "proxy": state_mask & ~human & ~synthetic,
+        }
+        result[state] = {
+            source: float(weights[mask.to_numpy()].sum()) for source, mask in source_masks.items()
+        }
+    return result
 
 
 def cap_synthetic_congested_weight(

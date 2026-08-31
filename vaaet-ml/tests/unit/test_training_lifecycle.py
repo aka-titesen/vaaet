@@ -63,6 +63,10 @@ def test_hitl_supervision_keeps_humans_and_decays_proxy() -> None:
     assert 0 < weights[0] < 1
     assert weights[3] < weights[2]
     assert report["human_support"] == {0: 0, 1: 1, 2: 0}
+    assert report["human_support_targets"] == {0: 300, 1: 300, 2: 100}
+    assert report["human_support_deficit"][1] == 299
+    assert report["effective_weight_by_class"][1]["human"] == 1.0
+    assert report["effective_weight_by_class"][2]["synthetic"] == weights[3]
 
 
 def test_final_synthetic_congested_cap_uses_normal_effective_weight() -> None:

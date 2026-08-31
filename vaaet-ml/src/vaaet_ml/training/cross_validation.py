@@ -17,6 +17,12 @@ from sklearn.utils.class_weight import compute_class_weight
 from vaaet.settings import N_MODEL_STATES, STATE_LABELS
 
 from vaaet_ml.data.datasets import build_group_ids
+from vaaet_ml.training.execution import (
+    TrainingFitConfig,
+    reset_training_state,
+    validate_training_history,
+    validate_training_inputs,
+)
 from vaaet_ml.training.lifecycle import ModelInputPolicy, apply_model_input_policy
 
 
@@ -65,6 +71,24 @@ class CrossValidationResult:
     mean_f1_macro: float
     std_f1_macro: float
 
+    def report_evidence(self) -> dict[str, object]:
+        """Serializa evidencia adicional sin filas, modelos ni decisiones de promoción."""
+
+        return {
+            "requested": True,
+            "mean_f1_macro": self.mean_f1_macro,
+            "std_f1_macro": self.std_f1_macro,
+            "folds": [
+                {
+                    "index": fold.index,
+                    "support": fold.support,
+                    "missing_labels": list(fold.missing_labels),
+                    "f1_macro": fold.f1_macro,
+                }
+                for fold in self.folds
+            ],
+        }
+
 
 def run_grouped_cross_validation(
     frame: pd.DataFrame,
@@ -77,6 +101,8 @@ def run_grouped_cross_validation(
     requested_folds: int = 5,
     epochs: int = 200,
     batch_size: int = 32,
+    clear_session: Callable[[], None] | None = None,
+    set_random_seed: Callable[[int], None] | None = None,
 ) -> CrossValidationResult:
     """Ejecuta folds reales agrupados sin sustituir el split final exportable.
 
@@ -84,6 +110,8 @@ def run_grouped_cross_validation(
     filtra estadísticas de entrenamiento al grupo de validación correspondiente.
     """
 
+    if (clear_session is None) != (set_random_seed is None):
+        raise ValueError("Cross-validation requires both session and seed callbacks together.")
     source = _real_cross_validation_source(frame)
     features = apply_model_input_policy(source, input_policy).to_numpy(dtype=float)
     labels = pd.to_numeric(source["traffic_state"], errors="raise").to_numpy(dtype=int)
@@ -102,6 +130,9 @@ def run_grouped_cross_validation(
             scaler_factory=scaler_factory,
             epochs=epochs,
             batch_size=batch_size,
+            clear_session=clear_session,
+            set_random_seed=set_random_seed,
+            random_seed=random_seed,
         )
         for index, (train_indices, validation_indices) in enumerate(
             splitter.split(features, labels, groups), start=1
@@ -146,14 +177,31 @@ def _evaluate_fold(
     scaler_factory: Callable[[], _FeatureScaler],
     epochs: int,
     batch_size: int,
+    clear_session: Callable[[], None] | None,
+    set_random_seed: Callable[[int], None] | None,
+    random_seed: int,
 ) -> CrossValidationFold:
     scaler = scaler_factory()
     train_features = scaler.fit_transform(features[train_indices])
     validation_features = scaler.transform(features[validation_indices])
     train_labels = labels[train_indices]
     validation_labels = labels[validation_indices]
+    validate_training_inputs(
+        train_features,
+        train_labels,
+        validation_features,
+        validation_labels,
+        input_features=train_features.shape[1],
+        output_classes=N_MODEL_STATES,
+    )
+    if clear_session is not None and set_random_seed is not None:
+        reset_training_state(
+            TrainingFitConfig(random_seed=random_seed, epochs=epochs, batch_size=batch_size),
+            clear_session=clear_session,
+            set_random_seed=set_random_seed,
+        )
     model = model_factory(input_features=train_features.shape[1], output_classes=N_MODEL_STATES)
-    model.fit(
+    history = model.fit(
         train_features,
         train_labels,
         epochs=epochs,
@@ -163,6 +211,7 @@ def _evaluate_fold(
         callbacks=callbacks_factory(),
         verbose=0,
     )
+    validate_training_history(history)
     predictions = model.predict(validation_features, verbose=0).argmax(axis=1).astype(int)
     support = {state: int((validation_labels == state).sum()) for state in range(N_MODEL_STATES)}
     missing_labels = tuple(STATE_LABELS[state] for state, count in support.items() if count == 0)

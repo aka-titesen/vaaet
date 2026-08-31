@@ -6,6 +6,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Literal
+from uuid import UUID
 
 from vaaet_ml.exceptions import RuntimeConfigurationError
 
@@ -22,6 +23,17 @@ def _require_bool(name: str, value: bool) -> None:
 def _optional_path(name: str, value: str | None) -> None:
     if value is not None and (not isinstance(value, str) or not value.strip()):
         raise RuntimeConfigurationError(f"{name} must be a non-empty path or None.")
+
+
+def _optional_run_id(name: str, value: str | None) -> None:
+    """Valida la referencia inmutable sin aceptar aliases mutables."""
+
+    if value is None:
+        return
+    try:
+        UUID(value)
+    except (AttributeError, TypeError, ValueError) as exc:
+        raise RuntimeConfigurationError(f"{name} must be a training pipeline UUID or None.") from exc
 
 
 @dataclass(frozen=True)
@@ -80,6 +92,9 @@ class TrainingWorkflowConfig:
     human_holdout_update_reason: str | None
     seed_artifact_action: ArtifactActionName
     seed_artifact_update_reason: str | None
+    write_training_report: bool = True
+    reference_training_run_id: str | None = None
+    run_grouped_cross_validation: bool = False
 
     def __post_init__(self) -> None:
         if self.training_mode not in {"seed_bootstrap", "hitl_retraining"}:
@@ -88,6 +103,8 @@ class TrainingWorkflowConfig:
             "enable_postgres_ingestion",
             "enable_data_upload",
             "human_holdout_frozen",
+            "write_training_report",
+            "run_grouped_cross_validation",
         ):
             _require_bool(name, getattr(self, name))
         if self.human_holdout_frozen and self.training_mode != "hitl_retraining":
@@ -100,6 +117,7 @@ class TrainingWorkflowConfig:
         self._validate_version_action(
             "seed_artifact", self.seed_artifact_action, self.seed_artifact_update_reason
         )
+        _optional_run_id("reference_training_run_id", self.reference_training_run_id)
 
     @staticmethod
     def _validate_version_action(name: str, action: str, update_reason: str | None) -> None:

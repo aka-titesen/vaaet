@@ -81,6 +81,10 @@ por separado.
 
 El bundle v2 contiene `traffic_classifier.keras`, `feature_scaler.joblib`, `label_mapping.joblib` y `model-manifest.json`. El MLP aprende `Normal`, `Reduced` y `Congested`; una sospecha de incidente conserva `Congested` y sólo una confirmación humana validada puede publicar `Accident`. El manifiesto fija las 19 features, calibración, política temporal, modo de entrenamiento, política de entrada, etapa de despliegue, elegibilidad, procedencia, checksums y descriptor del input lock. Consultá el [contrato de artefactos](../docs/ml/model-artifact-contract.md), [ADR-0014](../docs/architecture/decisions/0014-hierarchical-traffic-state-and-incident-policy.md), [ADR-0017](../docs/architecture/decisions/0017-seed-bootstrap-and-hitl-retraining.md) y [ADR-0019](../docs/architecture/decisions/0019-immutable-seed-and-hitl-datasets.md).
 
+Cada entrenamiento puede persistir un informe inmutable con su input lock,
+métricas agregadas, diagnósticos y una comparación compatible opcional. La
+decisión de promoción sigue siendo humana; consultá la [guía de observabilidad](../docs/ml/training-observability.md).
+
 Los aproximadamente 2.068 registros históricos permiten crear un bundle
 `pilot` mediante weak supervision. Ese resultado reproduce reglas preliminares,
 pero no acredita calidad real de producción: carece de telemetría v2 completa,

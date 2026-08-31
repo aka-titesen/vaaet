@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping, Sequence
+from copy import deepcopy
 from dataclasses import dataclass
 
 import numpy as np
@@ -18,6 +19,12 @@ from vaaet_ml.training.balancing import (
     BalanceCandidate,
     BalanceStrategy,
     compute_capped_balanced_weights,
+)
+from vaaet_ml.training.execution import (
+    TrainingFitConfig,
+    reset_training_state,
+    validate_training_history,
+    validate_training_inputs,
 )
 from vaaet_ml.training.lifecycle import ModelInputPolicy, cap_synthetic_congested_weight
 
@@ -47,8 +54,10 @@ def select_balance_candidate(
     input_policy: ModelInputPolicy,
     input_features: int,
     output_classes: int,
-    random_seed: int,
-    callbacks: Sequence[object],
+    fit_config: TrainingFitConfig | None = None,
+    callbacks_factory: Callable[[], Sequence[object]] | None = None,
+    random_seed: int | None = None,
+    callbacks: Sequence[object] | None = None,
     clear_session: Callable[[], None],
     set_random_seed: Callable[[int], None],
 ) -> BalanceSelection:
@@ -56,11 +65,24 @@ def select_balance_candidate(
 
     from vaaet_ml.training.modeling import build_traffic_state_mlp
 
+    config = _resolve_fit_config(fit_config, random_seed)
+    make_callbacks = _resolve_callbacks_factory(callbacks_factory, callbacks)
+    validate_training_inputs(
+        x_train,
+        y_train,
+        x_validation,
+        y_validation,
+        input_features=input_features,
+        output_classes=output_classes,
+    )
     records: list[dict[str, float | int | str]] = []
     trained: dict[BalanceStrategy, tuple[object, object, np.ndarray, dict[int, float]]] = {}
     for strategy, candidate in candidates.items():
-        clear_session()
-        set_random_seed(random_seed)
+        reset_training_state(
+            config,
+            clear_session=clear_session,
+            set_random_seed=set_random_seed,
+        )
         positions = candidate.row_positions
         candidate_frame = train_frame.iloc[positions].copy()
         candidate_y = y_train[positions]
@@ -75,13 +97,14 @@ def select_balance_candidate(
         history = model.fit(
             x_train[positions],
             candidate_y,
-            epochs=120,
-            batch_size=32,
+            epochs=config.epochs,
+            batch_size=config.batch_size,
             validation_data=(x_validation, y_validation),
             sample_weight=sample_weight,
-            callbacks=list(callbacks),
+            callbacks=list(make_callbacks()),
             verbose=0,
         )
+        validate_training_history(history)
         raw_validation_proba = model.predict(x_validation, verbose=0)
         temperature = fit_temperature(raw_validation_proba, y_validation)
         validation_proba = apply_temperature_scaling(raw_validation_proba, temperature)
@@ -117,3 +140,34 @@ def select_balance_candidate(
 
 def _macro_f1(actual: np.ndarray, predicted: np.ndarray) -> float:
     return float(f1_score(actual, predicted, labels=[0, 1, 2], average="macro", zero_division=0))
+
+
+def _resolve_fit_config(
+    fit_config: TrainingFitConfig | None,
+    random_seed: int | None,
+) -> TrainingFitConfig:
+    """Conserva la llamada 4.x mientras los notebooks migran al contrato tipado."""
+
+    if fit_config is not None:
+        if random_seed is not None and random_seed != fit_config.random_seed:
+            raise ValueError("fit_config and random_seed must agree when both are configured.")
+        return fit_config
+    if random_seed is None:
+        raise ValueError("select_balance_candidate requires fit_config or random_seed.")
+    return TrainingFitConfig(random_seed=random_seed)
+
+
+def _resolve_callbacks_factory(
+    callbacks_factory: Callable[[], Sequence[object]] | None,
+    callbacks: Sequence[object] | None,
+) -> Callable[[], Sequence[object]]:
+    """Evita reutilizar callbacks aun durante la compatibilidad temporal 4.x."""
+
+    if callbacks_factory is not None:
+        if callbacks is not None:
+            raise ValueError("Configure callbacks_factory or callbacks, not both.")
+        return callbacks_factory
+    if callbacks is None:
+        raise ValueError("select_balance_candidate requires callbacks_factory or callbacks.")
+    templates = tuple(callbacks)
+    return lambda: tuple(deepcopy(callback) for callback in templates)

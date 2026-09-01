@@ -94,7 +94,7 @@ psql 'postgresql://admin:...@host:5432/vaaet' -f vaaet-ml/migrations/provision-r
 
 ## Artefactos y Drive
 
-El entrenamiento genera cuatro archivos bajo `vaaet-ml/artifacts/traffic-state/` y puede copiarlos juntos a `MyDrive/vaaet-ml/artifacts/traffic-state`. Inferencia intenta, en orden: bundle local, Drive y upload manual. El manifiesto se valida antes de cargar Keras o joblib. `ALLOW_PILOT_BUNDLE=True` permite ejecutar conscientemente el bootstrap; `ALLOW_EXPERIMENTAL_BUNDLE=True` queda reservado para candidatos HITL no aprobados. Ninguno promociona el artefacto.
+El entrenamiento genera cuatro archivos bajo `vaaet-ml/artifacts/traffic-state/`. Sólo con `COPY_BUNDLE_TO_DRIVE=True` valida el manifiesto y copia el conjunto completo a `MyDrive/vaaet-ml/artifacts/traffic-state`; el valor predeterminado evita toda escritura adicional. Si el montaje o la copia fallan, el workflow se detiene sin declarar una sincronización parcial como éxito. Inferencia intenta, en orden: bundle local, Drive y upload manual. El manifiesto se valida antes de cargar Keras o joblib. `ALLOW_PILOT_BUNDLE=True` permite ejecutar conscientemente el bootstrap; `ALLOW_EXPERIMENTAL_BUNDLE=True` queda reservado para candidatos HITL no aprobados. Ninguno promociona el artefacto.
 
 Después de aprobar un modelo, registralo desde una máquina local con
 `vaaet-registry stage`, commit/tag Git y `vaaet-registry push`. La configuración
@@ -104,11 +104,11 @@ se versionan. Consultá la [guía del registro DVC](../ml/dvc-guide.md).
 
 ## Entradas y salidas
 
-- Adquisición: MP4 → MP4 anotado + `vaaet-ml/data/raw/traffic_data_raw.csv` + `vaaet_raw.traffic_data` opcional.
+- Adquisición: MP4 → MP4 anotado + `vaaet-ml/data/raw/traffic_data_raw.csv` + `vaaet_raw.traffic_data` opcional. En Colab, `DOWNLOAD_OUTPUTS=True` descarga video y CSV sólo al finalizar.
 - Entrenamiento semilla: raw explícito → 19 features → paquete semilla + bundle piloto.
 - Reentrenamiento HITL: paquete semilla + features validadas → bundle candidato.
 - Evaluación: Champion + Challenger + holdout humano exacto → evidencia comparativa manual.
-- Inferencia: MP4 + bundle → MP4 anotado + features/predicciones PostgreSQL opcionales.
+- Inferencia: MP4 + bundle → MP4 anotado + features/predicciones PostgreSQL opcionales. En Colab, `DOWNLOAD_ANNOTATED_VIDEO=True` descarga el video sólo al finalizar.
 
 Con un plan de vistas, las velocidades se estiman sólo dentro de la calibración
 local declarada; cada segmento expone un reporte lateral y el tramo que cruza
@@ -195,7 +195,7 @@ desplazarse tres horas respecto del texto original. Las features horarias siguen
 representando la hora argentina. Después de la aumentación, entrenamiento muestra
 `Canonical timestamp timezone: UTC` antes de auditar el dataset.
 
-Descargá los outputs antes de cerrar la sesión. El backup canónico usa el formato de archivo `1.16`, que requiere PostgreSQL 17 o posterior. Cuando debe procesarlo, el notebook de entrenamiento configura de forma visible el repositorio APT oficial PGDG, instala únicamente `postgresql-client-17` y ejecuta directamente `/usr/lib/postgresql/17/bin/pg_restore`. La clave, URL, codename y arquitectura del repositorio se declaran explícitamente en la celda; no se instala el servidor PostgreSQL. El importador selecciona entradas exactas del catálogo del archivo, por lo que admite tanto `public.traffic_data` legacy como `vaaet_raw.traffic_data` moderno sin restaurar DDL ni conectarse a una base viva.
+Antes de cerrar la sesión, activá explícitamente la descarga necesaria (`DOWNLOAD_OUTPUTS=True` o `DOWNLOAD_ANNOTATED_VIDEO=True`) o la copia validada del bundle (`COPY_BUNDLE_TO_DRIVE=True`). El backup canónico usa el formato de archivo `1.16`, que requiere PostgreSQL 17 o posterior. Cuando debe procesarlo, el notebook de entrenamiento configura de forma visible el repositorio APT oficial PGDG, instala únicamente `postgresql-client-17` y ejecuta directamente `/usr/lib/postgresql/17/bin/pg_restore`. La clave, URL, codename y arquitectura del repositorio se declaran explícitamente en la celda; no se instala el servidor PostgreSQL. El importador selecciona entradas exactas del catálogo del archivo, por lo que admite tanto `public.traffic_data` legacy como `vaaet_raw.traffic_data` moderno sin restaurar DDL ni conectarse a una base viva.
 
 Cada workflow registra un `pipeline_run_id`. Con PostgreSQL usa el schema
 `vaaet_ops`; sin conexión genera un manifiesto JSON redactado en
@@ -213,7 +213,7 @@ El cliente es una dependencia del sistema operativo y por eso no forma parte de 
 ## Checklist manual
 
 - Confirmar GPU y descarga automática de YOLO.
-- Procesar un clip real en adquisición y descargar CSV/video.
+- Procesar un clip real en adquisición y activar una vez la descarga explícita de CSV/video.
 - Aplicar Alembic fuera de Colab y verificar health check/rol sin secretos.
 - Activar una vez la persistencia y comprobar deduplicación en `vaaet_raw.traffic_data`.
 - Entrenar y validar los cuatro archivos del bundle.

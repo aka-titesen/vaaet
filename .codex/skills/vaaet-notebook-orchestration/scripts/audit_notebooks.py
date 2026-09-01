@@ -9,9 +9,9 @@ import glob
 import json
 import re
 import sys
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, Sequence
 
 SETUP_MARKER = "# Environment setup"
 CONFIG_MARKERS = (
@@ -49,7 +49,7 @@ class Finding:
 
 def _cell_source(cell: object) -> str:
     if not isinstance(cell, dict):
-        raise ValueError("cell entry must be an object")
+        raise TypeError("cell entry must be an object")
     source = cell.get("source", "")
     if isinstance(source, str):
         return source
@@ -59,17 +59,40 @@ def _cell_source(cell: object) -> str:
 
 
 def _assigned_names(tree: ast.Module) -> set[str]:
+    """Devuelve asignaciones del módulo, incluso dentro de control de flujo."""
+
     names: set[str] = set()
-    for statement in tree.body:
-        targets: list[ast.expr] = []
-        if isinstance(statement, (ast.Assign, ast.AnnAssign, ast.AugAssign)):
-            if isinstance(statement, ast.Assign):
-                targets.extend(statement.targets)
-            else:
-                targets.append(statement.target)
-        for target in targets:
-            if isinstance(target, ast.Name):
-                names.add(target.id)
+
+    class ModuleScopeAssignments(ast.NodeVisitor):
+        """Evita confundir las variables locales con configuración del notebook."""
+
+        @staticmethod
+        def _record_targets(targets: Sequence[ast.expr]) -> None:
+            for target in targets:
+                names.update(node.id for node in ast.walk(target) if isinstance(node, ast.Name))
+
+        def visit_Assign(self, node: ast.Assign) -> None:
+            self._record_targets(node.targets)
+
+        def visit_AnnAssign(self, node: ast.AnnAssign) -> None:
+            self._record_targets((node.target,))
+
+        def visit_AugAssign(self, node: ast.AugAssign) -> None:
+            self._record_targets((node.target,))
+
+        def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
+            return
+
+        def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:
+            return
+
+        def visit_Lambda(self, node: ast.Lambda) -> None:
+            return
+
+        def visit_ClassDef(self, node: ast.ClassDef) -> None:
+            return
+
+    ModuleScopeAssignments().visit(tree)
     return names
 
 
@@ -80,9 +103,10 @@ def _has_src_import(tree: ast.Module) -> bool:
                 alias.name == "src" or alias.name.startswith("src.") for alias in node.names
             ):
                 return True
-        elif isinstance(node, ast.ImportFrom):
-            if node.module == "src" or (node.module and node.module.startswith("src.")):
-                return True
+        elif isinstance(node, ast.ImportFrom) and (
+            node.module == "src" or (node.module and node.module.startswith("src."))
+        ):
+            return True
     return False
 
 
@@ -103,7 +127,7 @@ def _load_code_cells(path: Path) -> tuple[list[tuple[int, str, ast.Module]], lis
             continue
         try:
             source = _cell_source(cell)
-        except ValueError as exc:
+        except TypeError as exc:
             findings.append(Finding("ERROR", path, str(exc), cell_number))
             continue
 

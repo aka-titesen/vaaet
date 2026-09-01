@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import pytest
-
 from vaaet_ml.exceptions import RuntimeConfigurationError
 from vaaet_ml.workflow_config import (
     CollectionWorkflowConfig,
@@ -16,6 +15,11 @@ from vaaet_ml.workflow_config import (
 def test_view_plan_path_requires_a_non_empty_string_when_configured() -> None:
     with pytest.raises(RuntimeConfigurationError, match="view_plan_path"):
         CollectionWorkflowConfig(False, False, "")
+
+
+def test_collection_config_requires_an_explicit_boolean_for_downloads() -> None:
+    with pytest.raises(RuntimeConfigurationError, match="download_outputs"):
+        CollectionWorkflowConfig(False, False, None, "yes")  # type: ignore[arg-type]
 
 
 def test_inference_config_rejects_unknown_review_mode() -> None:
@@ -36,6 +40,21 @@ def test_training_config_requires_an_immutable_reference_run_id() -> None:
         TrainingWorkflowConfig(
             "seed_bootstrap", False, True, False, "reuse_or_create", None,
             "reuse_or_create", None, reference_training_run_id="latest",
+        )
+
+
+def test_training_config_requires_an_explicit_boolean_for_drive_copy() -> None:
+    with pytest.raises(RuntimeConfigurationError, match="copy_bundle_to_drive"):
+        TrainingWorkflowConfig(
+            "seed_bootstrap",
+            False,
+            True,
+            False,
+            "reuse_or_create",
+            None,
+            "reuse_or_create",
+            None,
+            copy_bundle_to_drive="yes",  # type: ignore[arg-type]
         )
 
 

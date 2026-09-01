@@ -32,6 +32,16 @@ def _code(path: Path) -> str:
 
 
 @pytest.mark.parametrize("path", ALL_NOTEBOOKS.values())
+def test_notebook_is_versioned_without_execution_outputs(path: Path) -> None:
+    notebook = json.loads(path.read_text(encoding="utf-8"))
+    for cell in notebook["cells"]:
+        if cell["cell_type"] != "code":
+            continue
+        assert cell.get("execution_count") is None
+        assert cell.get("outputs", []) == []
+
+
+@pytest.mark.parametrize("path", ALL_NOTEBOOKS.values())
 def test_notebook_has_one_shared_bootstrap_and_no_import_hacks(path: Path) -> None:
     code = _code(path)
     assert code.count("# Environment setup — run once per Colab runtime") == 1
@@ -279,7 +289,7 @@ def test_inference_centralizes_and_documents_supported_workflow_configuration() 
     assert "load_traffic_bundle(" in code
     assert 'stage == "candidate" and persist_to_database' in bundle_module
     assert "Los bundles candidatos son sólo offline" in bundle_module
-    assert "if IN_COLAB and DOWNLOAD_ANNOTATED_VIDEO" in code
+    assert "if IN_COLAB and WORKFLOW_CONFIG.download_annotated_video:" in code
     assert "if not SHOW_DASHBOARD" in code
     assert "HudConfig(debug=HUD_DEBUG)" in code
 
@@ -330,6 +340,7 @@ def test_collection_documents_three_complete_safe_recipes() -> None:
     assert "Diagnóstico técnico" in markdown
     assert markdown.count("PERSIST_TO_DATABASE =") == 3
     assert markdown.count("HUD_DEBUG =") == 3
+    assert markdown.count("DOWNLOAD_OUTPUTS =") == 3
 
 
 def test_inference_documents_four_complete_recipes() -> None:
@@ -346,6 +357,7 @@ def test_inference_documents_four_complete_recipes() -> None:
     )
     for assignment in recipe_assignments:
         assert markdown.count(assignment) == 4
+    assert markdown.count("DOWNLOAD_ANNOTATED_VIDEO = False") == 4
 
 
 def test_training_documents_complete_seed_hitl_and_versioning_recipes() -> None:
@@ -362,6 +374,7 @@ def test_training_documents_complete_seed_hitl_and_versioning_recipes() -> None:
     )
     for assignment in recipe_assignments:
         assert markdown.count(assignment) == 7
+    assert "COPY_BUNDLE_TO_DRIVE=False" in markdown
 
 
 def test_notebooks_delegate_model_and_dashboard_rendering() -> None:
@@ -382,7 +395,10 @@ def test_collection_centralizes_safe_workflow_configuration() -> None:
 
     assert code.count("PERSIST_TO_DATABASE =") == 1
     assert code.count("HUD_DEBUG =") == 1
+    assert code.count("DOWNLOAD_OUTPUTS =") == 1
     assert "PERSIST_TO_DATABASE = False" in code
+    assert "DOWNLOAD_OUTPUTS = False" in code
+    assert "if IN_COLAB and WORKFLOW_CONFIG.download_outputs:" in code
     config_index = next(
         index
         for index, cell in enumerate(notebook["cells"])
@@ -396,6 +412,22 @@ def test_collection_centralizes_safe_workflow_configuration() -> None:
         in "".join(cell.get("source", []))
     )
     assert config_index < setup_index
+
+
+def test_notebook_transfers_require_explicit_configuration() -> None:
+    collection = _code(NOTEBOOKS["collection"])
+    inference = _code(NOTEBOOKS["inference"])
+    training = _code(NOTEBOOKS["training"])
+
+    assert "DOWNLOAD_OUTPUTS = False" in collection
+    assert "if IN_COLAB and WORKFLOW_CONFIG.download_outputs:" in collection
+    assert "DOWNLOAD_ANNOTATED_VIDEO = False" in inference
+    assert "if IN_COLAB and WORKFLOW_CONFIG.download_annotated_video:" in inference
+    assert "COPY_BUNDLE_TO_DRIVE = False" in training
+    assert "elif not WORKFLOW_CONFIG.copy_bundle_to_drive:" in training
+    assert "validate_manifest(_bundle_directory)" in training
+    assert "No se pudo copiar el bundle validado a Drive" in training
+    assert "except Exception as e:" not in training
 
 
 def test_training_resolves_postgres_only_after_explicit_opt_in() -> None:

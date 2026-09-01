@@ -67,6 +67,13 @@ instala ambos componentes con los extras del workflow y ejecuta el preflight
 tipado. Los imports operativos usan `vaaet`; los de laboratorio, `vaaet_ml`.
 No se usan `requirements.txt`, `sys.path` ni instaladores ad hoc.
 
+Los notebooks versionados no almacenan ejecuciones, gráficos ni binarios. En Colab,
+colección deja `DOWNLOAD_OUTPUTS=False`, inferencia deja
+`DOWNLOAD_ANNOTATED_VIDEO=False` y entrenamiento deja
+`COPY_BUNDLE_TO_DRIVE=False`. Activá cada opción únicamente al final del workflow
+si necesitás descargar resultados o copiar un bundle ya validado al destino
+canónico de Drive.
+
 Colección e inferencia permiten `VIEW_PLAN_PATH` como JSON privado opcional para
 un video con vistas o zooms estables. `None` conserva la vista única. El plan se
 valida antes del análisis, no se guarda en Git/DVC y no mezcla telemetría entre

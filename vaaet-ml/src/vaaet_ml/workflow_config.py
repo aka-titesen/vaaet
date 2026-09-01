@@ -43,10 +43,12 @@ class CollectionWorkflowConfig:
     persist_to_database: bool
     hud_debug: bool
     view_plan_path: str | None = None
+    download_outputs: bool = False
 
     def __post_init__(self) -> None:
         _require_bool("persist_to_database", self.persist_to_database)
         _require_bool("hud_debug", self.hud_debug)
+        _require_bool("download_outputs", self.download_outputs)
         _optional_path("view_plan_path", self.view_plan_path)
 
 
@@ -95,6 +97,7 @@ class TrainingWorkflowConfig:
     write_training_report: bool = True
     reference_training_run_id: str | None = None
     run_grouped_cross_validation: bool = False
+    copy_bundle_to_drive: bool = False
 
     def __post_init__(self) -> None:
         if self.training_mode not in {"seed_bootstrap", "hitl_retraining"}:
@@ -105,6 +108,7 @@ class TrainingWorkflowConfig:
             "human_holdout_frozen",
             "write_training_report",
             "run_grouped_cross_validation",
+            "copy_bundle_to_drive",
         ):
             _require_bool(name, getattr(self, name))
         if self.human_holdout_frozen and self.training_mode != "hitl_retraining":

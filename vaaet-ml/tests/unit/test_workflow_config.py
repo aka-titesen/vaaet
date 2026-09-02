@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import pytest
+
 from vaaet_ml.exceptions import RuntimeConfigurationError
 from vaaet_ml.workflow_config import (
     CollectionWorkflowConfig,

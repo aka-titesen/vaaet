@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: 2026 VAAET Contributors
 # SPDX-License-Identifier: AGPL-3.0-only
-"""Leakage-safe partitions for seed bootstrap and HITL retraining."""
+"""Particiones sin fuga para bootstrap semilla y reentrenamiento HITL."""
 
 from __future__ import annotations
 
@@ -23,6 +23,8 @@ if TYPE_CHECKING:
 
 @dataclass(frozen=True)
 class TrainingPartitions:
+    """Agrupa train, validación y test con sus fronteras ya verificadas."""
+
     train: pd.DataFrame
     validation: pd.DataFrame
     test: pd.DataFrame
@@ -38,7 +40,7 @@ def build_training_partitions(
     random_state: int,
     frozen_holdout: HumanHoldoutSnapshot | None = None,
 ) -> TrainingPartitions:
-    """Build proxy evaluation or reuse an exact human-only HITL holdout."""
+    """Construye evaluación proxy o reutiliza un holdout HITL humano exacto."""
     active_mode = TrainingMode(mode)
     if active_mode is TrainingMode.SEED_BOOTSTRAP:
         if frozen_holdout is not None:

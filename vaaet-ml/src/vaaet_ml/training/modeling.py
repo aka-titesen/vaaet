@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: 2026 VAAET Contributors
 # SPDX-License-Identifier: AGPL-3.0-only
-"""Keras model factories used by VAAET traffic-state training."""
+"""Factorías Keras para entrenar el clasificador de tránsito VAAET."""
 
 from __future__ import annotations
 
@@ -16,10 +16,10 @@ def build_traffic_state_mlp(
     input_features: int = len(FEATURE_COLS),
     output_classes: int = N_MODEL_STATES,
 ) -> Sequential:
-    """Build and compile the canonical three-state tabular MLP.
+    """Construye y compila el MLP tabular canónico de tres estados.
 
-    The explicit contract checks prevent a notebook override from silently
-    producing a model that cannot be served by the bundle v2 pipeline.
+    Las validaciones impiden que una personalización del notebook produzca en
+    silencio un modelo incompatible con el pipeline de bundle v2.
     """
     if input_features != len(FEATURE_COLS):
         raise ValueError(

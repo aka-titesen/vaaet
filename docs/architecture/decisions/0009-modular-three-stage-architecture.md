@@ -14,7 +14,9 @@
 > extraer lógica de notebooks. Las rutas y límites activos son
 > `vaaet-core/src/vaaet/` y `vaaet-ml/src/vaaet_ml/`; ADR-0021 gobierna el
 > monorepo y ADR-0022 el serving con YOLO. El cuerpo siguiente no describe el
-> layout actual.
+> layout actual. La convención histórica «English-only» tampoco gobierna la
+> documentación interna vigente: los identificadores permanecen en inglés y
+> los comentarios y docstrings propios se redactan en español rioplatense.
 
 ## Context
 

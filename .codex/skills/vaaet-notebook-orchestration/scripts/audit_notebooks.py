@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Audit VAAET notebooks without modifying them."""
+"""Audita notebooks VAAET sin modificarlos."""
 
 from __future__ import annotations
 
@@ -13,11 +13,8 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
-SETUP_MARKER = "# Environment setup"
-CONFIG_MARKERS = (
-    "# Workflow configuration",
-    "# Training workflow configuration",
-)
+SETUP_MARKER = "# Preparación del entorno"
+CONFIG_MARKERS = ("# Configuración del workflow",)
 SOFT_CELL_LINE_LIMIT = 50
 HARD_CELL_LINE_LIMIT = 500
 
@@ -33,7 +30,7 @@ PIP_INSTALL_PATTERN = re.compile(
 
 @dataclass(frozen=True)
 class Finding:
-    """One deterministic notebook audit result."""
+    """Representa un hallazgo determinista de la auditoría."""
 
     severity: str
     path: Path
@@ -168,7 +165,7 @@ def _load_code_cells(path: Path) -> tuple[list[tuple[int, str, ast.Module]], lis
 
 
 def audit_notebook(path: Path) -> list[Finding]:
-    """Return all findings for one notebook."""
+    """Devuelve todos los hallazgos de un notebook."""
     code_cells, findings = _load_code_cells(path)
     if not code_cells:
         if not any(item.severity == "ERROR" for item in findings):

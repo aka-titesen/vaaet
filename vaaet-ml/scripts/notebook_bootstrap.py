@@ -1,9 +1,9 @@
 # SPDX-FileCopyrightText: 2026 VAAET Contributors
 # SPDX-License-Identifier: AGPL-3.0-only
-"""Idempotent package installation for VAAET notebook environment cells.
+"""Instalación idempotente de paquetes para las celdas de entorno VAAET.
 
-This module intentionally uses only the standard library: it must run from a
-fresh checkout before either VAAET distribution is importable.
+Usa deliberadamente sólo la biblioteca estándar porque debe ejecutarse desde
+un checkout nuevo antes de que las distribuciones VAAET puedan importarse.
 """
 
 from __future__ import annotations
@@ -24,11 +24,11 @@ if TYPE_CHECKING:
 
 
 class NotebookBootstrapError(RuntimeError):
-    """Raised when a notebook runtime cannot be prepared safely."""
+    """Indica que el runtime del notebook no pudo prepararse de forma segura."""
 
 
 class ProcessResult(Protocol):
-    """Minimal subprocess result needed by the bootstrap."""
+    """Define el resultado mínimo de subprocess requerido por el bootstrap."""
 
     returncode: int
 
@@ -38,7 +38,7 @@ CommandRunner = Callable[..., ProcessResult]
 
 @dataclass(frozen=True)
 class NotebookInstallSpec:
-    """Immutable local-distribution requirements for one notebook workflow."""
+    """Representa requisitos inmutables de instalación para un workflow."""
 
     workspace_root: Path
     core_root: Path
@@ -70,7 +70,7 @@ def _format_requirement(project_root: Path, extras: tuple[str, ...]) -> str:
 
 
 def _dependency_fingerprint(spec: NotebookInstallSpec) -> str:
-    """Fingerprint dependency declarations and selected extras, never source code."""
+    """Calcula un fingerprint de dependencias y extras, nunca del código fuente."""
 
     digest = hashlib.sha256()
     for project_root, extras in (
@@ -136,7 +136,7 @@ def install_notebook_components(
     state_path: Path | None = None,
     runner: CommandRunner = subprocess.run,
 ) -> None:
-    """Resolve dependencies only when needed and always refresh local package code."""
+    """Resuelve dependencias sólo ante cambios y siempre actualiza el código local."""
 
     fingerprint = _dependency_fingerprint(spec)
     state_path = state_path or _default_state_path(spec.workspace_root)
@@ -171,7 +171,7 @@ def bootstrap_notebook(
     framework: str | None,
     require_gpu: bool,
 ) -> RuntimeDiagnostics:
-    """Install the selected extras, refresh code, and run VAAET preflight diagnostics."""
+    """Instala extras, actualiza el código y ejecuta el preflight de VAAET."""
 
     spec = NotebookInstallSpec(
         workspace_root=workspace_root,

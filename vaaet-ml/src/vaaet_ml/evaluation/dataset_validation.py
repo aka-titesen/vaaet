@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: 2026 VAAET Contributors
 # SPDX-License-Identifier: AGPL-3.0-only
-"""Contractual dataset audit performed before any VAAET model training."""
+"""Auditoría contractual del dataset previa a todo entrenamiento VAAET."""
 
 from __future__ import annotations
 
@@ -22,6 +22,8 @@ __all__ = ["DatasetAudit", "audit_training_dataset", "validate_training_partitio
 
 @dataclass(frozen=True)
 class DatasetAudit:
+    """Representa evidencia de calidad y bloqueos de elegibilidad del dataset."""
+
     report: dict[str, object]
     production_eligible: bool
     blockers: tuple[str, ...]
@@ -32,7 +34,7 @@ def audit_training_dataset(
     *,
     require_production_eligible: bool = False,
 ) -> DatasetAudit:
-    """Return provenance/quality evidence and stop on structural corruption."""
+    """Obtiene evidencia de procedencia y calidad; detiene datos corruptos."""
     _validate_dataset_source(df)
     df = df.copy()
     df["record_time"] = normalize_timestamp_series(df["record_time"])
@@ -123,6 +125,8 @@ def _resolve_data_origins(df: pd.DataFrame) -> tuple[pd.Series, pd.Series]:
 def _build_audit_evidence(
     df: pd.DataFrame, origins: pd.Series, real_mask: pd.Series
 ) -> dict[str, object]:
+    """Calcula agregados trazables sin exponer filas ni alterar el dataset."""
+
     real_frame = df.loc[real_mask]
     modern_present = [column for column in TELEMETRY_QUALITY_COLUMNS if column in df]
     coverage = {
@@ -218,7 +222,7 @@ def validate_training_partitions(
     validation: pd.DataFrame,
     test: pd.DataFrame,
 ) -> None:
-    """Reject group leakage, synthetic evaluation, and unsupported labels."""
+    """Rechaza fuga entre grupos, evaluación sintética y etiquetas no admitidas."""
     partitions = {"train": train, "validation": validation, "test": test}
     groups = {name: set(build_group_ids(frame)) for name, frame in partitions.items()}
     if groups["train"] & groups["validation"] or groups["train"] & groups["test"]:

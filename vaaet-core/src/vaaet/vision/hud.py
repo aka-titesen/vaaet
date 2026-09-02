@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: 2026 VAAET Contributors
 # SPDX-License-Identifier: AGPL-3.0-only
-"""Responsive public-facing HUD for annotated traffic videos."""
+"""HUD público y adaptable para videos de tránsito anotados."""
 
 from __future__ import annotations
 
@@ -25,14 +25,14 @@ __all__ = [
 
 @dataclass(frozen=True)
 class HudConfig:
-    """User-facing annotation options shared by collection and inference."""
+    """Configura las anotaciones compartidas por colección e inferencia."""
 
     debug: bool = False
 
 
 @dataclass(frozen=True)
 class HudSnapshot:
-    """Frame-level values consumed by the HUD renderer."""
+    """Agrupa los valores de un frame que consume el renderer del HUD."""
 
     elapsed_seconds: float
     cumulative_counts: Mapping[str, int]
@@ -47,7 +47,7 @@ class HudSnapshot:
 
 @dataclass(frozen=True)
 class PanelBounds:
-    """Inclusive-exclusive rectangle used by responsive HUD layouts."""
+    """Define un rectángulo semiabierto para distribuir paneles adaptables."""
 
     x1: int
     y1: int
@@ -65,7 +65,7 @@ class PanelBounds:
 
 @dataclass(frozen=True)
 class HudLayout:
-    """Resolved panel placement for one frame resolution."""
+    """Representa la disposición resuelta para una resolución de frame."""
 
     mode: str
     status: PanelBounds
@@ -110,7 +110,7 @@ _INCIDENT_COLOR = (48, 48, 225)
 
 
 def format_elapsed_time(elapsed_seconds: float) -> str:
-    """Return a stable clock label suitable for public video overlays."""
+    """Formatea un reloj estable para superponerlo en el video público."""
     total_seconds = max(int(elapsed_seconds), 0)
     hours, remainder = divmod(total_seconds, 3600)
     minutes, seconds = divmod(remainder, 60)
@@ -148,7 +148,7 @@ def format_track_label(
     track_id: int,
     debug: bool,
 ) -> str:
-    """Build a concise Spanish vehicle label with optional technical identity."""
+    """Construye una etiqueta vehicular con identidad técnica opcional."""
     vehicle = _VEHICLE_LABELS.get(vehicle_type, vehicle_type.upper())
     if stationary:
         motion = "DETENIDO"
@@ -168,7 +168,7 @@ def compute_hud_layout(
     *,
     debug: bool = False,
 ) -> HudLayout:
-    """Resolve two-corner cards with a safe compact fallback."""
+    """Distribuye las tarjetas y usa un modo compacto cuando falta espacio."""
     if frame_width <= 0 or frame_height <= 0:
         raise ValueError("Frame dimensions must be positive.")
     margin = max(2, round(min(frame_width, frame_height) * 0.018))
@@ -467,7 +467,7 @@ def render_hud(
     snapshot: HudSnapshot,
     config: HudConfig | None = None,
 ) -> HudLayout:
-    """Render the public HUD in place and return its resolved layout."""
+    """Renderiza el HUD sobre el frame y devuelve su disposición."""
     active_config = config or HudConfig()
     height, width = frame.shape[:2]
     layout = compute_hud_layout(width, height, debug=active_config.debug)
@@ -490,7 +490,7 @@ def draw_track_annotation(
     stationary: bool,
     config: HudConfig | None = None,
 ) -> None:
-    """Draw a vehicle box and a concise public or technical label."""
+    """Dibuja el vehículo y su etiqueta pública o técnica."""
     import cv2
 
     active_config = config or HudConfig()

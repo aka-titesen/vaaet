@@ -62,11 +62,11 @@ class TestExtractDuration:
 
     def test_five_minute_clip(self) -> None:
         path = "bridge_2024-01-15_08-00-00_to_08-05-00.mp4"
-        assert extract_duration(path) == 300.0  # 5 minutes
+        assert extract_duration(path) == 300.0
 
     def test_one_hour_clip(self) -> None:
         path = "bridge_2024-01-15_08-00-00_to_09-00-00.mp4"
-        assert extract_duration(path) == 3600.0  # 1 hour
+        assert extract_duration(path) == 3600.0
 
     def test_thirty_second_clip(self) -> None:
         path = "bridge_2024-01-15_14-30-00_to_14-30-30.mp4"
@@ -76,11 +76,10 @@ class TestExtractDuration:
         """End time < start time → assumed to cross midnight."""
         path = "bridge_2024-01-15_23-55-00_to_00-05-00.mp4"
         duration = extract_duration(path)
-        assert duration == 600.0  # 10 minutes
+        assert duration == 600.0
 
     def test_non_standard_filename_with_metadata(self) -> None:
         """Non-standard filename falls back to metadata read."""
-        # Create a tiny temp video (~1 frame)
         with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as f:
             tmp_path = f.name
 
@@ -92,12 +91,12 @@ class TestExtractDuration:
                 30.0,
                 (100, 100),
             )
-            for _ in range(30):  # 1 second at 30fps
+            for _ in range(30):
                 writer.write(frame)
             writer.release()
 
             duration = extract_duration(tmp_path)
-            assert 0.5 < duration < 2.0  # ~1 second
+            assert 0.5 < duration < 2.0
         finally:
             os.unlink(tmp_path)
 

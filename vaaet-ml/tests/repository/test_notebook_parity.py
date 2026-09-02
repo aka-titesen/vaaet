@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -26,6 +27,12 @@ ALL_NOTEBOOKS = {**NOTEBOOKS, "evaluation": EVALUATION_NOTEBOOK}
 NOTEBOOK_AUDITOR = (
     WORKSPACE_ROOT
     / ".codex/skills/vaaet-notebook-orchestration/scripts/audit_notebooks.py"
+)
+WORKFLOW_CONFIG_MODULE = (ML_ROOT / "src/vaaet_ml/workflow_config.py").read_text(
+    encoding="utf-8"
+)
+WORKFLOW_PRESET_MODULE = (ML_ROOT / "src/vaaet_ml/workflow_presets.py").read_text(
+    encoding="utf-8"
 )
 
 
@@ -77,7 +84,8 @@ def test_active_notebooks_pass_the_structural_auditor() -> None:
 @pytest.mark.parametrize("path", ALL_NOTEBOOKS.values())
 def test_notebook_has_one_shared_bootstrap_and_no_import_hacks(path: Path) -> None:
     code = _code(path)
-    assert code.count("# Environment setup — run once per Colab runtime") == 1
+    assert code.count("# Preparación del entorno: ejecutá esta celda una vez por runtime.") == 1
+    assert re.search(r"(?m)^\s*# Cell \d", code) is None
     assert code.count("runpy.run_path") == 1
     assert "sys.path.insert" not in code
     assert "install_if_missing" not in code
@@ -141,8 +149,7 @@ def test_collection_uses_shared_analysis_and_data_contracts() -> None:
     code = _code(NOTEBOOKS["collection"])
     assert "from vaaet.vision.analysis import analyze_video" in code
     assert "from vaaet_ml.view_plan import load_video_view_plan" in code
-    assert "VIEW_PLAN_PATH = None" in code
-    assert "view_plan_path=VIEW_PLAN_PATH" in code
+    assert "SELECTED_PRESET = CollectionPreset.LOCAL" in code
     assert "VIEW_PLAN = load_video_view_plan(WORKFLOW_CONFIG.view_plan_path)" in code
     assert "view_plan=VIEW_PLAN" in code
     assert "merge_raw_telemetry_csv" in code
@@ -197,9 +204,10 @@ def test_training_uses_shared_feature_contracts() -> None:
     assert "TrainingMode.SEED_BOOTSTRAP" in code
     assert "TrainingMode.HITL_RETRAINING" in code
     assert "SeedDatasetPackageSource" in code
-    assert "HUMAN_HOLDOUT_FROZEN = False" in code
-    assert "HumanHoldoutAction.REUSE_OR_CREATE" in code
-    assert "HUMAN_HOLDOUT_UPDATE_REASON" in code
+    assert "SELECTED_PRESET = TrainingPreset.SEED_UPLOAD" in code
+    assert "WORKFLOW_CONFIG.human_holdout_frozen" in code
+    assert "HumanHoldoutAction(WORKFLOW_CONFIG.human_holdout_action)" in code
+    assert "WORKFLOW_CONFIG.human_holdout_update_reason" in code
     assert "resolve_human_holdout(" in code
     assert "frozen_holdout=human_holdout_snapshot" in code
     assert "human_holdout_snapshot.descriptor" in code
@@ -207,7 +215,8 @@ def test_training_uses_shared_feature_contracts() -> None:
     assert "no se usará un fallback efímero" in code
     assert "compose_supervised_dataset(" in code
     assert "VersionedSeedStore" in code
-    assert "DatasetArtifactAction.REUSE_OR_CREATE" in code
+    assert "DatasetArtifactAction(WORKFLOW_CONFIG.seed_artifact_action)" in code
+    assert '"reuse_or_create"' in WORKFLOW_PRESET_MODULE
     assert "HitlCatalogSource(HITL_CATALOG_PATH, CatalogSelection.ALL_ACTIVE)" in code
     assert "create_training_input_lock(" in code
     assert "training_input_lock=training_input_lock.descriptor" in code
@@ -234,9 +243,9 @@ def test_training_delegates_grouped_cross_validation() -> None:
 def test_training_uses_the_governed_observability_workflow() -> None:
     code = _code(NOTEBOOKS["training"])
 
-    assert code.count("WRITE_TRAINING_REPORT =") == 1
-    assert code.count("REFERENCE_TRAINING_RUN_ID =") == 1
-    assert code.count("RUN_GROUPED_CROSS_VALIDATION =") == 1
+    assert "WORKFLOW_CONFIG.write_training_report" in code
+    assert "WORKFLOW_CONFIG.reference_training_run_id" in code
+    assert "WORKFLOW_CONFIG.run_grouped_cross_validation" in code
     assert "TrainingFitConfig(" in code
     assert "build_training_callbacks(" in code
     assert "evaluate_candidate_eligibility(" in code
@@ -256,7 +265,8 @@ def test_training_uses_the_governed_observability_workflow() -> None:
 
 def test_training_prepares_postgres_backup_reader_in_colab() -> None:
     code = _code(NOTEBOOKS["training"])
-    assert "ENABLE_DATA_UPLOAD = True" in code
+    assert "SELECTED_PRESET = TrainingPreset.SEED_UPLOAD" in code
+    assert "WORKFLOW_CONFIG.enable_data_upload" in code
     restore_module = (ML_ROOT / "src/vaaet_ml/data/postgres_restore.py").read_text(encoding="utf-8")
     assert "resolve_pg_restore_for_backup" in code
     assert 'Path("/usr/lib/postgresql/17/bin/pg_restore")' in restore_module
@@ -294,49 +304,53 @@ def test_inference_centralizes_and_documents_supported_workflow_configuration() 
         for cell in notebook["cells"]
         if cell.get("cell_type") == "markdown"
     )
-    assignments = {
-        "ALLOW_PILOT_BUNDLE =": 1,
-        "ALLOW_EXPERIMENTAL_BUNDLE =": 1,
-        "PERSIST_TO_DATABASE =": 1,
-        "ENABLE_HUMAN_REVIEW =": 1,
-        "REVIEW_MODE =": 1,
-        "DOWNLOAD_ANNOTATED_VIDEO =": 1,
-        "SHOW_DASHBOARD =": 1,
-        "HUD_DEBUG =": 1,
-    }
-    for assignment, expected_count in assignments.items():
-        assert code.count(assignment) == expected_count
+    assert code.count("SELECTED_PRESET =") == 1
+    assert code.count("CUSTOM_CONFIG =") == 1
+    assert code.count("WORKFLOW_CONFIG =") == 1
+    assert "SELECTED_PRESET = InferencePreset.PILOT_OFFLINE" in code
+    assert "resolve_inference_config(" in code
+    assert "render_workflow_summary(" in code
 
     config_index = next(
         index
         for index, cell in enumerate(notebook["cells"])
-        if "# Workflow configuration — edit only this cell" in "".join(cell.get("source", []))
+        if "# Configuración del workflow: editá únicamente esta celda."
+        in "".join(cell.get("source", []))
     )
     setup_index = next(
         index
         for index, cell in enumerate(notebook["cells"])
-        if "# Environment setup — run once per Colab runtime" in "".join(cell.get("source", []))
+        if "# Preparación del entorno: ejecutá esta celda una vez por runtime."
+        in "".join(cell.get("source", []))
     )
-    assert config_index < setup_index
-    assert 'if REVIEW_MODE not in {"priority", "all"}:' in code
+    assert setup_index < config_index
     assert "load_traffic_bundle(" in code
     assert 'stage == "candidate" and persist_to_database' in bundle_module
     assert "Los bundles candidatos son sólo offline" in bundle_module
     assert "if IN_COLAB and WORKFLOW_CONFIG.download_annotated_video:" in code
-    assert "if not SHOW_DASHBOARD" in code
-    assert "HudConfig(debug=HUD_DEBUG)" in code
+    assert "if not WORKFLOW_CONFIG.show_dashboard" in code
+    assert "HudConfig(debug=WORKFLOW_CONFIG.hud_debug)" in code
 
     for heading in (
-        "Piloto offline recomendado",
-        "Piloto con HITL portable",
-        "Persistencia sin revisión",
-        "PostgreSQL + revisión prioritaria",
-        'REVIEW_MODE="all"',
-        'ALLOW_EXPERIMENTAL_BUNDLE=True',
-        "bundle `production`",
-        "Menos de 60 segundos",
+        "InferencePreset.PILOT_OFFLINE",
+        "InferencePreset.PILOT_HITL",
+        "InferencePreset.PERSISTED_INFERENCE",
+        "InferencePreset.PERSISTED_HITL",
+        "InferencePreset.EXPERIMENTAL_OFFLINE",
+        "Personalización tipada",
     ):
         assert heading in markdown
+    for legacy_assignment in (
+        "ALLOW_PILOT_BUNDLE =",
+        "ALLOW_EXPERIMENTAL_BUNDLE =",
+        "PERSIST_TO_DATABASE =",
+        "ENABLE_HUMAN_REVIEW =",
+        "REVIEW_MODE =",
+        "DOWNLOAD_ANNOTATED_VIDEO =",
+        "SHOW_DASHBOARD =",
+        "HUD_DEBUG =",
+    ):
+        assert legacy_assignment not in code
     assert "try:\n    if df_telemetry" not in markdown
 
 
@@ -358,7 +372,7 @@ def test_evaluation_notebook_is_read_only_and_uses_shared_services() -> None:
     assert "build_feature_cohort_from_raw_telemetry" in code
     assert "load_telemetry_window" in code
     assert "DatabaseProfile.TRAINING" in code
-    assert "current.json" in code
+    assert "current.json" in WORKFLOW_CONFIG_MODULE
     assert "PipelineRunMetadata" not in code
     assert "pipeline_run(" not in code
     assert "persist_" not in code
@@ -366,48 +380,44 @@ def test_evaluation_notebook_is_read_only_and_uses_shared_services() -> None:
     assert "Accident" in markdown
 
 
-def test_collection_documents_three_complete_safe_recipes() -> None:
+def test_collection_documents_named_safe_presets() -> None:
     markdown = _markdown(NOTEBOOKS["collection"])
-    assert "Recolección local recomendada" in markdown
-    assert "Recolección con PostgreSQL" in markdown
-    assert "Diagnóstico técnico" in markdown
-    assert markdown.count("PERSIST_TO_DATABASE =") == 3
-    assert markdown.count("HUD_DEBUG =") == 3
-    assert markdown.count("DOWNLOAD_OUTPUTS =") == 3
+    for preset in (
+        "CollectionPreset.LOCAL",
+        "CollectionPreset.POSTGRES",
+        "CollectionPreset.TRACKING_DIAGNOSTIC",
+        "CollectionPreset.CUSTOM",
+    ):
+        assert preset in markdown
+    assert "PERSIST_TO_DATABASE =" not in markdown
 
 
-def test_inference_documents_four_complete_recipes() -> None:
+def test_inference_documents_named_presets_without_flat_recipes() -> None:
     markdown = _markdown(NOTEBOOKS["inference"])
-    recipe_assignments = (
-        "ALLOW_PILOT_BUNDLE =",
-        "ALLOW_EXPERIMENTAL_BUNDLE =",
-        "PERSIST_TO_DATABASE =",
-        "ENABLE_HUMAN_REVIEW =",
-        "REVIEW_MODE =",
-        "DOWNLOAD_ANNOTATED_VIDEO =",
-        "SHOW_DASHBOARD =",
-        "HUD_DEBUG =",
-    )
-    for assignment in recipe_assignments:
-        assert markdown.count(assignment) == 4
-    assert markdown.count("DOWNLOAD_ANNOTATED_VIDEO = False") == 4
+    for preset in (
+        "InferencePreset.PILOT_OFFLINE",
+        "InferencePreset.PILOT_HITL",
+        "InferencePreset.PERSISTED_INFERENCE",
+        "InferencePreset.PERSISTED_HITL",
+        "InferencePreset.EXPERIMENTAL_OFFLINE",
+        "InferencePreset.CUSTOM",
+    ):
+        assert preset in markdown
+    assert "ALLOW_PILOT_BUNDLE =" not in markdown
 
 
-def test_training_documents_complete_seed_hitl_and_versioning_recipes() -> None:
+def test_training_documents_named_seed_and_hitl_presets() -> None:
     markdown = _markdown(NOTEBOOKS["training"])
-    recipe_assignments = (
-        "TRAINING_MODE =",
-        "ENABLE_POSTGRES_INGESTION =",
-        "ENABLE_DATA_UPLOAD =",
-        "HUMAN_HOLDOUT_FROZEN =",
-        "HUMAN_HOLDOUT_ACTION =",
-        "HUMAN_HOLDOUT_UPDATE_REASON =",
-        "SEED_ARTIFACT_ACTION =",
-        "SEED_ARTIFACT_UPDATE_REASON =",
-    )
-    for assignment in recipe_assignments:
-        assert markdown.count(assignment) == 7
-    assert "COPY_BUNDLE_TO_DRIVE=False" in markdown
+    for preset in (
+        "TrainingPreset.SEED_UPLOAD",
+        "TrainingPreset.SEED_POSTGRES",
+        "TrainingPreset.HITL_CATALOG",
+        "TrainingPreset.HITL_CATALOG_POSTGRES",
+        "TrainingPreset.HITL_FROZEN_HOLDOUT",
+        "TrainingPreset.CUSTOM",
+    ):
+        assert preset in markdown
+    assert "TRAINING_MODE =" not in markdown
 
 
 def test_notebooks_delegate_model_and_dashboard_rendering() -> None:
@@ -426,25 +436,25 @@ def test_collection_centralizes_safe_workflow_configuration() -> None:
     notebook = json.loads(NOTEBOOKS["collection"].read_text(encoding="utf-8"))
     code = _code(NOTEBOOKS["collection"])
 
-    assert code.count("PERSIST_TO_DATABASE =") == 1
-    assert code.count("HUD_DEBUG =") == 1
-    assert code.count("DOWNLOAD_OUTPUTS =") == 1
-    assert "PERSIST_TO_DATABASE = False" in code
-    assert "DOWNLOAD_OUTPUTS = False" in code
+    assert code.count("SELECTED_PRESET =") == 1
+    assert code.count("CUSTOM_CONFIG =") == 1
+    assert code.count("WORKFLOW_CONFIG =") == 1
+    assert "SELECTED_PRESET = CollectionPreset.LOCAL" in code
+    assert "resolve_collection_config(" in code
     assert "if IN_COLAB and WORKFLOW_CONFIG.download_outputs:" in code
     config_index = next(
         index
         for index, cell in enumerate(notebook["cells"])
-        if "# Workflow configuration — edit only this cell"
+        if "# Configuración del workflow: editá únicamente esta celda."
         in "".join(cell.get("source", []))
     )
     setup_index = next(
         index
         for index, cell in enumerate(notebook["cells"])
-        if "# Environment setup — run once per Colab runtime"
+        if "# Preparación del entorno: ejecutá esta celda una vez por runtime."
         in "".join(cell.get("source", []))
     )
-    assert config_index < setup_index
+    assert setup_index < config_index
 
 
 def test_notebook_transfers_require_explicit_configuration() -> None:
@@ -452,11 +462,14 @@ def test_notebook_transfers_require_explicit_configuration() -> None:
     inference = _code(NOTEBOOKS["inference"])
     training = _code(NOTEBOOKS["training"])
 
-    assert "DOWNLOAD_OUTPUTS = False" in collection
+    assert (
+        "CollectionPreset.LOCAL: CollectionWorkflowConfig(False, False)"
+        in WORKFLOW_PRESET_MODULE
+    )
     assert "if IN_COLAB and WORKFLOW_CONFIG.download_outputs:" in collection
-    assert "DOWNLOAD_ANNOTATED_VIDEO = False" in inference
+    assert "InferencePreset.PILOT_OFFLINE" in WORKFLOW_PRESET_MODULE
     assert "if IN_COLAB and WORKFLOW_CONFIG.download_annotated_video:" in inference
-    assert "COPY_BUNDLE_TO_DRIVE = False" in training
+    assert "TrainingPreset.SEED_UPLOAD" in WORKFLOW_PRESET_MODULE
     assert "elif not WORKFLOW_CONFIG.copy_bundle_to_drive:" in training
     assert "validate_manifest(_bundle_directory)" in training
     assert "No se pudo copiar el bundle validado a Drive" in training
@@ -467,35 +480,35 @@ def test_training_resolves_postgres_only_after_explicit_opt_in() -> None:
     notebook = json.loads(NOTEBOOKS["training"].read_text(encoding="utf-8"))
     code = _code(NOTEBOOKS["training"])
 
-    assert code.count("ENABLE_POSTGRES_INGESTION =") == 1
-    assert "ENABLE_POSTGRES_INGESTION = False" in code
+    assert "SELECTED_PRESET = TrainingPreset.SEED_UPLOAD" in code
     assert code.count(
         "get_optional_database_settings(DatabaseProfile.TRAINING)"
     ) == 1
-    guard_index = code.index("if ENABLE_POSTGRES_INGESTION:")
+    guard_index = code.index("if WORKFLOW_CONFIG.enable_postgres_ingestion:")
     settings_index = code.index(
         "get_optional_database_settings(DatabaseProfile.TRAINING)"
     )
     assert guard_index < settings_index
     assert "PostgreSQL ingestion is enabled, but the read-only training profile" in code
-    assert "PERSIST_TO_DATABASE" not in code
+    assert "PERSIST_TO_DATABASE =" not in code
 
     setup_index = next(
         index
         for index, cell in enumerate(notebook["cells"])
-        if "# Environment setup — run once per Colab runtime"
+        if "# Preparación del entorno: ejecutá esta celda una vez por runtime."
         in "".join(cell.get("source", []))
     )
     config_index = next(
         index
         for index, cell in enumerate(notebook["cells"])
-        if "# Training workflow configuration — edit only this cell"
+        if "# Configuración del workflow: editá únicamente esta celda."
         in "".join(cell.get("source", []))
     )
     upload_index = next(
         index
         for index, cell in enumerate(notebook["cells"])
-        if "# Cell 1b — Data Upload (Colab only)" in "".join(cell.get("source", []))
+        if '_backup_dest = os.path.join(DATA_RAW_DIR, "traffic_data.backup")'
+        in "".join(cell.get("source", []))
     )
     assert setup_index < config_index < upload_index
 
@@ -545,8 +558,7 @@ def test_inference_uses_shared_analysis_and_validates_bundle() -> None:
     bundle_module = (CORE_ROOT / "src/vaaet/inference/bundle.py").read_text(encoding="utf-8")
     assert "from vaaet.vision.analysis import analyze_video" in code
     assert "from vaaet_ml.view_plan import load_video_view_plan" in code
-    assert "VIEW_PLAN_PATH = None" in code
-    assert "view_plan_path=VIEW_PLAN_PATH" in code
+    assert "SELECTED_PRESET = InferencePreset.PILOT_OFFLINE" in code
     assert "VIEW_PLAN = load_video_view_plan(WORKFLOW_CONFIG.view_plan_path)" in code
     assert "view_plan=VIEW_PLAN" in code
     assert "TrafficStateEngine" in code
@@ -558,15 +570,15 @@ def test_inference_uses_shared_analysis_and_validates_bundle() -> None:
     assert "build_review_widget" in code
     assert "finalize_current_review" in code
     assert "DatabaseProfile.REVIEW" in code
-    assert "ENABLE_HUMAN_REVIEW = False" in code
-    assert "PERSIST_TO_DATABASE = False" in code
+    assert "WORKFLOW_CONFIG.enable_human_review" in code
+    assert "WORKFLOW_CONFIG.persist_to_database" in code
     assert "validation_split" not in code
     assert "SMOTE" not in code
     assert "def estimate_speed(" not in code
     assert "def generate_annotated_video(" not in code
     assert 'decision_policy=manifest["decision_policy"]' in code
-    assert "ALLOW_EXPERIMENTAL_BUNDLE" in code
-    assert "ALLOW_PILOT_BUNDLE" in code
+    assert "WORKFLOW_CONFIG.allow_experimental_bundle" in code
+    assert "WORKFLOW_CONFIG.allow_pilot_bundle" in code
     assert "DEPLOYMENT_STAGE" in code
     assert 'model_version=manifest["model_version"]' in code
     assert "retrain_with_feedback" not in code
@@ -578,9 +590,8 @@ def test_annotated_video_workflows_default_to_public_shared_hud() -> None:
     collection = _code(NOTEBOOKS["collection"])
     inference = _code(NOTEBOOKS["inference"])
     for code in (collection, inference):
-        assert code.count("HUD_DEBUG = False") == 1
         assert "from vaaet.vision.hud import HudConfig" in code
-        assert "hud_config=HudConfig(debug=HUD_DEBUG)" in code
+        assert "hud_config=HudConfig(debug=WORKFLOW_CONFIG.hud_debug)" in code
     engine = (CORE_ROOT / "src/vaaet/inference/engine.py").read_text(encoding="utf-8")
     assert "prediction_provider=traffic_engine.predict_latest" in inference
     assert 'incident_candidate=bool(latest.get("accident_rule_triggered", False))' in engine

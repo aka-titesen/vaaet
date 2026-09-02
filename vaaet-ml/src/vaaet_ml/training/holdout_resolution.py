@@ -147,6 +147,8 @@ def _select_groups(
     desired: int,
     remaining_per_state: int,
 ) -> set[str]:
+    """Selecciona grupos sin consumir el soporte mínimo de la partición restante."""
+
     selected: set[str] = set()
 
     def can_reserve(group: str) -> bool:

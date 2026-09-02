@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: 2026 VAAET Contributors
 # SPDX-License-Identifier: AGPL-3.0-only
-"""Redacted, provider-neutral lifecycle records for VAAET workflows."""
+"""Registros redactados y neutrales de proveedor para el ciclo de los workflows."""
 
 from __future__ import annotations
 
@@ -40,6 +40,8 @@ SELECT vaaet_ops.finish_pipeline_run(
 
 
 class PipelineWorkflow(str, Enum):
+    """Identifica el workflow propietario de una corrida trazable."""
+
     COLLECTION = "collection"
     INFERENCE = "inference"
     TRAINING = "training"
@@ -48,6 +50,8 @@ class PipelineWorkflow(str, Enum):
 
 @dataclass(frozen=True)
 class PipelineRunMetadata:
+    """Representa metadata segura y portable para iniciar una corrida."""
+
     workflow: PipelineWorkflow
     git_commit: str | None = None
     source_kind: str | None = None
@@ -79,6 +83,8 @@ class PipelineRunMetadata:
 
 @dataclass
 class PipelineRunHandle:
+    """Conserva el identificador y el conteo final durante una corrida activa."""
+
     id: UUID
     metadata: PipelineRunMetadata
     output_rows: int | None = None
@@ -164,7 +170,7 @@ def finish_pipeline_run(
     local_manifest_directory: str | Path | None = None,
     error_category: str | None = None,
 ) -> Path | None:
-    """Finish a run without storing exception messages or other arbitrary metadata."""
+    """Finaliza una corrida sin persistir excepciones ni metadata arbitraria."""
     if status not in {"succeeded", "failed"}:
         raise ValueError("Final pipeline status must be succeeded or failed.")
     if status == "succeeded":
@@ -202,7 +208,7 @@ def pipeline_run(
     local_manifest_directory: str | Path | None = None,
     run_id: UUID | str | None = None,
 ) -> Iterator[PipelineRunHandle]:
-    """Record a complete workflow lifecycle and re-raise the original failure."""
+    """Registra el ciclo completo y vuelve a propagar el fallo original."""
     handle, started_at = start_pipeline_run(
         metadata,
         engine=engine,
@@ -221,7 +227,7 @@ def pipeline_run(
                 local_manifest_directory=local_manifest_directory,
                 error_category=type(error).__name__,
             )
-        except Exception as audit_error:  # never mask the workflow failure
+        except Exception as audit_error:  # La evidencia nunca debe ocultar el fallo del workflow.
             logger.warning(
                 "Pipeline failure audit could not be finalized: %s",
                 type(audit_error).__name__,

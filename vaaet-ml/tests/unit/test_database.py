@@ -245,9 +245,6 @@ class TestDatabaseSettingsLoader:
         assert settings.host == "localhost"
 
 
-# Backup restoration tests
-
-
 class TestRestoreBackupToSql:
     """Test restore_backup_to_sql() error handling (no pg_restore needed)."""
 
@@ -262,11 +259,9 @@ class TestRestoreBackupToSql:
     ) -> None:
         from vaaet_ml.data.database import restore_backup_to_sql
 
-        # Create a dummy backup file
         backup = tmp_path / "test.backup"
         backup.write_bytes(b"\x00" * 100)
 
-        # Hide pg_restore from PATH
         monkeypatch.setenv("PATH", str(tmp_path))
 
         with pytest.raises(FileNotFoundError, match="pg_restore not found"):
@@ -345,10 +340,8 @@ class TestRestoreBackupToSql:
         backup = tmp_path / "test.backup"
         backup.write_bytes(b"\x00" * 100)
 
-        # Mock shutil.which to return a fake pg_restore path
         monkeypatch.setattr("vaaet_ml.data.database.shutil.which", lambda _: "/usr/bin/pg_restore")
 
-        # Mock subprocess.run to simulate version mismatch
         ver_result = MagicMock(returncode=0, stdout="pg_restore (PostgreSQL) 14.0")
         run_result = MagicMock(
             returncode=1,
@@ -360,9 +353,9 @@ class TestRestoreBackupToSql:
         def fake_run(*args, **kwargs):
             nonlocal call_count
             call_count += 1
-            if call_count == 1:  # --version call
+            if call_count == 1:
                 return ver_result
-            return run_result  # actual pg_restore call
+            return run_result
 
         with patch("vaaet_ml.data.database.subprocess.run", side_effect=fake_run):
             with pytest.raises(ValueError, match="reader version is incompatible"):

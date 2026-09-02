@@ -143,6 +143,8 @@ def _normalize_validations(
     run_id: str,
     finalized_at: datetime,
 ) -> pd.DataFrame:
+    """Normaliza decisiones append-only y preserva su vínculo con la predicción."""
+
     frame = _validation_frame(validations)
     if frame.empty:
         return pd.DataFrame(

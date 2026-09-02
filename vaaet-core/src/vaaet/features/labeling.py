@@ -1,16 +1,9 @@
 # SPDX-FileCopyrightText: 2026 VAAET Contributors
 # SPDX-License-Identifier: AGPL-3.0-only
-"""Auto-labeling rules for the VAAET traffic-state classifier.
+"""Reglas de autoetiquetado para el clasificador de estados de tránsito.
 
-Assigns traffic states (0–3) to telemetry records using domain-driven
-engineering rules. These labels serve as a proxy for ground truth until
-HITL validation is available.
-
-Evaluation order (most severe first):
-  Accident (3) → Congested (2) → Reduced (1) → Normal (0, default).
-
-This module is shared between the data-preparation notebook (training labels)
-and the production notebook (labeling new inference data for feedback).
+Las etiquetas son supervisión proxy hasta contar con validación HITL. Las
+reglas se evalúan por severidad: Accident, Congested, Reduced y Normal.
 """
 
 from __future__ import annotations
@@ -43,7 +36,7 @@ def _optional_ratio(df: pd.DataFrame, column: str, minimum: float) -> pd.Series:
 
 
 def build_accident_signal_frame(df: pd.DataFrame) -> pd.DataFrame:
-    """Return the conservative sub-signals used for accident detection."""
+    """Construye las señales conservadoras del detector de posibles incidentes."""
     t = LABELING_THRESHOLDS
 
     low_speed = df["avg_speed"] < float(t["accident_speed_max"])
@@ -115,7 +108,7 @@ def build_accident_signal_frame(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def build_accident_mask(df: pd.DataFrame) -> pd.Series:
-    """Return the conservative accident mask used in labeling and gating."""
+    """Combina las señales conservadoras usadas por etiquetado y gates."""
     signals = build_accident_signal_frame(df)
     return (
         signals["accident_low_speed"]
@@ -127,24 +120,19 @@ def build_accident_mask(df: pd.DataFrame) -> pd.Series:
 
 
 def assign_instant_state(df: pd.DataFrame) -> pd.Series:
-    """Label short clips purely based on instantaneous metrics (no history).
+    """Etiqueta clips cortos mediante métricas instantáneas, sin historial.
 
-    Uses wider thresholds than the temporal labeler because sprint mode
-    cannot rely on persistence or rolling windows to filter noise.
-    Threshold rationale for Belgrano Bridge:
-      - avg_speed < 15 km/h with vehicles present -> Congested
-      - avg_speed 15-30 km/h -> Reduced
-      - avg_speed >= 30 km/h -> Normal
+    Usa umbrales más amplios porque no dispone de persistencia temporal para
+    filtrar ruido: menos de 15 km/h es Congested, entre 15 y 30 es Reduced y
+    desde 30 es Normal.
     """
     states = pd.Series(0, index=df.index, dtype=int)
     if df.empty or "avg_speed" not in df.columns:
         return states
 
-    # Congested (2): Very low speed with any vehicles present
     congested_mask = (df["avg_speed"] < 15) & (df["total_vehicles"] > 0)
     states[congested_mask] = 2
 
-    # Reduced (1): Moderate speed
     reduced_mask = df["avg_speed"].between(15, 30) & (states == 0)
     states[reduced_mask] = 1
 
@@ -152,19 +140,17 @@ def assign_instant_state(df: pd.DataFrame) -> pd.Series:
 
 
 def assign_traffic_state(df: pd.DataFrame) -> pd.Series:
-    """Assign legacy four-class proxy labels for retrospective comparisons.
+    """Asigna las cuatro etiquetas proxy legadas para comparaciones históricas.
 
-    New training code must use :func:`assign_stable_traffic_state`; Accident
-    proxy labels are retained only so v1 experiments remain reproducible.
+    El entrenamiento nuevo debe usar :func:`assign_stable_traffic_state`.
+    Accident se conserva aquí sólo para reproducir experimentos v1.
     """
     t = LABELING_THRESHOLDS
     states = pd.Series(0, index=df.index, dtype=int)
 
-    # Accident (3)
     accident_mask = build_accident_mask(df)
     states[accident_mask] = 3
 
-    # Congested (2)
     congestion = (df["avg_speed"] < t["congested_speed_max"]) & (
         df["total_vehicles"] >= t["congested_vehicles_min"]
     )
@@ -178,7 +164,6 @@ def assign_traffic_state(df: pd.DataFrame) -> pd.Series:
     stuck_mask = congestion & consecutive_congestion & (states != 3)
     states[stuck_mask] = 2
 
-    # Reduced (1)
     reduced_mask = (
         df["avg_speed"].between(t["reduced_speed_min"], t["reduced_speed_max"])
         & df["total_vehicles"].between(
@@ -193,11 +178,10 @@ def assign_traffic_state(df: pd.DataFrame) -> pd.Series:
 
 
 def assign_stable_traffic_state(df: pd.DataFrame) -> pd.Series:
-    """Assign only Normal, Reduced, and Congested proxy labels.
+    """Asigna únicamente etiquetas proxy Normal, Reduced y Congested.
 
-    These rules are a bootstrap label source, not human ground truth. Rolling
-    persistence is scoped to each clip so unrelated episodes cannot reinforce
-    one another.
+    Estas reglas inicializan la supervisión y no representan verdad humana.
+    La persistencia se limita a cada clip para no mezclar episodios.
     """
     t = LABELING_THRESHOLDS
     states = pd.Series(0, index=df.index, dtype=int)

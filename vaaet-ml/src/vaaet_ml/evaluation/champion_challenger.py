@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: 2026 VAAET Contributors
 # SPDX-License-Identifier: AGPL-3.0-only
-"""Read-only Champion--Challenger evaluation for VAAET model bundles."""
+"""Evaluación read-only Champion--Challenger de bundles VAAET."""
 
 from __future__ import annotations
 
@@ -41,15 +41,15 @@ __all__ = [
 
 
 class PredictionModel(Protocol):
-    """Minimal Keras-compatible boundary used by the evaluator."""
+    """Define el límite mínimo compatible con Keras usado por el evaluador."""
 
     def predict(self, values: np.ndarray, *, verbose: int = 0) -> np.ndarray:
-        """Return one Normal/Reduced/Congested probability vector per record."""
+        """Devuelve un vector Normal/Reduced/Congested por registro."""
 
 
 @dataclass(frozen=True)
 class EvaluationBundle:
-    """A validated serving bundle loaded only for offline evaluation."""
+    """Representa un bundle validado y cargado sólo para evaluación offline."""
 
     name: str
     path: Path
@@ -60,7 +60,7 @@ class EvaluationBundle:
 
 @dataclass(frozen=True)
 class ModelEvaluation:
-    """Metrics and predictions for one bundle on the immutable test partition."""
+    """Agrupa métricas y predicciones sobre la partición inmutable de test."""
 
     name: str
     metrics: Mapping[str, float]
@@ -71,7 +71,7 @@ class ModelEvaluation:
 
 @dataclass(frozen=True)
 class ChampionChallengerComparison:
-    """Paired offline evidence; it deliberately contains no promotion decision."""
+    """Representa evidencia offline pareada sin decidir una promoción."""
 
     champion: ModelEvaluation
     challenger: ModelEvaluation
@@ -115,7 +115,7 @@ def _bundle_model_version(bundle: EvaluationBundle) -> str:
 def _default_model_loader(path: Path) -> PredictionModel:
     try:
         from tensorflow import keras
-    except ImportError as exc:  # pragma: no cover - depends on optional training extra
+    except ImportError as exc:  # pragma: no cover - depende del extra de entrenamiento
         raise RuntimeError(
             "Champion--Challenger evaluation requires the VAAET training extra."
         ) from exc
@@ -133,7 +133,7 @@ def load_evaluation_bundle(
     model_loader: Callable[[Path], PredictionModel] | None = None,
     scaler_loader: Callable[[Path], FeatureScaler] | None = None,
 ) -> EvaluationBundle:
-    """Validate a portable serving bundle before loading its binary artifacts."""
+    """Valida el bundle portable antes de cargar sus artefactos binarios."""
     directory = Path(bundle_dir).resolve()
     manifest = validate_manifest(directory)
     load_model = model_loader or _default_model_loader
@@ -171,7 +171,7 @@ def validate_evaluation_pair(
     challenger: EvaluationBundle,
     holdout: HumanHoldoutSnapshot,
 ) -> None:
-    """Prove both bundles target the exact frozen benchmark before scoring."""
+    """Comprueba que ambos bundles usen exactamente el benchmark congelado."""
     champion_holdout = _holdout_descriptor(champion.manifest)
     challenger_holdout = _holdout_descriptor(challenger.manifest)
     require_comparable_holdouts(champion_holdout, challenger_holdout)
@@ -265,7 +265,7 @@ def paired_bootstrap_intervals(
     samples: int = 1_000,
     random_state: int = RANDOM_SEED,
 ) -> pd.DataFrame:
-    """Return deterministic paired 95% intervals for key evaluation deltas."""
+    """Calcula intervalos pareados deterministas del 95 % para deltas clave."""
     truth = np.asarray(y_true, dtype=int)
     champion = np.asarray(champion_predictions, dtype=int)
     challenger = np.asarray(challenger_predictions, dtype=int)
@@ -307,7 +307,7 @@ def plot_champion_challenger_confusion(
     comparison: ChampionChallengerComparison,
     y_true: np.ndarray | list[int],
 ) -> None:
-    """Render final stable-state confusion matrices side by side for human review."""
+    """Grafica matrices finales de estados estables para revisión humana."""
     import matplotlib.pyplot as plt
     import seaborn as sns
     from sklearn.metrics import confusion_matrix
@@ -347,7 +347,7 @@ def evaluate_champion_challenger(
     bootstrap_samples: int = 1_000,
     random_state: int = RANDOM_SEED,
 ) -> ChampionChallengerComparison:
-    """Evaluate two compatible bundles without selecting thresholds or promoting either one."""
+    """Evalúa bundles compatibles sin elegir umbrales ni promover candidatos."""
     validate_evaluation_pair(champion, challenger, holdout)
     test = _validate_holdout_records(holdout)
     champion_result = _evaluate_bundle(champion, test)

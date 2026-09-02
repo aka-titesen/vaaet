@@ -1,12 +1,6 @@
 # SPDX-FileCopyrightText: 2026 VAAET Contributors
 # SPDX-License-Identifier: AGPL-3.0-only
-"""Video I/O utilities for the VAAET production pipeline.
-
-Handles strict filename validation (bridge camera naming convention),
-duration extraction from filenames, and safe video capture opening.
-
-See ADR-0009 and ADR-0013 for the filename and acquisition decisions.
-"""
+"""Utilidades de I/O y metadatos para videos del pipeline VAAET."""
 
 from __future__ import annotations
 
@@ -30,17 +24,16 @@ _FILENAME_RE = re.compile(VIDEO_FILENAME_PATTERN)
 
 
 def validate_filename(path: str) -> bool:
-    """Check whether a video filename matches the expected bridge format."""
+    """Verifica el formato contractual del nombre de un video."""
     basename = os.path.basename(path)
     return bool(_FILENAME_RE.match(basename))
 
 
 def extract_recording_start(path: str) -> datetime | None:
-    """Return the recording start encoded in a bridge filename, if present.
+    """Extrae el inicio de grabación codificado en el nombre, si existe.
 
-    Free-form filenames deliberately return ``None``. Callers can then use one
-    explicit processing timestamp and report the reduced provenance instead of
-    silently pretending that processing time is capture time.
+    Los nombres libres devuelven ``None`` para que el consumidor declare un
+    timestamp de procesamiento sin presentarlo como tiempo de captura.
     """
     basename = os.path.basename(path)
     match = _FILENAME_RE.match(basename)
@@ -55,7 +48,7 @@ def extract_recording_start(path: str) -> datetime | None:
 
 
 def extract_duration(path: str) -> float:
-    """Extract video duration in seconds from a bridge-format filename."""
+    """Extrae la duración en segundos desde el nombre o los metadatos."""
     basename = os.path.basename(path)
     match = _FILENAME_RE.match(basename)
     if match:
@@ -79,7 +72,7 @@ def extract_duration(path: str) -> float:
 
 
 def open_video(path: str) -> cv2.VideoCapture:
-    """Open a video file and return a ``cv2.VideoCapture`` with validation."""
+    """Abre un video y valida el ``cv2.VideoCapture`` resultante."""
     if not os.path.isfile(path):
         raise ArtifactNotFoundError(f"Video file not found: {path}")
 
@@ -91,7 +84,7 @@ def open_video(path: str) -> cv2.VideoCapture:
 
 
 def _duration_from_metadata(path: str) -> float:
-    """Read duration from video file using OpenCV metadata."""
+    """Calcula la duración mediante metadatos de OpenCV."""
     cap = cv2.VideoCapture(path)
     if not cap.isOpened():
         raise VideoValidationError(f"Cannot open video for metadata: {path}")

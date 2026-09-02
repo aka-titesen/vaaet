@@ -17,8 +17,9 @@ con YOLO.
   contratos; cualquier cambio requiere aprobación y un ADR nuevo.
 - Los pesos YOLO y binarios `.keras`/`.joblib` no se versionan con Git. El bundle
   completo se registra como unidad mediante DVC.
-- Código, APIs, nombres y comentarios técnicos se escriben en inglés; la
-  documentación explicativa se mantiene en español.
+- Código, APIs, identificadores y nombres se escriben en inglés. Los comentarios
+  y docstrings propios usan español rioplatense formal y sólo explican contratos,
+  efectos laterales, invariantes, decisiones o algoritmos no evidentes.
 
 ## Entorno y calidad
 

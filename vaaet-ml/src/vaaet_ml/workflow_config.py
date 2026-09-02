@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: 2026 VAAET Contributors
 # SPDX-License-Identifier: AGPL-3.0-only
-"""Immutable, validated configuration contracts used by VAAET notebooks."""
+"""Contratos inmutables y validados para los workflows de notebooks VAAET."""
 
 from __future__ import annotations
 
@@ -36,9 +36,20 @@ def _optional_run_id(name: str, value: str | None) -> None:
         raise RuntimeConfigurationError(f"{name} must be a training pipeline UUID or None.") from exc
 
 
+def _string_tuple(name: str, values: tuple[str, ...]) -> None:
+    """Valida filtros inmutables sin aceptar colecciones ambiguas o vacías."""
+
+    if not isinstance(values, tuple) or any(
+        not isinstance(value, str) or not value.strip() for value in values
+    ):
+        raise RuntimeConfigurationError(f"{name} must be a tuple of non-empty strings.")
+    if len(values) != len(set(values)):
+        raise RuntimeConfigurationError(f"{name} must not contain duplicates.")
+
+
 @dataclass(frozen=True)
 class CollectionWorkflowConfig:
-    """Safe, explicit controls for annotated telemetry collection."""
+    """Controles explícitos para recolectar telemetría y video anotado."""
 
     persist_to_database: bool
     hud_debug: bool
@@ -54,7 +65,7 @@ class CollectionWorkflowConfig:
 
 @dataclass(frozen=True)
 class InferenceWorkflowConfig:
-    """Safe controls for bundle selection, persistence, and human review."""
+    """Controles para seleccionar bundles, persistir y revisar inferencias."""
 
     allow_pilot_bundle: bool
     allow_experimental_bundle: bool
@@ -84,7 +95,7 @@ class InferenceWorkflowConfig:
 
 @dataclass(frozen=True)
 class TrainingWorkflowConfig:
-    """Validated training switches without mutable notebook state."""
+    """Controles de entrenamiento validados sin estado mutable del notebook."""
 
     training_mode: TrainingModeName
     enable_postgres_ingestion: bool
@@ -135,7 +146,7 @@ class TrainingWorkflowConfig:
 
 @dataclass(frozen=True)
 class EvaluationWorkflowConfig:
-    """Read-only controls for exact bundle and drift evaluation."""
+    """Controles read-only para comparar bundles y analizar deriva."""
 
     run_model_evaluation: bool
     champion_bundle_dir: str
@@ -148,6 +159,9 @@ class EvaluationWorkflowConfig:
     use_postgres_operational: bool
     postgres_start_utc: str
     postgres_end_utc: str
+    postgres_pipeline_run_ids: tuple[str, ...] = ()
+    postgres_clip_ids: tuple[str, ...] = ()
+    drift_plot_features: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         for name in (
@@ -184,3 +198,6 @@ class EvaluationWorkflowConfig:
                 raise RuntimeConfigurationError(
                     "PostgreSQL drift analysis requires explicit UTC bounds."
                 )
+        _string_tuple("postgres_pipeline_run_ids", self.postgres_pipeline_run_ids)
+        _string_tuple("postgres_clip_ids", self.postgres_clip_ids)
+        _string_tuple("drift_plot_features", self.drift_plot_features)

@@ -25,26 +25,25 @@ class TestOpticalFlowEstimator:
         frame = np.random.randint(0, 255, (480, 640, 3), dtype=np.uint8)
         est.update(frame)
         motion = est.update(frame.copy())
-        assert np.linalg.norm(motion) < 1.0  # near-zero
+        assert np.linalg.norm(motion) < 1.0
 
     def test_shifted_frame_detects_motion(self) -> None:
         """Frame shifted by a known amount → global motion ≈ shift."""
         est = OpticalFlowEstimator(grid_step=20)
-        # Create a textured image (gradient + noise for feature tracking)
+        # La textura y el ruido aportan esquinas suficientes para Lucas-Kanade.
         h, w = 240, 320
         base = np.tile(np.arange(w, dtype=np.uint8), (h, 1))
         noise = np.random.randint(0, 30, (h, w), dtype=np.uint8)
         gray = np.clip(base.astype(int) + noise, 0, 255).astype(np.uint8)
         frame1 = np.stack([gray, gray, gray], axis=-1)
 
-        # Shift right by 10 pixels
         shift_px = 10
         frame2 = np.zeros_like(frame1)
         frame2[:, shift_px:] = frame1[:, :-shift_px]
 
         est.update(frame1)
         motion = est.update(frame2)
-        # The horizontal component should be positive (shift-right)
+        # Un corrimiento a la derecha debe conservar signo horizontal positivo.
         assert motion[0] > 3.0, f"Expected positive dx, got {motion[0]}"
 
     def test_reset_clears_state(self) -> None:
@@ -61,7 +60,7 @@ class TestOpticalFlowEstimator:
         """Multiple frames should produce smoothed global motion estimates."""
         est = OpticalFlowEstimator(running_mean_window=5, grid_step=20)
 
-        # Create a textured base with strong gradients for LK tracking
+        # Los gradientes fuertes vuelven observable el tracking en entornos headless.
         h, w = 240, 320
         np.random.seed(42)
         base_gray = np.random.randint(0, 255, (h, w), dtype=np.uint8)
@@ -72,17 +71,15 @@ class TestOpticalFlowEstimator:
         motions = []
         current = frame1.copy()
         for _ in range(5):
-            # Shift right by 5 pixels
             shifted = np.zeros_like(current)
             shifted[:, 5:] = current[:, :-5]
             m = est.update(shifted)
             motions.append(m.copy())
             current = shifted
 
-        # At least some motions should be non-zero if flow was detected
         norms = [np.linalg.norm(m) for m in motions]
-        # The test passes if either (a) flow was detected and consistent,
-        # or (b) all zeros (flow tracking failed — acceptable in headless env)
+        # OpenCV puede no detectar flujo en un entorno headless; ambos resultados
+        # admitidos deben seguir siendo finitos y coherentes.
         if any(n > 0 for n in norms):
             assert np.std(norms[-3:]) < np.mean(norms[-3:]) + 1.0
 

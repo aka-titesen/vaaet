@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: 2026 VAAET Contributors
 # SPDX-License-Identifier: AGPL-3.0-only
-"""Conservative, reproducible training-balance candidates."""
+"""Candidatos conservadores y reproducibles para balancear entrenamiento."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ from sklearn.utils.class_weight import compute_class_weight
 
 
 class BalanceStrategy(str, Enum):
-    """Supported stable-state balancing alternatives."""
+    """Enumera estrategias admitidas para balancear estados estables."""
 
     CLASS_WEIGHTS = "class-weights"
     MODERATE_OVERSAMPLING = "moderate-oversampling"
@@ -22,7 +22,7 @@ class BalanceStrategy(str, Enum):
 
 @dataclass(frozen=True)
 class BalanceCandidate:
-    """Row positions and supervision weights for one candidate."""
+    """Representa filas y pesos de supervisión de un candidato."""
 
     strategy: BalanceStrategy
     row_positions: np.ndarray
@@ -35,7 +35,7 @@ def build_balance_candidates(
     *,
     random_state: int,
 ) -> dict[BalanceStrategy, BalanceCandidate]:
-    """Build candidates without modifying validation or test partitions."""
+    """Construye candidatos sin alterar las particiones de validación ni test."""
     weights = np.asarray(supervision_weights, dtype=float)
     if len(train_frame) != len(weights):
         raise ValueError("Training rows and supervision weights must have equal length.")
@@ -94,7 +94,7 @@ def compute_capped_balanced_weights(
     *,
     maximum_class_weight: float = 4.0,
 ) -> tuple[np.ndarray, dict[int, float]]:
-    """Combine capped class weights with source-supervision weights."""
+    """Combina pesos de clase acotados con los pesos de supervisión."""
     target = np.asarray(states, dtype=int)
     supervision = np.asarray(supervision_weights, dtype=float)
     if len(target) != len(supervision):

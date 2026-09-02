@@ -425,6 +425,8 @@ def _evaluation_evidence_document(value: TrainingEvaluationEvidence) -> dict[str
 
 
 def _runtime_evidence(value: Mapping[str, object]) -> dict[str, object]:
+    """Reduce el runtime a evidencia agregada, portable y libre de paths."""
+
     unknown = set(value) - _RUNTIME_FIELDS
     if unknown:
         raise ValueError(f"Runtime evidence contains unsupported fields: {sorted(unknown)}")
@@ -617,6 +619,8 @@ def _flat_metrics(document: Mapping[str, object]) -> dict[str, float]:
 
 
 def _validate_report_document(value: Mapping[str, object]) -> dict[str, object]:
+    """Valida contrato, identidad y fingerprint antes de aceptar un informe."""
+
     document = dict(value)
     if document.get("contract") != TRAINING_OBSERVABILITY_REPORT_CONTRACT:
         raise TrainingStabilityError("Unsupported training observability report contract.")
@@ -777,6 +781,8 @@ def _safe_aggregate_mapping(value: Mapping[str, object], *, label: str) -> dict[
 
 
 def _reject_sensitive_values(value: object, *, label: str) -> None:
+    """Rechaza recursivamente campos o valores que podrían filtrar datos sensibles."""
+
     if isinstance(value, Mapping):
         for key, item in value.items():
             key_name = str(key).lower()

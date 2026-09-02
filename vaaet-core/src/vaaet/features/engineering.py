@@ -1,11 +1,9 @@
 # SPDX-FileCopyrightText: 2026 VAAET Contributors
 # SPDX-License-Identifier: AGPL-3.0-only
-"""Feature engineering for the VAAET traffic-state classifier.
+"""Ingeniería de features para el clasificador de estados de tránsito.
 
-Transforms raw telemetry into features that capture inter-record dynamics,
-temporal patterns, vehicle composition, and speed-measurement quality.
-This module is shared between the data-preparation notebook (training) and
-the production notebook (inference).
+Transforma telemetría cruda en dinámicas temporales, composición vehicular y
+calidad de medición. Entrenamiento e inferencia comparten esta implementación.
 """
 
 from __future__ import annotations
@@ -58,7 +56,7 @@ def _validate_and_order(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def engineer_features(df: pd.DataFrame) -> pd.DataFrame:
-    """Transform raw telemetry into engineered features."""
+    """Transforma telemetría cruda ordenada en las 19 features canónicas."""
     out = df.copy()
     thresholds = LABELING_THRESHOLDS
 
@@ -149,9 +147,8 @@ def engineer_features(df: pd.DataFrame) -> pd.DataFrame:
     out["hour_of_day"] = traffic_local_hour(out["record_time"])
     out["weather_condition"] = (~out["hour_of_day"].between(6, 18)).astype(int)
 
-    # Delta-based features are undefined for the first record. Preserve the
-    # established training/inference contract by removing that row instead of
-    # silently fabricating zero deltas.
+    # El primer registro no tiene deltas definidos. Se elimina para preservar
+    # la paridad train/serve en lugar de inventar ceros.
     out = out.dropna(
         subset=["delta_speed", "delta_count", "cumulative_delta_speed"]
     ).reset_index(drop=True)

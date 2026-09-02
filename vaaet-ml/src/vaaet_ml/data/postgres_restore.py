@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: 2026 VAAET Contributors
 # SPDX-License-Identifier: AGPL-3.0-only
-"""Colab-safe PostgreSQL backup reader preparation for training ingestion."""
+"""Preparación segura del lector de backups PostgreSQL para ingestión en Colab."""
 
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ def resolve_pg_restore_for_backup(
     *,
     in_colab: bool,
 ) -> str | None:
-    """Return a compatible ``pg_restore`` only when the explicit backup needs it."""
+    """Resuelve un ``pg_restore`` compatible sólo cuando el backup lo requiere."""
 
     pg_restore_path = shutil.which("pg_restore")
     if not backup_path.is_file() or csv_path.is_file():

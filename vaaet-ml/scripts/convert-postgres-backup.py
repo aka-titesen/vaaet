@@ -1,19 +1,16 @@
 # SPDX-FileCopyrightText: 2026 VAAET Contributors
 # SPDX-License-Identifier: AGPL-3.0-only
 #!/usr/bin/env python3
-"""Manual utility to convert traffic_data.backup into traffic_data_raw.csv.
+"""Utilidad manual para convertir ``traffic_data.backup`` a CSV crudo.
 
-This script is not used by the active notebooks at runtime. It exists as a
-one-time local helper for preparing a Colab-friendly CSV from a PostgreSQL
-binary backup.
+Los notebooks activos no lo usan durante el runtime. Su propósito es preparar
+una única vez, en un entorno local con cliente PostgreSQL 17, un ``RawCsvSource``
+apto para Colab. El contenido crudo es sensible y permanece ignorado por Git.
 
-Run this script locally (where PostgreSQL client 17 is installed) to produce an
-explicit ``RawCsvSource``. Raw data is sensitive and remains ignored by Git.
-
-Usage:
+Uso:
     python scripts/convert-postgres-backup.py
 
-    # Custom paths:
+    # Paths personalizados:
     python scripts/convert-postgres-backup.py --backup path/to/file.backup --output path/to/out.csv
 """
 

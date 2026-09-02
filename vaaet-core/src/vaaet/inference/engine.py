@@ -24,7 +24,7 @@ class TrafficStateEngine:
     bundle: LoadedTrafficBundle
 
     def classify(self, telemetry: pd.DataFrame) -> pd.DataFrame:
-        """Classify complete telemetry minutes through the bundle policy."""
+        """Clasifica minutos completos mediante la política validada del bundle."""
 
         return classify_raw_telemetry(
             telemetry,
@@ -37,13 +37,13 @@ class TrafficStateEngine:
         )
 
     def predict_latest(self, telemetry: pd.DataFrame) -> TrafficStatePrediction | None:
-        """Return the latest typed prediction for the ordered video pipeline."""
+        """Devuelve la última predicción tipada al pipeline ordenado de video."""
 
         try:
             classified = self.classify(telemetry)
         except ValueError:
-            # A finite clip may not yet contain a complete minute. This is not
-            # an inference failure and must not manufacture a traffic state.
+            # Un clip finito puede no completar todavía un minuto. Esa ausencia
+            # no es un fallo de inferencia ni habilita inventar un estado.
             return None
         if classified.empty:
             return None

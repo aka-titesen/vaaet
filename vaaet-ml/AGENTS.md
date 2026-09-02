@@ -57,6 +57,15 @@ Los notebooks instalan primero `vaaet-core` y luego `vaaet-ml`: importan
 `vaaet.*` para operaciones y `vaaet_ml.*` para laboratorio. Nunca modifican
 `sys.path`. El core no puede importar este paquete ni PostgreSQL, DVC o Drive.
 
+## Comentarios y docstrings
+
+Mantené identificadores y código en inglés. Redactá comentarios y docstrings
+propios en español rioplatense formal; explicá contratos, efectos laterales,
+invariantes y decisiones no evidentes, sin narrar operaciones triviales. Usá
+forma declarativa en contratos y voseo formal sólo en instrucciones operativas.
+Las revisiones Alembic son historial ejecutable y no se reescriben para adaptar
+su estilo documental.
+
 ## Validación
 
 1. Instalar `../vaaet-core` y luego este componente local.

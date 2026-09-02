@@ -246,6 +246,8 @@ def _sync_to_catalog(
     reviewed_rows: int,
     pending_rows: int,
 ) -> FinalizedReviewSession:
+    """Sincroniza el paquete en forma idempotente y verifica su identidad canónica."""
+
     catalog = HitlReviewCatalog(canonical_root / HITL_CATALOG_FILE)
     existing = catalog.find(pipeline_run_id=str(pipeline_run_id), fingerprint=fingerprint)
     if existing is not None:

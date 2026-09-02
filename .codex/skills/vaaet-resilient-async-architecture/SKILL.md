@@ -1,9 +1,9 @@
 ---
 name: vaaet-resilient-async-architecture
-description: Design, review, or safely evolve resilient asynchronous VAAET workflows. Use for bounded Producer-Consumer persistence, durable spooling, circuit breakers, replay after PostgreSQL failures, cache lifecycle, system-quality reviews, or future distributed-worker proposals.
+description: Diseñá y revisá flujos VAAET resilientes entre Python, API, web y aceleración nativa futura, sin adelantar componentes no aprobados.
 ---
 
-# VAAET Resilient Async Architecture
+# Arquitectura asíncrona y resiliente de VAAET
 
 ## Position and current state
 
@@ -13,10 +13,10 @@ Read ADR-0021 and ADR-0013 through ADR-0019 before changing workflow behavior. R
 governance.
 
 Describe the current implementation accurately: `vaaet.vision.analyze_video()`
-is an ordered, synchronous per-clip loop. It has no runtime queues, Redis,
-Celery, `asyncpg`, remote workers, or distributed cache. `pipeline_run` can
-emit a redacted local lifecycle manifest when PostgreSQL is unavailable; it is
-not a telemetry spool.
+is an ordered, synchronous Python per-clip loop. It has no runtime queues,
+Redis, Celery, `asyncpg`, FastAPI, React, Next.js, C++, remote workers, or
+distributed cache. `pipeline_run` can emit a redacted local lifecycle manifest
+when PostgreSQL is unavailable; it is not a telemetry spool.
 
 Preserve the stateful vision chain in one ordered execution context:
 
@@ -29,6 +29,25 @@ Do not parallelize, reorder, or externalize SORT state, optical flow, speed
 smoothing, stationary detection, minute accumulation, classification policy,
 or incident handling. Preserve the 19 features, bundle v2, three MLP outputs,
 and human-only Accident publication.
+
+## Keep boundaries explicit across runtimes
+
+`vaaet-core` remains the portable Python owner of ordered vision, telemetry,
+bundle validation, and inference. `vaaet-ml` remains the Python laboratory for
+training, evaluation, DVC, PostgreSQL, and notebooks; it is never a serving
+dependency. `vaaet-app/` remains reserved until a versioned HTTP contract,
+approved scope, and the ADR-0022 serving path exist.
+
+A future FastAPI component may be the HTTP adapter, job-status surface, and
+worker coordinator. A future React or Next.js component may present request,
+loading, retry, cancellation, and result states. Both consume only the approved
+HTTP contract: they never import Python, read a bundle, access DVC or Drive,
+connect to PostgreSQL, or expose secrets and private paths.
+
+A future C++ component is an optional internal accelerator behind a stable
+`vaaet-core` interface with an equivalent Python fallback. It does not receive
+web traffic, replace public domain APIs, alter the bundle v2, or share mutable
+tracker state across runtimes.
 
 ## Introduce local decoupling only with evidence
 
@@ -83,6 +102,11 @@ exceptions, or arbitrary raw payloads in logs, lifecycle metadata, or spool
 names. Use parameter binding through SQLAlchemy; never interpolate SQL strings.
 Do not use administrative database credentials in a notebook or worker.
 
+When a future HTTP request starts a persistent workflow, correlate its job
+identity with `pipeline_run` only where the versioned contract authorizes it.
+Define idempotency, backpressure, timeout, cancellation, retry,
+acknowledgement, retention, and recovery at that boundary before coding.
+
 ## Keep distributed services future and governed
 
 Redis, Celery, distributed caching, external schedulers, remote durable brokers,
@@ -90,6 +114,30 @@ Redis, Celery, distributed caching, external schedulers, remote durable brokers,
 VAAET components. Those workers must use `vaaet-core`, not `vaaet-ml`. Before selecting one, obtain explicit authorization and
 document the dependency, deployment identity, encryption and authentication,
 retention, backpressure, failure recovery, monitoring, cost, and ADR impact.
+
+FastAPI is a future HTTP adapter, not a durable queue or the owner of vision.
+`async def` does not make `analyze_video()` non-blocking: do not run the ordered
+core loop in an API event loop. Do not present `FastAPI BackgroundTasks` as
+durable persistence or a substitute for a governed worker, queue, or spool.
+Define job creation, cancellation, status queries, load limits, and event
+transport in the HTTP contract before implementation.
+
+React and Next.js may render explicit API states but must not duplicate work or
+decide replays. Server-side rendering, route handlers, polling, SSE, and
+WebSockets are future options, not default architecture. Require a use case,
+authorization, resource limits, and security review before choosing one.
+
+Use C++ only for a measured bottleneck and retain a Python fallback. Before
+adopting a native binding or ML library, define data representation and layout,
+units, memory ownership, copies between runtimes, cleanup, cancellation, error
+translation, ABI/platform compatibility, and failure fallback. Do not assume a
+GPU, released GIL, or native kernel improves the representative workload.
+
+ONNX Runtime, TensorRT, LibTorch, C/C++ bindings, FastAPI, JavaScript,
+TypeScript, React, Next.js, Redis, Celery, brokers, and additional libraries
+all require explicit authorization, profiling where relevant, licensing and
+redistribution review, security, deployment identity, observability, CI impact,
+cost evaluation, and an ADR when architecture or contracts change.
 
 Do not treat CAP as a reason to weaken PostgreSQL integrity. CAP is relevant
 when replicated distributed services partition; PostgreSQL writes retain their
@@ -120,8 +168,15 @@ Before accepting a local queue, spool, or future broker proposal:
 6. Add focused tests for ordering, queue saturation, shutdown, circuit states,
    atomic spool recovery, idempotent replay, and redaction; then run all VAAET
    repository gates.
+7. For a native accelerator, compare outputs and rejection paths against the
+   Python fallback with small inputs and boundary cases, including memory and
+   binding failures.
+8. For an API or web proposal, validate the versioned contract, authorization,
+   cancellation, retries, redaction, and absence of internal-resource leakage.
 
 Reject blocking network I/O in the vision thread, unbounded queues, commits per
 frame, long-lived transactions, automatic promotion, mutable or ephemeral-only
 recovery claims, SQL interpolation, concurrent tracker mutation, and unmeasured
-availability or performance claims.
+availability or performance claims. Also reject API event loops that execute
+vision directly, UI retries that duplicate work, and native acceleration without
+measured evidence and a validated fallback.

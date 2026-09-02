@@ -403,7 +403,7 @@ def test_portable_agent_context_describes_the_active_monorepo() -> None:
     normalized_core_rules = " ".join(core_rules.split())
 
     assert "vaaet-core==0.1.0" in root_context
-    assert "vaaet-ml==4.5.3" in root_context
+    assert "vaaet-ml==4.5.4" in root_context
     assert "import `vaaet_ml`" in root_context
     assert "cuatro notebooks" in root_context
     assert "No puede importar `vaaet_ml`, PostgreSQL, DVC, Google Drive" in normalized_core_rules

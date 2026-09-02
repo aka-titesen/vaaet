@@ -21,7 +21,7 @@ Python internas:
 ```text
 vaaet/
 ├─ vaaet-core/  # distribución vaaet-core==0.1.0, import vaaet
-├─ vaaet-ml/    # distribución vaaet-ml==4.5.3, import vaaet_ml
+├─ vaaet-ml/    # distribución vaaet-ml==4.5.4, import vaaet_ml
 ├─ vaaet-app/   # reservado, sin código de API ni web todavía
 ├─ docs/
 ├─ .dvc/

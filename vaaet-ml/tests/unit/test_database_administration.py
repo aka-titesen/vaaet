@@ -43,7 +43,7 @@ def test_administrator_uses_shared_typed_endpoint_outside_colab(
     settings = load_database_admin_settings(allow_legacy=False)
 
     assert settings.host == "localhost"
-    assert settings.application == "vaaet-migration-4.5.3"
+    assert settings.application == "vaaet-migration-4.5.4"
     assert "not-a-real-secret" not in repr(settings)
 
 
@@ -182,7 +182,7 @@ def test_admin_engine_uses_null_pool_and_common_tls_arguments(
     assert captured["poolclass"] is NullPool
     assert captured["connect_args"] == {
         "connect_timeout": 10,
-        "application_name": "vaaet-migration-4.5.3",
+        "application_name": "vaaet-migration-4.5.4",
         "sslmode": "disable",
     }
 

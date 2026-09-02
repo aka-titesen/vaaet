@@ -1,7 +1,7 @@
 # Documentación de VAAET
 
 VAAET es un monorepo con `vaaet-core` (`vaaet`, versión interna 0.1.0),
-`vaaet-ml` (`vaaet_ml`, versión 4.5.3) y `vaaet-app` reservado. La topología y
+`vaaet-ml` (`vaaet_ml`, versión 4.5.4) y `vaaet-app` reservado. La topología y
 los límites vigentes están definidos por [ADR-0021](architecture/decisions/0021-portable-core-and-ml-laboratory-boundary.md).
 
 ## Estado y precedencia documental

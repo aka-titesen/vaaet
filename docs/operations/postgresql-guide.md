@@ -1,4 +1,4 @@
-# Operación PostgreSQL portable — VAAET ML 4.5.3
+# Operación PostgreSQL portable — VAAET ML 4.5.4
 
 PostgreSQL es opcional y pertenece exclusivamente a `vaaet-ml`. VAAET admite
 AWS RDS, Supabase, Neon o un servidor propio sólo si exponen las capacidades

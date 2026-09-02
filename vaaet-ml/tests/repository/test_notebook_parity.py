@@ -441,7 +441,8 @@ def test_collection_centralizes_safe_workflow_configuration() -> None:
     assert code.count("WORKFLOW_CONFIG =") == 1
     assert "SELECTED_PRESET = CollectionPreset.LOCAL" in code
     assert "resolve_collection_config(" in code
-    assert "if IN_COLAB and WORKFLOW_CONFIG.download_outputs:" in code
+    assert "resolve_video_input(" in code
+    assert "_video_uploader = files.upload" in code
     config_index = next(
         index
         for index, cell in enumerate(notebook["cells"])
@@ -467,6 +468,8 @@ def test_notebook_transfers_require_explicit_configuration() -> None:
         in WORKFLOW_PRESET_MODULE
     )
     assert "if IN_COLAB and WORKFLOW_CONFIG.download_outputs:" in collection
+    assert "if IN_COLAB and not WORKFLOW_CONFIG.download_outputs:" in collection
+    assert "elif IN_COLAB:" not in collection
     assert "InferencePreset.PILOT_OFFLINE" in WORKFLOW_PRESET_MODULE
     assert "if IN_COLAB and WORKFLOW_CONFIG.download_annotated_video:" in inference
     assert "TrainingPreset.SEED_UPLOAD" in WORKFLOW_PRESET_MODULE
@@ -474,6 +477,21 @@ def test_notebook_transfers_require_explicit_configuration() -> None:
     assert "validate_manifest(_bundle_directory)" in training
     assert "No se pudo copiar el bundle validado a Drive" in training
     assert "except Exception as e:" not in training
+
+
+def test_collection_invalidates_stale_results_and_guards_persistence() -> None:
+    collection = _code(NOTEBOOKS["collection"])
+
+    assert "from vaaet_ml.notebook_io import resolve_video_input" in collection
+    assert "EXPLICIT_VIDEO_PATH: Path | None = None" in collection
+    assert 'staging_directory=Path("/content") if IN_COLAB' in collection
+    assert collection.count("result = None") >= 2
+    assert collection.count("COLLECTION_PIPELINE_RUN_ID = None") >= 2
+    assert "PROCESSED_VIDEO_PATH = VIDEO_PATH.resolve()" in collection
+    assert (
+        "result is None or COLLECTION_PIPELINE_RUN_ID is None "
+        "or PROCESSED_VIDEO_PATH != VIDEO_PATH.resolve()"
+    ) in collection
 
 
 def test_training_resolves_postgres_only_after_explicit_opt_in() -> None:

@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: 2026 VAAET Contributors
 # SPDX-License-Identifier: AGPL-3.0-only
 #!/usr/bin/env python3
-"""Build a checksum-protected vaaet-training-dataset-v1 package from CSV exports."""
+"""Construye desde CSV un paquete v1 protegido mediante checksums."""
 
 from __future__ import annotations
 

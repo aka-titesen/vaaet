@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: 2026 VAAET Contributors
 # SPDX-License-Identifier: AGPL-3.0-only
-"""Manifest-first loading for the VAAET traffic-state bundle v2."""
+"""Carga manifest-first del bundle v2 de estados de tránsito."""
 
 from __future__ import annotations
 
@@ -22,7 +22,7 @@ from vaaet.settings import FEATURE_COLS, STATE_LABELS
 
 @dataclass(frozen=True)
 class LoadedTrafficBundle:
-    """A bundle that passed its portable contract before deserialization."""
+    """Representa un bundle validado antes de deserializar sus binarios."""
 
     manifest: TrafficBundleManifest
     model: TrafficStateModel
@@ -39,7 +39,7 @@ def authorize_bundle(
     allow_experimental: bool,
     persist_to_database: bool,
 ) -> tuple[str, str]:
-    """Reject unauthorized deployment stages before loading model bytes."""
+    """Rechaza etapas no autorizadas antes de cargar bytes del modelo."""
 
     lifecycle = manifest["training_lifecycle"]
     if not isinstance(lifecycle, Mapping):
@@ -64,7 +64,7 @@ def load_traffic_bundle(
     allow_experimental: bool,
     persist_to_database: bool,
 ) -> LoadedTrafficBundle:
-    """Validate the v2 manifest, authorize lifecycle, then deserialize its files."""
+    """Valida manifiesto y lifecycle antes de deserializar el bundle."""
 
     manifest = validate_manifest(directory)
     stage, input_policy = authorize_bundle(

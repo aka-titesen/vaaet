@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: 2026 VAAET Contributors
 # SPDX-License-Identifier: AGPL-3.0-only
-"""Validation-only selection of conservative balance candidates."""
+"""Selección conservadora de balance basada únicamente en validación."""
 
 from __future__ import annotations
 
@@ -31,7 +31,7 @@ from vaaet_ml.training.lifecycle import ModelInputPolicy, cap_synthetic_congeste
 
 @dataclass(frozen=True)
 class BalanceSelection:
-    """The selected model and its validation-only comparison evidence."""
+    """Agrupa el modelo elegido y su evidencia exclusiva de validación."""
 
     strategy: BalanceStrategy
     model: object
@@ -61,7 +61,7 @@ def select_balance_candidate(
     clear_session: Callable[[], None],
     set_random_seed: Callable[[int], None],
 ) -> BalanceSelection:
-    """Fit candidate MLPs and choose the lowest-risk validation result."""
+    """Ajusta candidatos MLP y elige el resultado de menor riesgo validado."""
 
     from vaaet_ml.training.modeling import build_traffic_state_mlp
 

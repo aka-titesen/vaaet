@@ -64,3 +64,21 @@ def test_evaluation_config_requires_exact_holdout() -> None:
         EvaluationWorkflowConfig(
             True, "champion", "challenger", "current.json", 1, False, "", "", False, "", ""
         )
+
+
+def test_evaluation_config_validates_immutable_filters() -> None:
+    with pytest.raises(RuntimeConfigurationError, match="postgres_clip_ids"):
+        EvaluationWorkflowConfig(
+            False,
+            "",
+            "",
+            "",
+            1,
+            False,
+            "",
+            "",
+            False,
+            "",
+            "",
+            postgres_clip_ids=("clip-1", "clip-1"),
+        )

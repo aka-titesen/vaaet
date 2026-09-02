@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: 2026 VAAET Contributors
 # SPDX-License-Identifier: AGPL-3.0-only
-"""Explicit, composable training inputs for PostgreSQL, backups, and CSV bundles."""
+"""Entradas explícitas y componibles para entrenamiento desde fuentes gobernadas."""
 
 from __future__ import annotations
 
@@ -76,7 +76,7 @@ class DatasetPackageSource:
 
 @dataclass(frozen=True)
 class SeedDatasetPackageSource:
-    """Processed weak-label seed package; never inferred from generic feature files."""
+    """Representa un paquete semilla weak-label declarado de forma explícita."""
 
     path: Path
 
@@ -93,6 +93,8 @@ TrainingSource = (
 
 @dataclass(frozen=True)
 class TrainingIngestionPlan:
+    """Define fuentes y política de supervisión para una carga de entrenamiento."""
+
     mode: TrainingMode
     raw_sources: tuple[TrainingSource, ...] = ()
     seed_sources: tuple[SeedDatasetPackageSource, ...] = ()
@@ -110,6 +112,8 @@ class TrainingIngestionPlan:
 
 @dataclass(frozen=True)
 class TrainingDataset:
+    """Agrupa tablas deduplicadas y su procedencia para entrenar o auditar."""
+
     raw: pd.DataFrame
     seed_features: pd.DataFrame
     validated_feedback: pd.DataFrame
@@ -118,6 +122,8 @@ class TrainingDataset:
 
 
 def _load_seed_features(source: SeedDatasetPackageSource) -> pd.DataFrame:
+    """Valida contrato, procedencia y orden de features antes de aceptar la semilla."""
+
     frames = load_dataset_package(
         source.path,
         accepted_contracts=(SEED_DATASET_PACKAGE_CONTRACT, DATASET_PACKAGE_CONTRACT),
@@ -197,6 +203,8 @@ def _latest_validated_feedback(frames: dict[str, pd.DataFrame]) -> pd.DataFrame:
 def _frames_from_backup(
     source: PostgresBackupSource, *, components: set[str]
 ) -> dict[str, pd.DataFrame]:
+    """Extrae tablas reconocidas sin ejecutar el SQL contenido en el backup."""
+
     catalog = inspect_backup_catalog(source.path, pg_restore_path=source.pg_restore_path)
     if not catalog:
         raise ValueError("PostgreSQL backup contains no recognized VAAET tables.")
@@ -349,6 +357,8 @@ def _deduplicate_raw(frames: Sequence[pd.DataFrame]) -> pd.DataFrame:
 def _deduplicate_feedback(
     frames: Sequence[pd.DataFrame], *, require_human_validation: bool = True
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Consolida decisiones humanas y separa incidentes del MLP estable."""
+
     non_empty = [frame.copy() for frame in frames if not frame.empty]
     if not non_empty:
         return pd.DataFrame(), pd.DataFrame()
@@ -392,7 +402,7 @@ def _deduplicate_feedback(
 def compose_supervised_dataset(
     proxy_features: pd.DataFrame, validated_feedback: pd.DataFrame
 ) -> pd.DataFrame:
-    """Combine stable proxy labels with human labels, giving humans precedence."""
+    """Combina etiquetas proxy estables con prioridad para las etiquetas humanas."""
     if proxy_features.empty and validated_feedback.empty:
         raise ValueError("No stable training records are available for composition.")
     frames: list[pd.DataFrame] = []
@@ -421,6 +431,8 @@ def compose_supervised_dataset(
 
 
 def load_training_inputs(plan: TrainingIngestionPlan) -> TrainingDataset:
+    """Carga y consolida únicamente las fuentes declaradas en el plan validado."""
+
     raw_frames: list[pd.DataFrame] = []
     seed_frames: list[pd.DataFrame] = []
     feedback_frames: list[pd.DataFrame] = []

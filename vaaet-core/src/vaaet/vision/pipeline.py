@@ -1,11 +1,9 @@
 # SPDX-FileCopyrightText: 2026 VAAET Contributors
 # SPDX-License-Identifier: AGPL-3.0-only
-"""Ordered Pipe-and-Filter internals for finite VAAET video analysis.
+"""Pipe-and-Filter ordenado para analizar videos finitos.
 
-The module deliberately keeps every filter in one process and one ordered
-session. Tracking, motion estimation, telemetry accumulation and rendering all
-depend on the preceding frame, so they are not safe boundaries for concurrent
-workers.
+Todos los filtros permanecen en una sesión y un proceso. Tracking, cinemática,
+telemetría y render dependen del frame anterior y no admiten workers concurrentes.
 """
 
 from __future__ import annotations
@@ -62,26 +60,26 @@ _Result = TypeVar("_Result")
 
 
 class FrameCapture(Protocol):
-    """Minimal ordered frame source used by the synchronous pipeline."""
+    """Define la fuente mínima y ordenada de frames."""
 
     def read(self) -> tuple[bool, np.ndarray]: ...
 
 
 class FrameWriter(Protocol):
-    """Minimal annotated-frame sink used by the synchronous pipeline."""
+    """Define el destino mínimo de frames anotados."""
 
     def write(self, frame: np.ndarray) -> None: ...
 
 
 class Detector(Protocol):
-    """Vehicle detector boundary kept small for test doubles."""
+    """Define la frontera mínima del detector vehicular."""
 
     def detect(self, frame: np.ndarray) -> list[Detection]: ...
 
 
 @dataclass(frozen=True)
 class TrafficStatePrediction:
-    """Compact state prediction used by the video overlay."""
+    """Representa la predicción compacta que muestra el video."""
 
     state: int
     label: str
@@ -101,7 +99,7 @@ PredictionProvider = Callable[[pd.DataFrame], TrafficStatePrediction | None]
 
 @dataclass(frozen=True)
 class PipelineMetrics:
-    """Portable timings for one completed synchronous video run."""
+    """Representa tiempos portables de una ejecución síncrona completa."""
 
     frames_processed: int
     processing_seconds: float
@@ -125,12 +123,12 @@ class PipelineMetrics:
 
     @classmethod
     def empty(cls) -> PipelineMetrics:
-        """Return the backward-compatible default used before a run completes."""
+        """Crea el valor compatible anterior a completar una ejecución."""
         return cls(0, 0.0, 0.0, {})
 
 
 class PipelineMetricsCollector:
-    """Injectable monotonic timing collector for deterministic tests."""
+    """Acumula tiempos con un reloj monotónico inyectable."""
 
     def __init__(self, *, clock: Callable[[], float] = perf_counter) -> None:
         self._clock = clock
@@ -138,7 +136,7 @@ class PipelineMetricsCollector:
         self._stage_seconds: dict[str, float] = {stage: 0.0 for stage in _PIPELINE_STAGES}
 
     def measure(self, stage: str, operation: Callable[[], _Result]) -> _Result:
-        """Run one filter and accumulate its elapsed wall-clock time."""
+        """Ejecuta un filtro y acumula su tiempo transcurrido."""
         if stage not in self._stage_seconds:
             raise ValueError(f"Unsupported vision pipeline stage: {stage}")
         started_at = self._clock()
@@ -148,7 +146,7 @@ class PipelineMetricsCollector:
             self._stage_seconds[stage] += max(self._clock() - started_at, 0.0)
 
     def finish(self, *, frames_processed: int) -> PipelineMetrics:
-        """Materialize timings without exposing the mutable collector."""
+        """Materializa las métricas sin exponer el acumulador mutable."""
         elapsed = max(self._clock() - self._started_at, 0.0)
         return PipelineMetrics(
             frames_processed=frames_processed,
@@ -160,7 +158,7 @@ class PipelineMetricsCollector:
 
 @dataclass(frozen=True)
 class FramePacket:
-    """One decoded BGR frame with stable ordered-video identity."""
+    """Representa un frame BGR con identidad estable y ordenada."""
 
     clip_id: str
     frame_index: int
@@ -186,7 +184,7 @@ class FramePacket:
 
 @dataclass(frozen=True)
 class PerceptionPacket:
-    """Frame plus optical-flow and vehicle-detection output."""
+    """Agrupa un frame con sus resultados de flujo óptico y detección."""
 
     frame: FramePacket
     global_motion: np.ndarray
@@ -202,7 +200,7 @@ class PerceptionPacket:
 
 @dataclass(frozen=True)
 class TrackingPacket:
-    """Perception output with serial SORT state applied."""
+    """Agrupa la percepción luego de aplicar el estado serial de SORT."""
 
     perception: PerceptionPacket
     tracks: tuple[Track, ...]
@@ -216,7 +214,7 @@ class TrackingPacket:
 
 @dataclass(frozen=True)
 class TrackAnnotation:
-    """Resolved visual annotation after speed and stationary-state evaluation."""
+    """Representa una anotación resuelta tras evaluar velocidad e inmovilidad."""
 
     bbox: tuple[int, int, int, int]
     vehicle_type: str
@@ -227,7 +225,7 @@ class TrackAnnotation:
 
 @dataclass(frozen=True)
 class MotionPacket:
-    """Tracked frame after ordered motion, speed and telemetry updates."""
+    """Agrupa un frame luego de actualizar movimiento, velocidad y telemetría."""
 
     tracking: TrackingPacket
     annotations: tuple[TrackAnnotation, ...]
@@ -245,7 +243,7 @@ class MotionPacket:
 
 @dataclass(frozen=True)
 class RenderedFramePacket:
-    """Frame that has been annotated and is ready for its ordered sink."""
+    """Representa un frame anotado listo para su destino ordenado."""
 
     motion: MotionPacket
 
@@ -256,7 +254,7 @@ class RenderedFramePacket:
 
 @dataclass(frozen=True)
 class PipelineRunOutput:
-    """Internal materialized output consumed by the public analysis boundary."""
+    """Agrupa la salida interna que consume la frontera pública."""
 
     telemetry_records: tuple[dict[str, object], ...]
     classification_records: tuple[dict[str, object], ...]
@@ -291,10 +289,10 @@ class _ViewSegmentProgress:
 
 @dataclass
 class VisionPipelineSession:
-    """Stateful, ordered filters for one finite video clip.
+    """Coordina filtros ordenados con estado para un video finito.
 
-    This is deliberately not a worker or queue. Its mutable state is local to
-    one clip so that the stateful perception chain remains deterministic.
+    No es un worker ni una cola. El estado mutable pertenece a un único clip
+    para conservar determinista la cadena de percepción.
     """
 
     clip_id: str
@@ -339,7 +337,7 @@ class VisionPipelineSession:
         *,
         max_frames: int | None,
     ) -> PipelineRunOutput:
-        """Read, filter and write frames in exact source order."""
+        """Lee, filtra y escribe frames en el orden exacto de la fuente."""
         frames_processed = 0
         while max_frames is None or frames_processed < max_frames:
             ok, frame = self._metrics.measure("read", capture.read)
@@ -378,7 +376,7 @@ class VisionPipelineSession:
         )
 
     def process_frame(self, packet: FramePacket) -> RenderedFramePacket:
-        """Apply all non-I/O filters to one packet in monotonic order."""
+        """Aplica los filtros sin I/O a un paquete en orden monotónico."""
         if packet.frame_index != self._next_frame_index:
             raise VideoValidationError(
                 "vision.frame_order: frame_index is not the next ordered frame"
@@ -424,6 +422,8 @@ class VisionPipelineSession:
         )
 
     def _measure_motion(self, packet: TrackingPacket) -> MotionPacket:
+        """Evalúa cinemática y calidad sin mezclar calibración y modo legado."""
+
         for track_id in packet.pruned_track_ids:
             self.speed_tracker.remove_track(track_id)
             self.motion_tracker.remove_track(track_id)

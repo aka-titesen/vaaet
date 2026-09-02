@@ -125,6 +125,8 @@ class SORTTracker:
     def _match_existing_tracks(
         self, detections: list[TrackObservation]
     ) -> tuple[set[int], set[int]]:
+        """Asocia por distancia creciente sin mezclar tipos de vehículo."""
+
         if not detections or not self._tracks:
             return set(), set()
         distances = self._distance_matrix(detections)

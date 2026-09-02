@@ -36,7 +36,7 @@ def apply_model_input_policy(
     frame: pd.DataFrame,
     policy: ModelInputPolicy | str,
 ) -> pd.DataFrame:
-    """Return the canonical model matrix with explicit legacy neutralization."""
+    """Construye la matriz canónica y neutraliza explícitamente el modo legado."""
 
     active_policy = ModelInputPolicy(policy)
     missing = [column for column in FEATURE_COLS if column not in frame]
@@ -57,7 +57,7 @@ def build_training_lifecycle(
     *,
     production_eligible: bool,
 ) -> dict[str, object]:
-    """Build the bundle lifecycle block without coupling it to training I/O."""
+    """Construye el lifecycle del bundle sin acoplarlo al I/O de entrenamiento."""
 
     active_mode = TrainingMode(mode)
     active_policy = ModelInputPolicy(input_policy)

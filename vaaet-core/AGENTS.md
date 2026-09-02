@@ -25,6 +25,14 @@ persistencia ni rutas remotas.
   desde rutas remotas, inferir perfiles, transferir IDs entre vistas ni emitir
   telemetría de un minuto que cruza una transición.
 
+## Comentarios y docstrings
+
+Usá identificadores y código en inglés, y comentarios y docstrings propios en
+español rioplatense formal. Documentá APIs públicas, invariantes del pipeline y
+algoritmos no evidentes; evitá explicar helpers triviales o repetir el código.
+Los contratos se redactan en forma declarativa y las instrucciones, con voseo
+formal.
+
 ## Calidad
 
 Desde `vaaet-core/`, instalar los extras estrictamente necesarios y ejecutar:

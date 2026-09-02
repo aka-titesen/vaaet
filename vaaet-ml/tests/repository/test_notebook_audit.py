@@ -43,8 +43,8 @@ def test_auditor_rejects_configuration_reassigned_in_control_flow(tmp_path: Path
     _write_notebook(
         notebook_path,
         [
-            "# Environment setup — run once per Colab runtime\npass\n",
-            "# Workflow configuration — edit only this cell\nPERSIST_TO_DATABASE = False\n",
+            "# Preparación del entorno: ejecutá esta celda una vez por runtime.\npass\n",
+            "# Configuración del workflow: editá únicamente esta celda.\nPERSIST_TO_DATABASE = False\n",
             "if True:\n    PERSIST_TO_DATABASE = True\n",
         ],
     )
@@ -60,8 +60,8 @@ def test_auditor_ignores_function_local_names(tmp_path: Path) -> None:
     _write_notebook(
         notebook_path,
         [
-            "# Environment setup — run once per Colab runtime\npass\n",
-            "# Workflow configuration — edit only this cell\nPERSIST_TO_DATABASE = False\n",
+            "# Preparación del entorno: ejecutá esta celda una vez por runtime.\npass\n",
+            "# Configuración del workflow: editá únicamente esta celda.\nPERSIST_TO_DATABASE = False\n",
             "def local_preview() -> bool:\n    PERSIST_TO_DATABASE = True\n    return PERSIST_TO_DATABASE\n",
         ],
     )

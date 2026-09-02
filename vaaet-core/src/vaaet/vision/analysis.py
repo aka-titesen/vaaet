@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: 2026 VAAET Contributors
 # SPDX-License-Identifier: AGPL-3.0-only
-"""Public boundary for shared annotated-video analysis."""
+"""Frontera pública para analizar y anotar videos de tránsito."""
 
 from __future__ import annotations
 
@@ -53,7 +53,7 @@ _CLASSIFICATION_COLUMNS: tuple[str, ...] = (
 
 @dataclass(frozen=True)
 class VideoAnalysisResult:
-    """Files, tabular outputs and local timings produced by :func:`analyze_video`."""
+    """Agrupa archivos, tablas y métricas producidos por :func:`analyze_video`."""
 
     video_path: Path
     telemetry: pd.DataFrame
@@ -85,8 +85,8 @@ def analyze_video(
     """
     import cv2
 
-    # Retained for API compatibility. Predictions are requested after a complete
-    # minute, never on status-panel previews.
+    # Se conserva por compatibilidad. Las predicciones sólo se solicitan al
+    # completar un minuto, nunca para previsualizar el panel de estado.
     del status_every_seconds
 
     source = Path(video_path).expanduser().resolve()

@@ -1,10 +1,9 @@
 # SPDX-FileCopyrightText: 2026 VAAET Contributors
 # SPDX-License-Identifier: AGPL-3.0-only
-"""Typed internal contracts for VAAET shared modules.
+"""Contratos tipados que comparten los módulos portables de VAAET.
 
-The project still uses notebooks as entrypoints, but these dataclasses make
-the most important internal records explicit and validated so that notebook
-code and shared modules can evolve without drifting silently.
+Estas dataclasses validan los registros internos relevantes y evitan que los
+notebooks o consumidores futuros alteren sus contratos silenciosamente.
 """
 
 from __future__ import annotations
@@ -97,7 +96,7 @@ def _validate_origin(origin: str, scenario: str) -> None:
 
 @dataclass(frozen=True)
 class TelemetryRecord:
-    """Validated raw telemetry row."""
+    """Representa una fila validada de telemetría cruda."""
 
     id: int
     record_time: pd.Timestamp
@@ -157,6 +156,8 @@ class TelemetryRecord:
 
     @classmethod
     def from_mapping(cls, row: Mapping[str, object]) -> TelemetryRecord:
+        """Convierte un registro externo y valida cada valor en la frontera."""
+
         return cls(
             id=_coerce_int(row["id"], "id"),
             record_time=row["record_time"],
@@ -191,7 +192,7 @@ class TelemetryRecord:
 
 @dataclass(frozen=True)
 class EngineeredTelemetryRecord:
-    """Validated engineered-feature row used by the traffic classifier."""
+    """Representa una fila validada de features para el clasificador."""
 
     source_record_id: int
     record_time: pd.Timestamp
@@ -246,7 +247,7 @@ class EngineeredTelemetryRecord:
 
 @dataclass(frozen=True)
 class ClassificationRecord:
-    """Validated automatic prediction; human ground truth is a separate contract."""
+    """Representa una predicción automática separada de la verdad humana."""
 
     telemetry_feature_id: int
     traffic_state: int
@@ -286,7 +287,7 @@ class ClassificationRecord:
 
 @dataclass(frozen=True)
 class TrackSpeedState:
-    """Validated per-track speed state used during perception."""
+    """Representa el estado validado de velocidad de un track."""
 
     track_id: int
     vehicle_type: str

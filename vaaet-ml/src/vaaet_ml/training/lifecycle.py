@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: 2026 VAAET Contributors
 # SPDX-License-Identifier: AGPL-3.0-only
-"""Contracts shared by the one-time seed bootstrap and recurrent HITL training."""
+"""Contratos compartidos por el bootstrap semilla y el entrenamiento HITL."""
 
 from __future__ import annotations
 
@@ -33,7 +33,7 @@ HUMAN_SUPPORT_TARGETS: Mapping[int, int] = MappingProxyType({0: 300, 1: 300, 2: 
 
 
 def proxy_memory_weight(state: int, human_support: Mapping[int, int]) -> float:
-    """Return the deterministic class-specific proxy replay weight for HITL."""
+    """Calcula el peso determinista de memoria proxy por clase para HITL."""
     if state not in HUMAN_SUPPORT_TARGETS:
         raise ValueError("Proxy memory is defined only for stable states 0, 1, and 2.")
     support = max(int(human_support.get(state, 0)), 0)
@@ -48,7 +48,7 @@ def build_supervision_weights(
     synthetic_multiplier: float = 0.35,
     max_synthetic_congested_fraction_of_normal: float = 0.5,
 ) -> tuple[np.ndarray, dict[str, object]]:
-    """Build human-first proxy replay weights before class balancing is applied."""
+    """Calcula pesos human-first antes de aplicar el balance de clases."""
     active_mode = TrainingMode(mode)
     if "traffic_state" not in frame:
         raise ValueError("Supervised frame must contain traffic_state.")
@@ -145,7 +145,7 @@ def cap_synthetic_congested_weight(
     *,
     max_fraction_of_normal: float = 0.5,
 ) -> np.ndarray:
-    """Cap final effective synthetic Congested weight after class balancing."""
+    """Acota el peso sintético efectivo de ``Congested`` después del balance."""
     result = np.asarray(weights, dtype=float).copy()
     if result.shape != (len(frame),):
         raise ValueError("Supervision weights must match the training frame length.")

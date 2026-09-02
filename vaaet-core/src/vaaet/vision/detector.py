@@ -1,13 +1,9 @@
 # SPDX-FileCopyrightText: 2026 VAAET Contributors
 # SPDX-License-Identifier: AGPL-3.0-only
-"""YOLO detection wrapper for the VAAET production pipeline.
+"""Adaptador YOLO para detectar vehículos en el pipeline de VAAET.
 
-Provides a thin, testable interface around Ultralytics YOLO for vehicle
-detection.  The wrapper handles model loading, inference, and post-processing
-(NMS filtering, class filtering to vehicles only).
-
-Also includes adaptive model variant selection based on video duration. See
-ADR-0002 and ADR-0009 for the decision context.
+Aísla la carga, inferencia y posprocesamiento de Ultralytics, y limita sus
+resultados a las clases vehiculares admitidas por el contrato.
 """
 
 from __future__ import annotations
@@ -68,9 +64,9 @@ class YOLODetector:
     """Adaptador acotado de Ultralytics YOLO para detección vehicular.
 
     Args:
-        model_variant: YOLO model variant name (e.g. ``"yolo11m"``).
-        confidence_threshold: Minimum confidence to keep a detection.
-        nms_threshold: IoU threshold for Non-Max Suppression.
+        model_variant: Nombre de la variante YOLO, por ejemplo ``"yolo11m"``.
+        confidence_threshold: Confianza mínima para aceptar una detección.
+        nms_threshold: Umbral IoU para Non-Max Suppression.
     """
 
     def __init__(
@@ -96,10 +92,10 @@ class YOLODetector:
         """Ejecuta detección sobre un frame BGR.
 
         Args:
-            frame: OpenCV BGR image as a numpy array.
+            frame: Imagen BGR de OpenCV representada como array NumPy.
 
         Returns:
-            List of :class:`Detection` objects (vehicles only).
+            Detecciones limitadas a las clases vehiculares admitidas.
         """
         if self._model is None:
             self.load()
@@ -142,20 +138,15 @@ class YOLODetector:
 
 
 def select_model_variant(duration_seconds: float) -> str:
-    """Choose the optimal YOLO model variant based on video duration.
-
-    Shorter clips use lighter models (faster inference); longer clips use
-    heavier models (higher accuracy).  Thresholds are defined in
-    ``config.YOLO_MODEL_VARIANTS``.
+    """Selecciona la variante YOLO según la duración del video.
 
     Args:
-        duration_seconds: Clip duration in seconds.
+        duration_seconds: Duración del clip en segundos.
 
     Returns:
-        Model variant name string (e.g. ``"yolo11m"``).
+        Nombre de la variante configurada, por ejemplo ``"yolo11m"``.
     """
     for variant, meta in YOLO_MODEL_VARIANTS.items():
         if duration_seconds <= meta["max_duration"]:
             return variant
-    # Fallback to the largest variant
     return list(YOLO_MODEL_VARIANTS.keys())[-1]

@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: 2026 VAAET Contributors
 # SPDX-License-Identifier: AGPL-3.0-only
-"""Idempotent writes to the migrated VAAET PostgreSQL schemas."""
+"""Escrituras idempotentes sobre los schemas PostgreSQL migrados de VAAET."""
 
 from __future__ import annotations
 
@@ -29,6 +29,8 @@ PREDICTION_TABLE = "vaaet_ml.traffic_predictions"
 
 @dataclass(frozen=True)
 class PersistResult:
+    """Resume las filas persistidas y la corrida que conserva su lineage."""
+
     telemetry_rows: int
     classification_rows: int
     pipeline_run_id: str
@@ -277,6 +279,8 @@ def persist_raw_telemetry(
     engine: Engine | None = None,
     pipeline_run_id: UUID | str | None = None,
 ) -> int:
+    """Persiste telemetría cruda de forma idempotente dentro de una corrida."""
+
     if df.empty:
         return 0
     required = {
@@ -343,6 +347,8 @@ def persist_classified_telemetry(
     model_version: str = MODEL_VERSION,
     pipeline_run_id: UUID | str | None = None,
 ) -> PersistResult:
+    """Persiste features y predicciones asociadas en una única transacción."""
+
     run_id = str(pipeline_run_id or uuid4())
     if df.empty:
         return PersistResult(0, 0, run_id)
@@ -411,13 +417,13 @@ def persist_classified_telemetry(
 
 
 def ensure_raw_telemetry_table(engine: Engine) -> None:
-    """Deprecated guard: schema changes are administrator-only in VAAET 4.1."""
+    """Rechaza DDL desde notebooks; los cambios de schema son administrativos."""
     del engine
     raise RuntimeError("Apply `alembic upgrade head`; notebooks may not create database tables.")
 
 
 def ensure_persistence_tables(engine: Engine) -> None:
-    """Deprecated guard: schema changes are administrator-only in VAAET 4.1."""
+    """Rechaza DDL desde notebooks; los cambios de schema son administrativos."""
     del engine
     raise RuntimeError("Apply `alembic upgrade head`; notebooks may not create database tables.")
 

@@ -1,7 +1,7 @@
-# VAAET ML 4.5.3 — contexto de laboratorio
+# VAAET ML 4.5.4 — contexto de laboratorio
 
 Leé primero `../AGENTS.md`, `../llms.txt`, `AGENTS.md`, ADR-0021 y los ADRs de
-datos/HITL aplicables. Este componente es la distribución `vaaet-ml==4.5.3`,
+datos/HITL aplicables. Este componente es la distribución `vaaet-ml==4.5.4`,
 con import `vaaet_ml`; depende de `vaaet-core==0.1.0`, cuyo import operativo es
 `vaaet`. No existe un paquete instalable en la raíz.
 

@@ -1,13 +1,9 @@
 # SPDX-FileCopyrightText: 2026 VAAET Contributors
 # SPDX-License-Identifier: AGPL-3.0-only
-"""Optical-flow camera-motion estimation for the VAAET production pipeline.
+"""Estimación del movimiento de cámara mediante flujo óptico.
 
-Uses Lucas-Kanade sparse optical flow on a regular feature-point grid to
-estimate global camera motion, then applies a running mean for temporal
-smoothing.  This compensates for pan/tilt/zoom of the SISE cameras on the
-General Manuel Belgrano bridge.
-
-See ADR-0009 for the decision context.
+Aplica Lucas-Kanade sobre una grilla regular, toma la mediana del desplazamiento
+y suaviza temporalmente el resultado para compensar movimientos de cámara.
 """
 
 from __future__ import annotations
@@ -30,19 +26,16 @@ __all__ = ["OpticalFlowEstimator"]
 
 
 class OpticalFlowEstimator:
-    """Estimate global camera motion using Lucas-Kanade sparse optical flow.
+    """Estima el movimiento global mediante flujo óptico Lucas-Kanade.
 
-    The estimator places feature points on a regular grid (every
-    ``grid_step`` pixels), computes sparse flow between consecutive grey
-    frames, takes the **median** displacement as the raw global motion,
-    then applies a running mean over the last ``running_mean_window``
-    frames for temporal stability.
+    Ubica puntos en una grilla, calcula el flujo entre frames, usa la mediana
+    como movimiento crudo y aplica una media móvil para estabilizarlo.
 
     Args:
-        grid_step: Pixel spacing between feature points.
-        win_size: Lucas-Kanade window size ``(w, h)``.
-        max_level: Number of pyramid levels for LK tracking.
-        running_mean_window: Number of frames for motion smoothing.
+        grid_step: Separación en píxeles entre puntos.
+        win_size: Tamaño ``(w, h)`` de la ventana Lucas-Kanade.
+        max_level: Cantidad de niveles de pirámide.
+        running_mean_window: Frames usados para suavizar el movimiento.
     """
 
     def __init__(
@@ -79,20 +72,17 @@ class OpticalFlowEstimator:
             ),
         }
 
-    # Public API
     def update(self, frame: np.ndarray) -> np.ndarray:
-        """Compute the smoothed global motion vector for *frame*.
+        """Calcula el vector suavizado de movimiento global del frame.
 
-        On the first call the estimator stores the greyscale image and
-        returns a zero vector.  On subsequent calls it returns the
-        running-mean-smoothed global motion.
+        La primera llamada conserva la imagen en grises y devuelve cero; las
+        siguientes devuelven la media móvil del movimiento observado.
 
         Args:
-            frame: BGR frame (OpenCV convention).
+            frame: Frame BGR según la convención de OpenCV.
 
         Returns:
-            2-D float array ``[dx, dy]`` representing the smoothed global
-            camera motion in pixels.
+            Vector ``[dx, dy]`` del movimiento global suavizado, en píxeles.
         """
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
@@ -107,28 +97,25 @@ class OpticalFlowEstimator:
         self._motion_history.append(raw_motion)
         self._prev_gray = gray
 
-        # Running mean across recent frames
         return np.mean(self._motion_history, axis=0)
 
     def reset(self) -> None:
-        """Clear internal state (call between clips)."""
+        """Descarta el estado temporal entre clips o vistas."""
         self._prev_gray = None
         self._motion_history.clear()
         self.last_tracking_ratio = 0.0
         self.last_good_points = 0
         self.last_total_points = 0
 
-    # Private helpers
-
     def _build_grid_points(self, h: int, w: int) -> np.ndarray:
-        """Generate feature points on a regular grid.
+        """Genera puntos de seguimiento sobre una grilla regular.
 
         Args:
-            h: Frame height.
-            w: Frame width.
+            h: Altura del frame.
+            w: Ancho del frame.
 
         Returns:
-            Array of shape ``(N, 1, 2)`` with ``float32`` grid coordinates.
+            Coordenadas ``float32`` con forma ``(N, 1, 2)``.
         """
         y0 = max(self.border_margin, 0)
         x0 = max(self.border_margin, 0)
@@ -148,13 +135,13 @@ class OpticalFlowEstimator:
         return grid
 
     def _compute_raw_motion(self, gray: np.ndarray) -> np.ndarray:
-        """Run LK optical flow and return the raw median displacement.
+        """Ejecuta Lucas-Kanade y devuelve la mediana del desplazamiento.
 
         Args:
-            gray: Current greyscale frame.
+            gray: Frame actual en escala de grises.
 
         Returns:
-            2-D float array ``[dx, dy]``.
+            Vector de desplazamiento ``[dx, dy]``.
         """
         h, w = gray.shape[:2]
         pts = self._build_grid_points(h, w)
@@ -173,7 +160,7 @@ class OpticalFlowEstimator:
             self.last_total_points = len(pts)
             return np.zeros(2, dtype=float)
 
-        # Keep only points that were successfully tracked
+        # Sólo los puntos seguidos correctamente participan de la estimación.
         good_mask = status.ravel() == 1
         self.last_total_points = len(pts)
         self.last_good_points = int(np.count_nonzero(good_mask))
@@ -187,5 +174,5 @@ class OpticalFlowEstimator:
         new_good = new_pts[good_mask].reshape(-1, 2)
         displacements = new_good - old_good
 
-        # Median is robust against outliers (moving vehicles)
+        # La mediana reduce el efecto de vehículos móviles sobre el fondo.
         return np.median(displacements, axis=0)

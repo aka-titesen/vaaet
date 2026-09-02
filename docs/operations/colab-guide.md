@@ -47,12 +47,20 @@ reinicia el tracking por transición y descarta cualquier minuto mixto. No subas
 ni versionés el plan real, sus referencias métricas o el video; seguí la
 [guía de calibración multi-vista](multi-view-calibration-guide.md).
 
+La primera resolución instala los extras sin forzar la reinstalación de paquetes
+compatibles administrados por Colab. Cuando las dependencias no cambiaron, sólo
+refresca el código VAAET con `--no-deps`. Para workflows de visión, el setup
+descarta módulos Pillow/Ultralytics precargados y prueba `ImageDraw` y `YOLO`
+antes de declarar el runtime listo; este smoke test no descarga pesos.
+
 La instalación captura la salida de `pip`. Si falla, la celda muestra stdout y
 stderr completos, la versión de Python y los extras solicitados antes de
 detenerse. No continúes con las celdas siguientes: actualizá el repositorio y
 repetí la celda de setup. Si la sesión quedó con instalaciones parciales,
-reiniciá el runtime y ejecutá `Run All`; como recuperación temporal podés usar
-el runtime 2026.07 indicado arriba.
+reiniciá el runtime, reabrí el notebook actualizado desde GitHub y ejecutá
+`Run All`; `git pull` no reemplaza las celdas que ya estaban abiertas. Como
+recuperación temporal podés usar el runtime 2026.07 indicado arriba. No agregues
+instalaciones manuales con `!pip` sobre una sesión inconsistente.
 
 El diagnóstico `pip check` puede informar inconsistencias globales ajenas a VAAET —por ejemplo, `ipython` sin el paquete opcional `jedi`—; la advertencia se muestra, pero no bloquea los imports explícitos del workflow. En CI, donde el entorno es limpio, `pip check` continúa siendo estricto.
 
@@ -104,7 +112,7 @@ se versionan. Consultá la [guía del registro DVC](../ml/dvc-guide.md).
 
 ## Entradas y salidas
 
-- Adquisición: MP4 → MP4 anotado + `vaaet-ml/data/raw/traffic_data_raw.csv` + `vaaet_raw.traffic_data` opcional. En Colab, `DOWNLOAD_OUTPUTS=True` descarga video y CSV sólo al finalizar.
+- Adquisición: MP4 → MP4 anotado + `vaaet-ml/data/raw/traffic_data_raw.csv` + `vaaet_raw.traffic_data` opcional. El selector del MP4 se abre siempre en Colab cuando no se declaró una ruta; `download_outputs=True` sólo descarga video y CSV al equipo una vez finalizado el análisis.
 - Entrenamiento semilla: raw explícito → 19 features → paquete semilla + bundle piloto.
 - Reentrenamiento HITL: paquete semilla + features validadas → bundle candidato.
 - Evaluación: Champion + Challenger + holdout humano exacto → evidencia comparativa manual.

@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: 2026 VAAET Contributors
 # SPDX-License-Identifier: AGPL-3.0-only
-"""Minute-level telemetry accumulation for VAAET video workflows."""
+"""Acumulación de telemetría por minuto para workflows de video."""
 
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ def _empty_vehicle_counts() -> dict[str, int]:
 
 @dataclass
 class MinuteTelemetryAccumulator:
-    """Accumulate per-minute telemetry, quality, and count-once signals."""
+    """Acumula por minuto telemetría, calidad y conteos únicos."""
 
     clip_id: str
     minute_counts: dict[str, int] = field(default_factory=_empty_vehicle_counts)
@@ -46,7 +46,7 @@ class MinuteTelemetryAccumulator:
         recovered_gap: int,
         flow_tracking_ratio: float,
     ) -> None:
-        """Register one track observation into the current minute bucket."""
+        """Registra la observación de un track en el minuto actual."""
         track_id = track.track_id
         self.observed_track_ids.add(track_id)
         if near_zero_motion:
@@ -71,11 +71,11 @@ class MinuteTelemetryAccumulator:
             self.counted_tracks.add(track.track_id)
 
     def has_pending_data(self) -> bool:
-        """Return whether the accumulator holds any data worth flushing."""
+        """Indica si el minuto contiene información para materializar."""
         return bool(self.observed_track_ids or self.minute_speeds or any(self.minute_counts.values()))
 
     def build_record(self, record_time: datetime) -> dict[str, object]:
-        """Materialize the current minute into a telemetry record."""
+        """Materializa el minuto actual como registro de telemetría."""
         total = sum(self.minute_counts.values())
         speed_sample_count = len(self.reliable_speed_track_ids)
         rejected_ids = self.rejected_speed_track_ids - self.reliable_speed_track_ids
@@ -114,7 +114,7 @@ class MinuteTelemetryAccumulator:
         }
 
     def rollover_minute(self) -> None:
-        """Advance to the next minute and reset minute-local counters."""
+        """Avanza al minuto siguiente y reinicia sus contadores locales."""
         for vehicle_type, count in self.minute_counts.items():
             self.cumulative_counts[vehicle_type] = (
                 self.cumulative_counts.get(vehicle_type, 0) + count

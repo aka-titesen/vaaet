@@ -1,22 +1,12 @@
 # SPDX-FileCopyrightText: 2026 VAAET Contributors
 # SPDX-License-Identifier: AGPL-3.0-only
-"""Synthetic edge-case sequences for the VAAET traffic-state classifier.
+"""Secuencias sintéticas límite para el clasificador de tránsito VAAET.
 
-The historical Belgrano Bridge dataset has no human-confirmed Accident and
-limited proxy support for Congested.
-
-This module generates physically plausible synthetic sequences that push
-the telemetry into Congested and possible-incident territory. Congested may
-augment train; Accident scenarios only stress the rule detector. Records are
-distinguishable from real data:
-
-* ``id`` starts at :data:`SYNTHETIC_ID_OFFSET` (50 001).
-* ``record_time`` falls in the week *before* real data (2025-04-21 … 27).
-* Provenance columns explicitly label real vs synthetic support.
-* ``clip_id`` identifies each synthetic episode so grouped evaluation can
-  keep entire episodes together.
-
-The generator is deterministic for a given seed, ensuring reproducibility.
+El dataset histórico no contiene accidentes confirmados por personas y tiene
+poco soporte proxy de congestión. Las secuencias plausibles de este módulo
+refuerzan ``Congested`` sólo en train y reservan ``Accident`` para estresar la
+regla conservadora. IDs, tiempos, procedencia y clips permiten distinguirlas
+de datos reales y mantener cada episodio completo durante el particionado.
 """
 
 from __future__ import annotations
@@ -41,10 +31,10 @@ __all__ = [
 ]
 
 SYNTHETIC_ID_OFFSET: int = 50_001
-"""First ``id`` assigned to synthetic records (avoids collision with real IDs 1–2 114)."""
+"""Primer ``id`` sintético, fuera del rango histórico de registros reales."""
 
 _SYNTHETIC_TIME_START = normalize_timestamp(pd.Timestamp("2025-04-21 06:00:00"))
-"""UTC instant for 06:00 bridge-local time, one week before real data."""
+"""Instante UTC previo al rango real, equivalente a las 06:00 locales."""
 
 
 def _with_provenance(
@@ -53,14 +43,11 @@ def _with_provenance(
     data_origin: str,
     synthetic_scenario: str,
 ) -> pd.DataFrame:
-    """Attach explicit provenance columns without mutating the input."""
+    """Adjunta procedencia explícita sin mutar la entrada."""
     out = df.copy()
     out[DATA_ORIGIN_COL] = data_origin
     out[SYNTHETIC_SCENARIO_COL] = synthetic_scenario
     return out
-
-
-# Accident sequences
 
 
 def generate_accident_sequences(
@@ -69,7 +56,7 @@ def generate_accident_sequences(
     *,
     seed: int = RANDOM_SEED,
 ) -> pd.DataFrame:
-    """Create synthetic telemetry that triggers the Accident (3) label."""
+    """Genera telemetría sintética que activa la regla de ``Accident``."""
     rng = np.random.default_rng(seed)
     t = LABELING_THRESHOLDS
     rows: list[dict] = []
@@ -152,16 +139,13 @@ def generate_accident_sequences(
     )
 
 
-# Congestion sequences
-
-
 def generate_congestion_sequences(
     n_sequences: int = 5,
     records_per_seq: int = 10,
     *,
     seed: int = RANDOM_SEED,
 ) -> pd.DataFrame:
-    """Create synthetic telemetry that triggers the Congested (2) label."""
+    """Genera telemetría sintética compatible con la etiqueta ``Congested``."""
     rng = np.random.default_rng(seed + 1)
     t = LABELING_THRESHOLDS
     rows: list[dict] = []
@@ -228,9 +212,6 @@ def generate_congestion_sequences(
     )
 
 
-# Public API — augment a real DataFrame
-
-
 def augment_with_synthetic(
     df_raw: pd.DataFrame,
     *,
@@ -239,7 +220,7 @@ def augment_with_synthetic(
     records_per_seq: int = 10,
     seed: int = RANDOM_SEED,
 ) -> pd.DataFrame:
-    """Append synthetic Accident and Congestion sequences to real telemetry."""
+    """Agrega secuencias sintéticas de accidente y congestión a datos reales."""
     canonical_real = df_raw.copy()
     canonical_real["record_time"] = normalize_timestamp_series(
         canonical_real["record_time"]

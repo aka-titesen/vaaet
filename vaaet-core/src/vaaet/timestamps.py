@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: 2026 VAAET Contributors
 # SPDX-License-Identifier: AGPL-3.0-only
-"""Canonical timestamp handling shared by every VAAET workflow."""
+"""Normalización temporal canónica compartida por todos los workflows."""
 
 from __future__ import annotations
 
@@ -25,7 +25,7 @@ def normalize_timestamp(
     naive_timezone: str = TRAFFIC_LOCAL_TIMEZONE,
     field_name: str = "record_time",
 ) -> pd.Timestamp:
-    """Return a UTC-aware timestamp, interpreting legacy naive values locally."""
+    """Normaliza a UTC e interpreta valores legados sin zona en horario local."""
     try:
         timestamp = pd.Timestamp(value)
     except (TypeError, ValueError) as exc:
@@ -53,7 +53,7 @@ def normalize_timestamp_series(
     naive_timezone: str = TRAFFIC_LOCAL_TIMEZONE,
     field_name: str = "record_time",
 ) -> pd.Series:
-    """Normalize a sequence to the canonical ``datetime64[ns, UTC]`` dtype."""
+    """Normaliza una secuencia al dtype canónico ``datetime64[ns, UTC]``."""
     source = values if isinstance(values, pd.Series) else pd.Series(values)
     normalized: list[pd.Timestamp] = []
     for position, value in source.items():
@@ -76,7 +76,7 @@ def normalize_timestamp_series(
 
 
 def count_naive_timestamps(values: pd.Series | Iterable[object]) -> int:
-    """Count valid timestamp values that do not declare a timezone."""
+    """Cuenta timestamps válidos que no declaran zona horaria."""
     source = values if isinstance(values, pd.Series) else pd.Series(values)
     count = 0
     for value in source:
@@ -92,10 +92,10 @@ def count_naive_timestamps(values: pd.Series | Iterable[object]) -> int:
 def traffic_local_timestamp_series(
     values: pd.Series | Iterable[object],
 ) -> pd.Series:
-    """Return canonical instants represented in the bridge's local timezone."""
+    """Representa instantes canónicos en la zona horaria local del puente."""
     return normalize_timestamp_series(values).dt.tz_convert(TRAFFIC_LOCAL_TIMEZONE)
 
 
 def traffic_local_hour(values: pd.Series | Iterable[object]) -> pd.Series:
-    """Return the operational local hour while preserving UTC storage semantics."""
+    """Obtiene la hora operativa local sin alterar la semántica UTC."""
     return traffic_local_timestamp_series(values).dt.hour.astype(int)

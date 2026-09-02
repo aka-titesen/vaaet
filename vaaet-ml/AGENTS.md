@@ -5,7 +5,7 @@
 | Campo | Detalle |
 |---|---|
 | Proyecto | VAAET ML — Video Advanced Analysis of Traffic |
-| Versión | 4.5.3 |
+| Versión | 4.5.4 |
 | Runtime objetivo | Python 3.10–3.13; Google Colab |
 | Responsable | Facundo Nicolás González |
 | Última revisión | 2026-08-27 |
@@ -56,6 +56,15 @@ ADR-0021 gobierna esta frontera junto con los ADRs de datos, HITL y holdouts.
 Los notebooks instalan primero `vaaet-core` y luego `vaaet-ml`: importan
 `vaaet.*` para operaciones y `vaaet_ml.*` para laboratorio. Nunca modifican
 `sys.path`. El core no puede importar este paquete ni PostgreSQL, DVC o Drive.
+
+## Comentarios y docstrings
+
+Mantené identificadores y código en inglés. Redactá comentarios y docstrings
+propios en español rioplatense formal; explicá contratos, efectos laterales,
+invariantes y decisiones no evidentes, sin narrar operaciones triviales. Usá
+forma declarativa en contratos y voseo formal sólo en instrucciones operativas.
+Las revisiones Alembic son historial ejecutable y no se reescriben para adaptar
+su estilo documental.
 
 ## Validación
 

@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: 2026 VAAET Contributors
 # SPDX-License-Identifier: AGPL-3.0-only
-"""Dataset grouping and split helpers for the academic training pipeline."""
+"""Agrupación y particionado de datasets para el pipeline académico."""
 
 from __future__ import annotations
 
@@ -35,7 +35,7 @@ __all__ = [
 
 @dataclass(frozen=True)
 class GroupedSplit:
-    """Indices and resolved group ids used in a leakage-aware split."""
+    """Representa índices y grupos resueltos para un split sin fuga."""
 
     train_idx: np.ndarray
     test_idx: np.ndarray
@@ -44,7 +44,7 @@ class GroupedSplit:
 
 @dataclass(frozen=True)
 class GroupedTrainValidationTestSplit:
-    """Leakage-safe indices for train, validation, and temporal test."""
+    """Representa índices sin fuga para train, validación y test temporal."""
 
     train_idx: np.ndarray
     validation_idx: np.ndarray
@@ -63,7 +63,7 @@ def build_group_ids(
     time_col: str = "record_time",
     fallback_window: str = "15min",
 ) -> pd.Series:
-    """Return group ids that prefer clip ids and fall back to time windows."""
+    """Resuelve grupos por clip y usa ventanas temporales sólo como respaldo."""
     if df.empty:
         return pd.Series(dtype="object")
 
@@ -129,7 +129,7 @@ def group_aware_train_test_split(
     test_size: float = 0.2,
     random_state: int = RANDOM_SEED,
 ) -> GroupedSplit:
-    """Split train/test while keeping clips or time windows intact."""
+    """Separa train y test sin dividir clips ni ventanas temporales."""
     if df.empty:
         empty = np.array([], dtype=int)
         return GroupedSplit(train_idx=empty, test_idx=empty, groups=pd.Series(dtype="object"))
@@ -199,7 +199,7 @@ def grouped_temporal_train_validation_test_split(
     validation_size: float = 0.2,
     random_state: int = RANDOM_SEED,
 ) -> GroupedTrainValidationTestSplit:
-    """Reserve latest real groups for test, then split grouped validation.
+    """Reserva los últimos grupos reales para test y separa validación por grupos.
 
     Rows marked ``data_origin=synthetic`` are assigned only to train. Returned
     arrays contain dataframe index labels, which keeps provenance traceable.
@@ -271,7 +271,7 @@ def merge_raw_telemetry_csv(
     telemetry: pd.DataFrame,
     destination: str | Path,
 ) -> pd.DataFrame:
-    """Merge telemetry into the canonical CSV and deduplicate idempotently.
+    """Integra telemetría al CSV canónico y deduplica de forma idempotente.
 
     The acquisition contract uses ``(clip_id, record_time)`` as its natural
     key. Extended quality columns are preserved for future feature engineering.

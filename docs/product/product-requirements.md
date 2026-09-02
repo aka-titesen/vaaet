@@ -13,7 +13,7 @@ cinemática multi-vista
 
 | Campo | Detalle |
 |---|---|
-| Versión del laboratorio | 4.5.3 |
+| Versión del laboratorio | 4.5.4 |
 | Última revisión | 2026-08-30 |
 | Responsable técnico | Facundo Nicolás González |
 

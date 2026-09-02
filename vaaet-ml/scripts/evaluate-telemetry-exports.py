@@ -1,42 +1,18 @@
 # SPDX-FileCopyrightText: 2026 VAAET Contributors
 # SPDX-License-Identifier: AGPL-3.0-only
-"""Manual offline evaluator for baseline vs candidate results on real clips.
+"""Evaluador offline manual de baseline y candidato sobre clips reales.
 
-This utility is not imported by the active notebooks. It is intended for
-academic review of robustness changes on exported telemetry CSVs.
+Los notebooks activos no importan esta utilidad. Se usa para revisar cambios de
+robustez sobre CSV exportados y compara picos de velocidad, falsos negativos de
+accidente y confusión entre ``Reduced`` y ``Congested``.
 
-This script focuses on three robustness goals:
-1. Speed spike reduction.
-2. Accident false negatives (FN).
-3. Reduced vs Congested confusion.
+Cada archivo debe contener las columnas de telemetría requeridas por
+``vaaet.features.engineering.engineer_features``. Las predicciones son
+opcionales: si faltan, se derivan mediante las reglas vigentes.
 
-Expected input files are CSVs produced from real clip processing runs.
-Each CSV should contain at least telemetry columns required by
-``vaaet.features.engineering.engineer_features``:
-    - avg_speed
-    - total_vehicles
-    - count_car
-    - count_truck
-    - count_bus
-    - count_motorcycle
-    - count_bicycle
-    - record_time
-
-Prediction columns are optional:
-    - traffic_state (preferred)
-    - state_label (fallback, mapped to numeric state)
-
-If prediction columns are missing, the script derives states from rules using
-``engineer_features`` + ``assign_traffic_state``.
-
-Ground-truth CSV is optional but required for FN/confusion metrics.
-It should contain either:
-    - true_state (numeric 0..3), or
-    - true_label (Normal/Reduced/Congested/Accident).
-
-Recommended join keys for all files: ``clip_id,minute_index``.
-If join keys are omitted or unavailable, the script aligns rows by index
-(within each file), which is less robust.
+El ground truth es opcional, pero se requiere para FN y confusión. La alineación
+recomendada usa ``clip_id,minute_index``; sin esas claves se recurre al índice,
+una alternativa menos robusta que el informe debe interpretar con cautela.
 """
 
 from __future__ import annotations
@@ -128,7 +104,7 @@ def ensure_predicted_states(df: pd.DataFrame) -> pd.DataFrame:
         out["traffic_state"] = out["state_label"].map(_map_state_label)
         return out
 
-    # Fallback path for telemetry-only data.
+    # El fallback reproduce las reglas sólo cuando el CSV no trae predicciones.
     feat = engineer_features(out)
     if feat.empty:
         out["traffic_state"] = np.nan
@@ -160,6 +136,8 @@ def align_pair(
     candidate: pd.DataFrame,
     join_keys: list[str],
 ) -> pd.DataFrame:
+    """Alinea por claves comunes y recurre al índice sólo si no están disponibles."""
+
     keys = _valid_join_keys(
         list(set(baseline.columns).intersection(candidate.columns)),
         join_keys,

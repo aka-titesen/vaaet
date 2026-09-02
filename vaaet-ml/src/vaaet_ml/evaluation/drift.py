@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: 2026 VAAET Contributors
 # SPDX-License-Identifier: AGPL-3.0-only
-"""Contract-aware feature-cohort profiling and covariate drift summaries."""
+"""Perfilado contractual de cohortes y resúmenes de drift covariable."""
 
 from __future__ import annotations
 
@@ -29,7 +29,7 @@ __all__ = [
 
 @dataclass(frozen=True)
 class FeatureCohortProfile:
-    """Traceable, read-only quality summary for a canonical feature cohort."""
+    """Resume en forma trazable y read-only la calidad de una cohorte canónica."""
 
     name: str
     records: int
@@ -43,7 +43,7 @@ class FeatureCohortProfile:
 
 @dataclass(frozen=True)
 class FeatureCohort:
-    """Validated cohort plus its profile; the frame is an analysis copy only."""
+    """Agrupa una cohorte validada y su perfil sobre una copia de análisis."""
 
     frame: pd.DataFrame
     profile: FeatureCohortProfile
@@ -51,7 +51,7 @@ class FeatureCohort:
 
 @dataclass(frozen=True)
 class DriftReport:
-    """Distribution evidence, not an automatic drift or retraining decision."""
+    """Representa evidencia distributiva, no una decisión automática."""
 
     reference: FeatureCohort
     operational: FeatureCohort
@@ -107,7 +107,7 @@ def _feature_summary(frame: pd.DataFrame) -> pd.DataFrame:
 
 
 def build_feature_cohort(frame: pd.DataFrame, *, name: str) -> FeatureCohort:
-    """Validate and profile an immutable, canonical 19-feature analysis cohort."""
+    """Valida y perfila una cohorte inmutable con las 19 features canónicas."""
     if not name.strip():
         raise ValueError("Feature cohort name must be non-empty.")
     required = {"clip_id", "record_time", "feature_schema_version", *FEATURE_COLS}
@@ -146,7 +146,7 @@ def build_feature_cohort(frame: pd.DataFrame, *, name: str) -> FeatureCohort:
 def build_feature_cohort_from_raw_telemetry(
     telemetry: pd.DataFrame, *, name: str
 ) -> FeatureCohort:
-    """Engineer a v2 raw-telemetry snapshot before profiling its 19 features."""
+    """Calcula features v2 de un snapshot crudo antes de perfilarlo."""
     if "telemetry_schema_version" not in telemetry:
         raise ValueError("Raw telemetry cohort must declare telemetry_schema_version.")
     versions = set(telemetry["telemetry_schema_version"].dropna().astype(str))
@@ -191,7 +191,7 @@ def compare_feature_cohorts(
     *,
     psi_bins: int = 10,
 ) -> DriftReport:
-    """Quantify covariate changes without deriving a retraining threshold or action."""
+    """Cuantifica cambios covariables sin derivar umbrales ni acciones."""
     if reference.profile.feature_schema_version != operational.profile.feature_schema_version:
         raise ValueError("Feature cohorts use different feature schema versions.")
     reference_summary = reference.profile.summary.set_index("feature")
@@ -229,7 +229,7 @@ def plot_feature_drift(
     sample_size: int = 20_000,
     random_state: int = RANDOM_SEED,
 ) -> None:
-    """Plot bounded, deterministic distribution overlays for selected canonical features."""
+    """Grafica distribuciones acotadas y deterministas de features seleccionadas."""
     import matplotlib.pyplot as plt
 
     if max_features < 1 or sample_size < 1:

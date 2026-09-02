@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: 2026 VAAET Contributors
 # SPDX-License-Identifier: AGPL-3.0-only
-"""Read-only PostgreSQL contract and operations audit for VAAET."""
+"""Auditoría read-only del contrato y la operación PostgreSQL de VAAET."""
 
 from __future__ import annotations
 
@@ -24,11 +24,11 @@ def _rows(connection: Connection, statement: str) -> list[dict[str, Any]]:
 
 
 def audit_database(connection: Connection) -> dict[str, Any]:
-    """Collect catalog, integrity, sizing, and plan evidence without mutating data."""
+    """Recolecta evidencia de catálogo, integridad, tamaño y planes sin mutar datos."""
     revision = None
     try:
         revision = connection.execute(text("SELECT version_num FROM alembic_version")).scalar()
-    except Exception:  # permissions and legacy installations are reported, not bypassed
+    except Exception:  # El auditor informa permisos o instalaciones legadas; no los elude.
         revision = "unavailable"
 
     return {

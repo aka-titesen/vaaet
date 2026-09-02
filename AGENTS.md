@@ -63,6 +63,15 @@ fuentes concretas antes de elegir una interpretación.
 No existe un paquete Python instalable en la raíz. En desarrollo, CI y Colab se
 instala primero `vaaet-core` y después `vaaet-ml`.
 
+## Convención de código y documentación interna
+
+Mantené identificadores, nombres de archivos y código en inglés. Redactá los
+comentarios y docstrings propios en español rioplatense formal: usá forma
+declarativa para contratos (por ejemplo, «Valida…» o «Representa…») y voseo
+formal para instrucciones operativas («Ejecutá…», «Editá…»). Documentá sólo
+contratos, efectos laterales, invariantes, decisiones y algoritmos no evidentes;
+no narres una línea obvia ni repitas el nombre de un símbolo.
+
 ## Límites de componentes
 
 ### `vaaet-core/`

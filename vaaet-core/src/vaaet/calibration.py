@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: 2026 VAAET Contributors
 # SPDX-License-Identifier: AGPL-3.0-only
-"""Lightweight calibration helpers for academic speed validation."""
+"""Utilidades livianas de calibración para validar velocidades académicamente."""
 
 from __future__ import annotations
 
@@ -24,7 +24,7 @@ __all__ = [
 
 
 def apply_temperature_scaling(probabilities: np.ndarray, temperature: float) -> np.ndarray:
-    """Calibrate multiclass probabilities with a scalar temperature."""
+    """Calibra probabilidades multiclase mediante una temperatura escalar."""
     values = np.asarray(probabilities, dtype=float)
     if values.ndim != 2 or values.shape[1] != 3:
         raise ValueError("probabilities must have shape (records, 3).")
@@ -37,7 +37,7 @@ def apply_temperature_scaling(probabilities: np.ndarray, temperature: float) -> 
 
 
 def fit_temperature(probabilities: np.ndarray, y_true: np.ndarray) -> float:
-    """Select temperature on validation negative log-likelihood only."""
+    """Selecciona la temperatura usando sólo la log-verosimilitud de validación."""
     values = np.asarray(probabilities, dtype=float)
     truth = np.asarray(y_true, dtype=int)
     if values.shape != (len(truth), 3) or len(truth) == 0:
@@ -51,7 +51,7 @@ def fit_temperature(probabilities: np.ndarray, y_true: np.ndarray) -> float:
 
 
 def multiclass_brier_score(y_true: np.ndarray, probabilities: np.ndarray) -> float:
-    """Return mean squared probability error across the three stable states."""
+    """Calcula el error cuadrático medio sobre los tres estados estables."""
     truth = np.asarray(y_true, dtype=int)
     values = np.asarray(probabilities, dtype=float)
     if values.shape != (len(truth), 3):
@@ -62,7 +62,7 @@ def multiclass_brier_score(y_true: np.ndarray, probabilities: np.ndarray) -> flo
 
 @dataclass(frozen=True)
 class CalibrationSegment:
-    """Known bridge landmark segment used for manual calibration."""
+    """Representa un tramo conocido del puente para calibración manual."""
 
     name: str
     pixel_start: tuple[float, float]
@@ -79,7 +79,7 @@ def _pixel_distance(segment: CalibrationSegment) -> float:
 
 
 def pixels_per_meter_from_segment(segment: CalibrationSegment) -> float:
-    """Return the per-segment pixel-to-meter ratio."""
+    """Calcula la relación entre píxeles y metros de un tramo."""
     if segment.meters <= 0:
         raise ValueError("meters must be > 0")
     px_distance = _pixel_distance(segment)
@@ -91,7 +91,7 @@ def pixels_per_meter_from_segment(segment: CalibrationSegment) -> float:
 def aggregate_pixels_per_meter(
     segments: list[CalibrationSegment],
 ) -> float:
-    """Return a robust aggregate calibration ratio from multiple landmarks."""
+    """Agrega en forma robusta relaciones obtenidas de varios tramos."""
     if not segments:
         raise ValueError("at least one calibration segment is required")
     ratios = [pixels_per_meter_from_segment(segment) for segment in segments]
@@ -103,7 +103,7 @@ def pseudo_ground_truth_speed_kmh(
     distance_m: float,
     elapsed_seconds: float,
 ) -> float:
-    """Convert manual travel time between two landmarks into km/h."""
+    """Convierte un tiempo manual entre referencias a kilómetros por hora."""
     if distance_m <= 0:
         raise ValueError("distance_m must be > 0")
     if elapsed_seconds <= 0:
@@ -114,7 +114,7 @@ def pseudo_ground_truth_speed_kmh(
 def build_calibration_table(
     segments: list[CalibrationSegment],
 ) -> pd.DataFrame:
-    """Return a notebook-friendly table for manual calibration review."""
+    """Construye una tabla apta para revisar la calibración en un notebook."""
     rows: list[dict[str, float | str | None]] = []
     for segment in segments:
         ppm = pixels_per_meter_from_segment(segment)

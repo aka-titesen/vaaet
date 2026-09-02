@@ -1,9 +1,9 @@
 # SPDX-FileCopyrightText: 2026 VAAET Contributors
 # SPDX-License-Identifier: AGPL-3.0-only
-"""Idempotent package installation for VAAET notebook environment cells.
+"""Instalación idempotente de paquetes para las celdas de entorno VAAET.
 
-This module intentionally uses only the standard library: it must run from a
-fresh checkout before either VAAET distribution is importable.
+Usa deliberadamente sólo la biblioteca estándar porque debe ejecutarse desde
+un checkout nuevo antes de que las distribuciones VAAET puedan importarse.
 """
 
 from __future__ import annotations
@@ -16,6 +16,7 @@ import sys
 import tempfile
 from collections.abc import Callable
 from dataclasses import dataclass
+from importlib import metadata
 from pathlib import Path
 from typing import TYPE_CHECKING, Protocol
 
@@ -24,21 +25,24 @@ if TYPE_CHECKING:
 
 
 class NotebookBootstrapError(RuntimeError):
-    """Raised when a notebook runtime cannot be prepared safely."""
+    """Indica que el runtime del notebook no pudo prepararse de forma segura."""
 
 
 class ProcessResult(Protocol):
-    """Minimal subprocess result needed by the bootstrap."""
+    """Define el resultado mínimo de subprocess requerido por el bootstrap."""
 
     returncode: int
+    stdout: str | None
+    stderr: str | None
 
 
 CommandRunner = Callable[..., ProcessResult]
+RuntimeValidator = Callable[["NotebookInstallSpec"], None]
 
 
 @dataclass(frozen=True)
 class NotebookInstallSpec:
-    """Immutable local-distribution requirements for one notebook workflow."""
+    """Representa requisitos inmutables de instalación para un workflow."""
 
     workspace_root: Path
     core_root: Path
@@ -70,7 +74,7 @@ def _format_requirement(project_root: Path, extras: tuple[str, ...]) -> str:
 
 
 def _dependency_fingerprint(spec: NotebookInstallSpec) -> str:
-    """Fingerprint dependency declarations and selected extras, never source code."""
+    """Calcula un fingerprint de dependencias y extras, nunca del código fuente."""
 
     digest = hashlib.sha256()
     for project_root, extras in (
@@ -124,10 +128,59 @@ def _pip_command(spec: NotebookInstallSpec, *options: str) -> list[str]:
 def _run_pip(command: list[str], runner: CommandRunner) -> None:
     result = runner(command, capture_output=True, text=True, check=False)
     if result.returncode:
+        stdout = str(getattr(result, "stdout", "") or "").strip()
+        stderr = str(getattr(result, "stderr", "") or "").strip()
+        diagnostic = "\n".join(part for part in (stdout, stderr) if part)
         raise NotebookBootstrapError(
             "La instalación de VAAET falló. Verificá conectividad, espacio libre y los "
             "extras declarados antes de reintentar."
+            + (f"\n\nDiagnóstico de pip:\n{diagnostic}" if diagnostic else "")
         )
+
+
+def _clear_installed_modules(spec: NotebookInstallSpec) -> None:
+    """Descarta módulos que podrían haber quedado cargados antes de la instalación."""
+
+    prefixes = ["vaaet", "vaaet_ml"]
+    if "vision" in spec.core_extras:
+        prefixes.extend(("PIL", "ultralytics"))
+    for module_name in tuple(sys.modules):
+        if any(module_name == prefix or module_name.startswith(f"{prefix}.") for prefix in prefixes):
+            sys.modules.pop(module_name, None)
+    importlib.invalidate_caches()
+
+
+def _installed_version(distribution: str) -> str:
+    try:
+        return metadata.version(distribution)
+    except metadata.PackageNotFoundError:
+        return "no instalada"
+
+
+def _validate_declared_runtime(spec: NotebookInstallSpec) -> None:
+    """Importa el borde visual real sin descargar pesos de modelos."""
+
+    if "vision" not in spec.core_extras:
+        return
+    try:
+        importlib.import_module("PIL.ImageDraw")
+        ultralytics_module = importlib.import_module("ultralytics")
+        _ = ultralytics_module.YOLO
+    except (AttributeError, ImportError, OSError, RuntimeError) as error:
+        python_version = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
+        raise NotebookBootstrapError(
+            "El runtime visual quedó inconsistente y no es seguro iniciar YOLO. "
+            f"Python={python_version} | Pillow={_installed_version('Pillow')} | "
+            "Ultralytics="
+            f"{_installed_version('ultralytics-opencv-headless')}. "
+            "Reiniciá el runtime, reabrí el notebook actualizado desde GitHub y ejecutá "
+            "Run All. No continúes con instalaciones manuales dentro de esta sesión."
+        ) from error
+    print(
+        "✅ Runtime visual validado | "
+        f"Pillow={_installed_version('Pillow')} | "
+        f"Ultralytics={_installed_version('ultralytics-opencv-headless')}"
+    )
 
 
 def install_notebook_components(
@@ -135,19 +188,23 @@ def install_notebook_components(
     *,
     state_path: Path | None = None,
     runner: CommandRunner = subprocess.run,
+    runtime_validator: RuntimeValidator | None = None,
 ) -> None:
-    """Resolve dependencies only when needed and always refresh local package code."""
+    """Resuelve dependencias, valida imports y recién entonces registra el runtime."""
 
     fingerprint = _dependency_fingerprint(spec)
     state_path = state_path or _default_state_path(spec.workspace_root)
     state = _read_state(state_path)
     if state is None or state["dependency_fingerprint"] != fingerprint:
         print("📦 Resolviendo los extras declarados para este workflow...")
-        _run_pip(_pip_command(spec, "--force-reinstall"), runner)
+        _run_pip(_pip_command(spec), runner)
     else:
         print("✅ Extras sin cambios; se reutilizan las dependencias del runtime.")
         print("🔄 Actualizando vaaet-core y vaaet-ml desde el checkout actual...")
         _run_pip(_pip_command(spec, "--force-reinstall", "--no-deps"), runner)
+    _clear_installed_modules(spec)
+    validator = runtime_validator or _validate_declared_runtime
+    validator(spec)
     _write_state(state_path, fingerprint)
 
 
@@ -171,7 +228,7 @@ def bootstrap_notebook(
     framework: str | None,
     require_gpu: bool,
 ) -> RuntimeDiagnostics:
-    """Install the selected extras, refresh code, and run VAAET preflight diagnostics."""
+    """Instala extras, actualiza el código y ejecuta el preflight de VAAET."""
 
     spec = NotebookInstallSpec(
         workspace_root=workspace_root,

@@ -23,6 +23,19 @@ Todos los cambios relevantes del proyecto VAAET se documentan en este archivo, s
 - Perfil y comparación de deriva de covariables para cohortes
   `traffic-features-v2`, con controles de calidad, PSI y procedencia.
 
+## [4.5.4] - 2026-09-02
+
+### Corregido
+
+- Bootstrap de Colab no destructivo: la primera resolución preserva paquetes
+  compatibles del runtime y los refrescos de código usan `--no-deps`.
+- Limpieza de módulos Pillow y Ultralytics cargados antes de instalar, seguida
+  por un smoke test real de `ImageDraw` y `YOLO` antes de registrar el runtime.
+- Selección de un único MP4 independiente de la descarga de resultados, con
+  validación temprana y staging explícito bajo `/content`.
+- Descargas condicionadas por configuración y protección contra persistencia
+  de resultados obsoletos después de una ejecución fallida.
+
 ## [4.5.3] - 2026-08-22
 
 ### Corregido

@@ -1,12 +1,9 @@
 # SPDX-FileCopyrightText: 2026 VAAET Contributors
 # SPDX-License-Identifier: AGPL-3.0-only
-"""Speed estimation for the VAAET production pipeline.
+"""Estimación de velocidad para el pipeline operativo de VAAET.
 
-Provides physics-based speed calculation from tracked vehicle centroids,
-with perspective correction, camera-motion compensation, stationary
-detection, and optional MLP 70/30 fusion smoothing.
-
-See ADR-0004, ADR-0006 and ADR-0009 for the decision context.
+Calcula velocidad física desde tracks, corrige perspectiva y movimiento de
+cámara, detecta inmovilidad y admite un suavizado auxiliar con MLP.
 """
 
 from __future__ import annotations
@@ -73,12 +70,10 @@ class SpeedRegressor(Protocol):
 
 
 def _lerp(start: float, end: float, alpha: float) -> float:
-    """Linearly interpolate between two values."""
     return start + (end - start) * alpha
 
 
 def _recent_displacement_norms(history: deque, window: int = 8) -> np.ndarray:
-    """Return recent per-frame displacement magnitudes for a track history."""
     if len(history) < 2:
         return np.array([], dtype=float)
     positions = np.array(list(history)[-window:], dtype=float)
@@ -110,7 +105,7 @@ def get_perspective_factor(
     mid_factor: float | None = None,
     far_factor: float | None = None,
 ) -> float:
-    """Return a perspective correction factor based on vertical position."""
+    """Interpola la corrección de perspectiva según la posición vertical."""
     _near = near_factor if near_factor is not None else PERSPECTIVE_ZONES["near"]["factor"]
     _mid = mid_factor if mid_factor is not None else PERSPECTIVE_ZONES["mid"]["factor"]
     _far = far_factor if far_factor is not None else PERSPECTIVE_ZONES["far"]["factor"]
@@ -149,7 +144,7 @@ def compensate_camera_motion(
     displacement: np.ndarray,
     global_motion: np.ndarray,
 ) -> np.ndarray:
-    """Subtract estimated camera motion from a vehicle displacement vector."""
+    """Resta el movimiento estimado de cámara al desplazamiento vehicular."""
     return displacement - global_motion
 
 
@@ -221,7 +216,7 @@ def estimate_speed(
 
 
 def is_near_zero_motion(history: deque) -> bool:
-    """Return ``True`` when motion is minimal but not necessarily stationary."""
+    """Detecta movimiento mínimo sin confirmarlo todavía como estacionario."""
     total_disp, max_segment, std_disp, avg_frame, max_frame = _motion_stats(history)
     return (
         total_disp < NEAR_ZERO_TOTAL_DISP_MAX
@@ -232,11 +227,8 @@ def is_near_zero_motion(history: deque) -> bool:
     )
 
 
-# Stationary detection
-
-
 def is_stationary(history: deque) -> bool:
-    """Determine whether a tracked vehicle is stationary."""
+    """Determina si un vehículo cumple todos los límites de inmovilidad."""
     total_disp, max_segment, std_disp, avg_frame, max_frame = _motion_stats(history)
     return (
         total_disp < STATIONARY_TOTAL_DISP_MAX
@@ -254,7 +246,7 @@ def is_speed_measurement_reliable(
     min_flow_tracking_ratio: float = OPTICAL_FLOW_MIN_TRACKING_RATIO,
     recovery_skip_gap: int = SPEED_RECOVERY_SKIP_GAP,
 ) -> bool:
-    """Return whether a track's speed estimate is reliable enough to use."""
+    """Determina si la velocidad de un track es confiable para telemetría."""
     if len(history) < max(2, SPEED_MIN_TRACK_LENGTH):
         return False
     if recovered_after_gap >= recovery_skip_gap:
@@ -283,7 +275,7 @@ def robust_speed_summary(
     trim_ratio: float = SPEED_ROBUST_TRIM_RATIO,
     outlier_sigma: float = SPEED_ROBUST_OUTLIER_SIGMA,
 ) -> float:
-    """Aggregate speeds using a robust mean that suppresses isolated spikes."""
+    """Agrega velocidades con una media robusta frente a picos aislados."""
     arr = np.asarray(speeds, dtype=float)
     if arr.size == 0:
         return 0.0
@@ -313,14 +305,11 @@ def robust_speed_summary(
     return round(float(np.mean(arr)), 2)
 
 
-# MLP 70/30 speed fusion
-
-
 def fuse_speed(
     physics_speed: float,
     mlp_speed: float | None,
 ) -> float:
-    """Fuse physics-based and MLP-predicted speed estimates."""
+    """Fusiona la estimación física con una predicción auxiliar del MLP."""
     if mlp_speed is None:
         return physics_speed
 
@@ -334,7 +323,7 @@ def fuse_speed(
 
 
 class SmoothedSpeedTracker:
-    """Per-track speed smoothing with optional MLP fusion."""
+    """Suaviza velocidades por track y admite fusión auxiliar con MLP."""
 
     def __init__(
         self,
@@ -351,7 +340,7 @@ class SmoothedSpeedTracker:
         physics_speed: float | None,
         mlp_features: np.ndarray | None = None,
     ) -> float | None:
-        """Record a new physics speed estimate and return the smoothed value."""
+        """Registra una velocidad física y devuelve su valor suavizado."""
         if physics_speed is None:
             self._speeds.pop(track_id, None)
             return None
@@ -374,7 +363,7 @@ class SmoothedSpeedTracker:
         return fuse_speed(avg_physics, mlp_speed)
 
     def remove_track(self, track_id: int) -> None:
-        """Remove speed history for a track that has been pruned."""
+        """Descarta el historial de un track eliminado."""
         self._speeds.pop(track_id, None)
 
     def reset(self) -> None:
@@ -383,7 +372,7 @@ class SmoothedSpeedTracker:
 
 
 class TrackMotionStateTracker:
-    """Hysteresis-based stationary state tracker per vehicle track."""
+    """Confirma inmovilidad por track mediante histéresis temporal."""
 
     def __init__(
         self,
@@ -404,7 +393,7 @@ class TrackMotionStateTracker:
         history: deque,
         candidate_speed: float | None = None,
     ) -> bool:
-        """Update and return the hysteresis-filtered stationary state."""
+        """Actualiza y devuelve el estado estacionario filtrado por histéresis."""
         raw_stationary = is_stationary(history)
         current = self._stationary.get(track_id, False)
 
@@ -428,7 +417,7 @@ class TrackMotionStateTracker:
         return current
 
     def remove_track(self, track_id: int) -> None:
-        """Forget all state for a track that disappeared or was pruned."""
+        """Descarta el estado de un track desaparecido o eliminado."""
         self._stationary.pop(track_id, None)
         self._enter_votes.pop(track_id, None)
         self._exit_votes.pop(track_id, None)

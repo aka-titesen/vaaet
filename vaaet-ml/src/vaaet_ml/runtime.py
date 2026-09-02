@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: 2026 VAAET Contributors
 # SPDX-License-Identifier: AGPL-3.0-only
-"""Idempotent, notebook-safe runtime diagnostics for local development and Colab."""
+"""Diagnósticos idempotentes y seguros para notebooks locales y Colab."""
 
 from __future__ import annotations
 
@@ -24,7 +24,7 @@ _GIB = 1024**3
 
 @dataclass(frozen=True)
 class RuntimeDiagnostics:
-    """Redacted and bounded evidence collected before an expensive workflow."""
+    """Representa evidencia redactada y acotada previa a un workflow costoso."""
 
     in_colab: bool
     workspace_root: Path
@@ -156,7 +156,7 @@ def bootstrap_notebook_runtime(
     framework: str | None,
     require_gpu: bool,
 ) -> RuntimeDiagnostics:
-    """Validate the installed package and preflight the runtime without exposing secrets."""
+    """Valida el paquete instalado y el runtime sin exponer secretos."""
 
     configure_logging()
     _validate_python_version((sys.version_info.major, sys.version_info.minor))
@@ -204,7 +204,7 @@ def bootstrap_notebook_runtime(
 
 
 def print_runtime_diagnostics(diagnostics: RuntimeDiagnostics) -> None:
-    """Display bounded, non-sensitive runtime evidence for notebook users."""
+    """Muestra evidencia acotada y no sensible para quien ejecuta el notebook."""
 
     print(
         "✅ Runtime ready | "

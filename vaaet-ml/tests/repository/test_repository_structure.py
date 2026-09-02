@@ -310,8 +310,9 @@ def test_dvc_registry_uses_declared_provider_extras_and_neutral_configuration() 
     gitignore = (WORKSPACE_ROOT / ".gitignore").read_text(encoding="utf-8")
 
     assert 'python -m pip install "./vaaet-core"' in workflow
-    assert 'python -m pip install "./vaaet-ml[dvc,dvc-gdrive,dvc-s3]"' in workflow
+    assert 'python -m pip install "./vaaet-ml[dvc,dvc-gdrive,dvc-s3,dev]"' in workflow
     assert 'vaaet-registry --help' in workflow
+    assert "pytest vaaet-ml/tests/unit/test_dvc_registry.py" in workflow
     assert 'dvc pull' not in workflow
     assert 'dvc push' not in workflow
     assert "dvc-gdrive" in pyproject
@@ -323,6 +324,21 @@ def test_dvc_registry_uses_declared_provider_extras_and_neutral_configuration() 
     assert "endpointurl" not in dvc_config
     assert ".dvc/config.local" in gitignore
     assert not (SCRIPTS_DIR / "setup-dvc.sh").exists()
+
+
+def test_ci_preserves_the_workspace_quality_gates() -> None:
+    """Evita que los controles de integración se degraden por cambios de workflow."""
+
+    workflow = (WORKSPACE_ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
+
+    assert '".codex/skills/**"' in workflow
+    assert "repository-quality:" in workflow
+    assert "git diff --check" in workflow
+    assert "package-smoke:" in workflow
+    assert 'ruff check notebooks --select F821' in workflow
+    assert "audit_notebooks.py notebooks" in workflow
+    assert 'python -m venv "$RUNNER_TEMP/vaaet-core-base"' in workflow
+    assert 'python -m venv "$RUNNER_TEMP/vaaet-workspace-base"' in workflow
 
 
 def test_python_313_is_declared_and_exercised_by_ci() -> None:

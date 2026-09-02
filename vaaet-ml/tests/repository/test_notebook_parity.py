@@ -5,6 +5,8 @@
 from __future__ import annotations
 
 import json
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -13,6 +15,7 @@ ML_ROOT = Path(__file__).resolve().parents[2]
 WORKSPACE_ROOT = ML_ROOT.parent
 CORE_ROOT = WORKSPACE_ROOT / "vaaet-core"
 REPO_ROOT = ML_ROOT
+NOTEBOOKS_DIR = REPO_ROOT / "notebooks"
 NOTEBOOKS = {
     "collection": REPO_ROOT / "notebooks/data-collection/collect_traffic_telemetry.ipynb",
     "training": REPO_ROOT / "notebooks/training/train_traffic_state_classifier.ipynb",
@@ -20,6 +23,10 @@ NOTEBOOKS = {
 }
 EVALUATION_NOTEBOOK = REPO_ROOT / "notebooks/evaluation/evaluate_models_and_eda.ipynb"
 ALL_NOTEBOOKS = {**NOTEBOOKS, "evaluation": EVALUATION_NOTEBOOK}
+NOTEBOOK_AUDITOR = (
+    WORKSPACE_ROOT
+    / ".codex/skills/vaaet-notebook-orchestration/scripts/audit_notebooks.py"
+)
 
 
 def _code(path: Path) -> str:
@@ -39,6 +46,32 @@ def test_notebook_is_versioned_without_execution_outputs(path: Path) -> None:
             continue
         assert cell.get("execution_count") is None
         assert cell.get("outputs", []) == []
+
+
+def test_active_notebooks_have_no_undefined_global_names() -> None:
+    """El lint selectivo detecta dependencias ocultas entre celdas de Run All."""
+
+    result = subprocess.run(
+        [sys.executable, "-m", "ruff", "check", "notebooks", "--select", "F821"],
+        cwd=REPO_ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_active_notebooks_pass_the_structural_auditor() -> None:
+    """Conserva los límites estructurales que el parseo AST no expresa."""
+
+    result = subprocess.run(
+        [sys.executable, str(NOTEBOOK_AUDITOR), str(NOTEBOOKS_DIR)],
+        cwd=WORKSPACE_ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
 
 
 @pytest.mark.parametrize("path", ALL_NOTEBOOKS.values())

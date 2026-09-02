@@ -15,6 +15,7 @@ on:
       - "vaaet-app/**"
       - "docs/**"
       - ".github/workflows/**"
+      - ".codex/skills/**"
       - ".dvc/**"
       - ".dvcignore"
       - ".gitignore"
@@ -33,6 +34,7 @@ on:
       - "vaaet-app/**"
       - "docs/**"
       - ".github/workflows/**"
+      - ".codex/skills/**"
       - ".dvc/**"
       - ".dvcignore"
       - ".gitignore"
@@ -45,6 +47,24 @@ on:
       - "LICENSE"
 
 jobs:
+  repository-quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verificar espacios y marcadores de conflicto del cambio
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: ${{ github.sha }}
+        run: |
+          if [ -z "$BASE_SHA" ] || [ "$BASE_SHA" = "0000000000000000000000000000000000000000" ]; then
+            git diff-tree --no-commit-id --check -r --root "$HEAD_SHA"
+          else
+            git diff --check "$BASE_SHA...$HEAD_SHA"
+          fi
+
   core:
     runs-on: ubuntu-latest
     defaults:
@@ -131,6 +151,12 @@ jobs:
           print('✅ Todos los notebooks compilan correctamente')
           "
 
+      - name: Detectar nombres no definidos entre celdas
+        run: ruff check notebooks --select F821
+
+      - name: Auditar estructura e higiene de notebooks
+        run: python ../.codex/skills/vaaet-notebook-orchestration/scripts/audit_notebooks.py notebooks
+
       - name: Rechazar binarios ML versionados por Git
         run: |
           python -c "
@@ -156,9 +182,32 @@ jobs:
           python -m pip install -e "vaaet-ml"
       - name: Verificar contratos de importación y DVC de raíz
         run: |
+          python -m pip check
           python -c "import vaaet, vaaet_ml; assert vaaet.__version__ == '0.1.0'; assert vaaet_ml.__version__ == '4.5.3'"
           test -d .dvc
           test -d vaaet-ml/artifacts/traffic-state
+
+  package-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Verificar instalaciones mínimas aisladas
+        run: |
+          python -m venv "$RUNNER_TEMP/vaaet-core-base"
+          "$RUNNER_TEMP/vaaet-core-base/bin/python" -m pip install --upgrade pip
+          "$RUNNER_TEMP/vaaet-core-base/bin/python" -m pip install ./vaaet-core
+          "$RUNNER_TEMP/vaaet-core-base/bin/python" -m pip check
+          "$RUNNER_TEMP/vaaet-core-base/bin/python" -c "import vaaet; assert vaaet.__version__ == '0.1.0'"
+
+          python -m venv "$RUNNER_TEMP/vaaet-workspace-base"
+          "$RUNNER_TEMP/vaaet-workspace-base/bin/python" -m pip install --upgrade pip
+          "$RUNNER_TEMP/vaaet-workspace-base/bin/python" -m pip install ./vaaet-core
+          "$RUNNER_TEMP/vaaet-workspace-base/bin/python" -m pip install ./vaaet-ml
+          "$RUNNER_TEMP/vaaet-workspace-base/bin/python" -m pip check
+          "$RUNNER_TEMP/vaaet-workspace-base/bin/python" -c "import vaaet, vaaet_ml; assert vaaet.__version__ == '0.1.0'; assert vaaet_ml.__version__ == '4.5.3'"
 
   typing:
     runs-on: ubuntu-latest
@@ -255,6 +304,7 @@ jobs:
         run: |
           python -m pip install -e "../vaaet-core[inference]"
           python -m pip install -e ".[database,dev]"
+          python -m pip check
 
       - name: Instalar cliente PostgreSQL 17
         run: |
@@ -305,7 +355,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           python -m pip install "./vaaet-core"
-          python -m pip install "./vaaet-ml[dvc,dvc-gdrive,dvc-s3]"
+          python -m pip install "./vaaet-ml[dvc,dvc-gdrive,dvc-s3,dev]"
           python -m pip check
 
       - name: Verificar CLI y configuración DVC sin red
@@ -317,3 +367,6 @@ jobs:
           dvc status
           vaaet-registry --help
           echo "✅ Configuración de DVC verificada"
+
+      - name: Probar el registro DVC con adaptadores falsos
+        run: pytest vaaet-ml/tests/unit/test_dvc_registry.py -v --tb=short

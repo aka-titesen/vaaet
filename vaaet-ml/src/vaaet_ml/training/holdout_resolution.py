@@ -230,8 +230,11 @@ def _replace_known_groups(
     current_frame = getattr(current, partition)
     groups = {group for group, assigned in assignments.items() if assigned == partition}
     replacements = available.loc[available["group_id"].isin(groups)].copy()
-    return pd.concat([current_frame, replacements], ignore_index=True).drop_duplicates(
-        list(IDENTITY_COLUMNS), keep="last"
+    return (
+        pd.concat([current_frame, replacements], ignore_index=True)
+        .drop_duplicates(list(IDENTITY_COLUMNS), keep="last")
+        .sort_values(["clip_id", "record_time"], kind="stable")
+        .reset_index(drop=True)
     )
 
 

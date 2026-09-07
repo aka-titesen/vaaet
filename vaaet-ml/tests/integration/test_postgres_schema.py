@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: 2026 VAAET Contributors
 # SPDX-License-Identifier: AGPL-3.0-only
-"""PostgreSQL 17 integration checks for vaaet-db-v2."""
+"""PostgreSQL 17 integration checks for vaaet-db-v3."""
 
 from __future__ import annotations
 
@@ -11,6 +11,8 @@ import pandas as pd
 import pytest
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
+from vaaet.artifacts import FEATURE_SCHEMA_VERSION
+from vaaet.settings import FEATURE_COLS
 
 from vaaet_ml.data.database_connection import create_admin_engine
 from vaaet_ml.data.database_settings import (
@@ -147,11 +149,14 @@ def test_automatic_accident_is_rejected_by_database(engine) -> None:
             text(
                 """
                 INSERT INTO vaaet_ml.telemetry_features
-                  (pipeline_run_id, clip_id, record_time, feature_schema_version)
+                  (pipeline_run_id, clip_id, continuity_id, record_time,
+                   feature_schema_version)
                 VALUES
                   ('00000000-0000-0000-0000-000000000001', 'constraint-test',
-                   '2026-08-04T12:00:00Z', 'traffic-features-v2')
-                ON CONFLICT (clip_id, record_time, feature_schema_version)
+                   'constraint-test:continuity-0001', '2026-08-04T12:00:00Z',
+                   'traffic-features-v3')
+                ON CONFLICT (pipeline_run_id, clip_id, record_time,
+                             feature_schema_version)
                 DO UPDATE SET clip_id=EXCLUDED.clip_id RETURNING id
                 """
             )
@@ -163,12 +168,12 @@ def test_automatic_accident_is_rejected_by_database(engine) -> None:
                     """
                     INSERT INTO vaaet_ml.traffic_predictions
                       (telemetry_feature_id, pipeline_run_id, traffic_state, state_label,
-                       confidence, model_version)
+                       confidence, model_version, model_revision)
                     VALUES (:feature_id, '00000000-0000-0000-0000-000000000001',
-                            3, 'Accident', 1, 'constraint-test')
+                            3, 'Accident', 1, 'constraint-test', :model_revision)
                     """
                 ),
-                {"feature_id": feature_id},
+                {"feature_id": feature_id, "model_revision": "a" * 64},
             )
 
 
@@ -178,8 +183,8 @@ def test_group_roles_follow_least_privilege(engine) -> None:
             "vaaet_raw.traffic_data": ("INSERT",),
         },
         "vaaet_inference_role": {
-            "vaaet_ml.telemetry_features": ("SELECT", "INSERT", "UPDATE"),
-            "vaaet_ml.traffic_predictions": ("SELECT", "INSERT", "UPDATE"),
+            "vaaet_ml.telemetry_features": ("SELECT", "INSERT"),
+            "vaaet_ml.traffic_predictions": ("SELECT", "INSERT"),
         },
         "vaaet_training_role": {
             "vaaet_raw.traffic_data": ("SELECT",),
@@ -206,6 +211,17 @@ def test_group_roles_follow_least_privilege(engine) -> None:
                 "'vaaet_feedback.human_validations', 'UPDATE')"
             )
         ).scalar()
+        for table in (
+            "vaaet_ml.telemetry_features",
+            "vaaet_ml.traffic_predictions",
+        ):
+            assert not connection.execute(
+                text(
+                    "SELECT has_table_privilege('vaaet_inference_role', "
+                    ":table, 'UPDATE')"
+                ),
+                {"table": table},
+            ).scalar()
         assert not connection.execute(
             text(
                 "SELECT has_table_privilege('vaaet_collection_role', "
@@ -227,7 +243,15 @@ def test_group_roles_follow_least_privilege(engine) -> None:
             assert connection.execute(
                 text(
                     "SELECT has_function_privilege(:role, "
-                    "'vaaet_ops.start_pipeline_run(uuid,text,text,text,text,text,text,text,text,bigint)', "
+                    "'vaaet_ops.start_pipeline_run(uuid,text,text,text,text,text,text,text,text,text,bigint)', "
+                    "'EXECUTE')"
+                ),
+                {"role": role},
+            ).scalar()
+            assert connection.execute(
+                text(
+                    "SELECT has_function_privilege(:role, "
+                    "'vaaet_ops.finish_pipeline_run(uuid,text,bigint,text,text)', "
                     "'EXECUTE')"
                 ),
                 {"role": role},
@@ -269,11 +293,12 @@ def test_hardening_constraints_comments_and_indexes(engine) -> None:
                 "WHERE conname='ck_raw_total_matches_types'"
             )
         ).scalar_one()
-    assert revision == "20260806_0002"
+    assert revision == "20260905_0003"
     assert undocumented == 0
     assert "idx_raw_clip_time" not in indexes
     assert "idx_features_clip_time" not in indexes
     assert "idx_validations_prediction_time_id" in indexes
+    assert "idx_predictions_model_revision" in indexes
     assert raw_total_validated is False
 
 
@@ -308,35 +333,52 @@ def test_new_raw_rows_require_consistent_vehicle_total(engine) -> None:
 
 
 def test_reinference_preserves_append_only_human_validation(engine) -> None:
-    frame = pd.DataFrame(
-        [
-            {
-                "clip_id": "reinference-test",
-                "record_time": "2026-08-04T13:00:00Z",
-                "traffic_state": 2,
-                "state_label": "Congested",
-                "confidence": 0.81,
-                "model_version": "mlp-v2.0-test",
-            }
-        ]
+    base = {column: 0.0 for column in FEATURE_COLS}
+    base.update(
+        {
+            "clip_id": "reinference-test",
+            "continuity_id": "reinference-test:continuity-0001",
+            "record_time": "2026-08-04T13:00:00Z",
+            "feature_schema_version": FEATURE_SCHEMA_VERSION,
+            "traffic_state": 2,
+            "state_label": "Congested",
+            "confidence": 0.81,
+            "model_version": "mlp-v3.0-test",
+            "model_revision": "a" * 64,
+        }
     )
-    persist_classified_telemetry(frame, engine=engine, model_version="mlp-v2.0-test")
+    frame = pd.DataFrame([base])
+    persist_classified_telemetry(
+        frame, engine=engine, model_version="mlp-v3.0-test", model_revision="a" * 64
+    )
     with engine.connect() as connection:
         prediction_id = connection.execute(
             text(
                 """
                 SELECT p.id FROM vaaet_ml.traffic_predictions p
                 JOIN vaaet_ml.telemetry_features f ON f.id=p.telemetry_feature_id
-                WHERE f.clip_id='reinference-test' AND p.model_version='mlp-v2.0-test'
+                WHERE f.clip_id='reinference-test' AND p.model_revision=:model_revision
                 """
-            )
+            ),
+            {"model_revision": "a" * 64},
         ).scalar_one()
     first_validation_id = persist_human_validation(
         HumanValidation(prediction_id, 1, "integration-reviewer"), engine=engine
     )
     frame.loc[0, "confidence"] = 0.92
-    persist_classified_telemetry(frame, engine=engine, model_version="mlp-v2.0-test")
+    frame.loc[0, "model_revision"] = "b" * 64
+    persist_classified_telemetry(
+        frame, engine=engine, model_version="mlp-v3.0-test", model_revision="b" * 64
+    )
     with engine.connect() as connection:
+        feature_count, prediction_count = connection.execute(
+            text(
+                "SELECT count(DISTINCT f.id), count(DISTINCT p.id) "
+                "FROM vaaet_ml.telemetry_features f "
+                "JOIN vaaet_ml.traffic_predictions p ON p.telemetry_feature_id=f.id "
+                "WHERE f.clip_id='reinference-test' AND p.model_version='mlp-v3.0-test'"
+            )
+        ).one()
         count = connection.execute(
             text(
                 "SELECT count(*) FROM vaaet_feedback.human_validations "
@@ -351,6 +393,8 @@ def test_reinference_preserves_append_only_human_validation(engine) -> None:
             ),
             {"prediction_id": prediction_id},
         ).scalar_one()
+    assert feature_count == 2
+    assert prediction_count == 2
     assert count == 1
     assert effective == 1
     persist_human_validation(

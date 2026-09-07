@@ -101,7 +101,7 @@ OPTICAL_FLOW_QUALITY_MIN: float = 0.35
 INCIDENT_PERSISTENCE_MINUTES: int = 2
 INCIDENT_RECOVERY_MINUTES: int = 3
 
-# Los umbrales por clase se guardan en el bundle v2 para seleccionarlos sobre
+# Los umbrales por clase se guardan en el bundle para seleccionarlos sobre
 # validación sin modificar la API.
 DEFAULT_CLASS_THRESHOLDS: Final[Mapping[int, float]] = MappingProxyType(
     {0: 0.60, 1: 0.60, 2: 0.70}
@@ -109,12 +109,12 @@ DEFAULT_CLASS_THRESHOLDS: Final[Mapping[int, float]] = MappingProxyType(
 DEFAULT_MIN_PROBABILITY_MARGIN: float = 0.10
 WORSENING_PERSISTENCE_MINUTES: int = 2
 RECOVERY_PERSISTENCE_MINUTES: int = 3
-FEATURE_MAX_GAP_MINUTES: int = 2
+CONTINUITY_MAX_GAP_SECONDS: int = 90
 
 
 # Versionado contractual
-MODEL_VERSION: str = "mlp-v2.1"
-TELEMETRY_SCHEMA_VERSION: str = "traffic-telemetry-v2"
+MODEL_VERSION: str = "mlp-v3.0"
+TELEMETRY_SCHEMA_VERSION: str = "traffic-telemetry-v3"
 
 
 # Contexto físico del puente

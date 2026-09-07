@@ -85,7 +85,7 @@ F1-Score ≥ 0.97 valida el objetivo de 97% de precisión. Si está por debajo, 
 | FPS Procesamiento | Variable | No publicado. Depende del modelo YOLO y GPU de Colab |
 | Precisión Estacionarios | Alta | Sin evaluación cuantitativa. Validado cualitativamente con demos sintéticos |
 | F1-macro Clasificación | ≥ 0.88 | Sólo válido sobre holdout real, humano y agrupado |
-| ECE | ≤ 0.05 | Registrado junto con temperatura y Brier en bundle v2 |
+| ECE | ≤ 0.05 | Registrado junto con temperatura y Brier en bundle v3 |
 | Estados Accident automáticos | 0 | Invariante contractual |
 | Candidatos falsos de incidente | < 1/100 h | Preliminar hasta acumular unas 300 h negativas |
 

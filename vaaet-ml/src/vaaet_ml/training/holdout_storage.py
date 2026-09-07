@@ -25,6 +25,8 @@ from vaaet_ml.training.holdout_contract import (
     HOLDOUT_RECORD_COLUMNS,
     HUMAN_HOLDOUT_CONTRACT,
     HUMAN_HOLDOUT_POINTER_CONTRACT,
+    LEGACY_HOLDOUT_RECORD_COLUMNS,
+    LEGACY_HUMAN_HOLDOUT_CONTRACT,
     PARTITION_FILES,
     HumanHoldoutConfig,
     HumanHoldoutSnapshot,
@@ -170,10 +172,20 @@ class FileSystemHoldoutStore:
         if metadata.get("sha256") != sha256_bytes(payload):
             raise ValueError(f"Checksum mismatch for holdout {partition}.")
         frame = pd.read_csv(io.BytesIO(payload), float_precision="round_trip")
-        if list(frame.columns) != list(HOLDOUT_RECORD_COLUMNS):
+        columns = (
+            LEGACY_HOLDOUT_RECORD_COLUMNS
+            if manifest.get("contract") == LEGACY_HUMAN_HOLDOUT_CONTRACT
+            else HOLDOUT_RECORD_COLUMNS
+        )
+        if list(frame.columns) != list(columns):
             raise ValueError(f"Column contract mismatch for holdout {partition}.")
         if len(frame) != metadata.get("rows"):
             raise ValueError(f"Row count mismatch for holdout {partition}.")
+        if manifest.get("contract") == LEGACY_HUMAN_HOLDOUT_CONTRACT:
+            frame["record_time"] = pd.to_datetime(frame["record_time"], utc=True)
+            return frame.loc[:, columns].sort_values(
+                ["group_id", "record_time", "clip_id"]
+            ).reset_index(drop=True)
         return prepare_records(frame)
 
     def _validate_manifest(self, manifest: Mapping[str, object]) -> None:
@@ -277,7 +289,10 @@ def _validate_manifest_fields(manifest: Mapping[str, object]) -> None:
 
 
 def _validate_manifest_identity(manifest: Mapping[str, object]) -> None:
-    if manifest["contract"] != HUMAN_HOLDOUT_CONTRACT:
+    if manifest["contract"] not in {
+        HUMAN_HOLDOUT_CONTRACT,
+        LEGACY_HUMAN_HOLDOUT_CONTRACT,
+    }:
         raise ValueError("Unsupported human holdout contract.")
     try:
         uuid.UUID(str(manifest["snapshot_id"]))
@@ -291,7 +306,12 @@ def _validate_manifest_identity(manifest: Mapping[str, object]) -> None:
 
 
 def _validate_manifest_schema(manifest: Mapping[str, object]) -> None:
-    if manifest["feature_schema_version"] != FEATURE_SCHEMA_VERSION:
+    expected_schema = (
+        "traffic-features-v2"
+        if manifest["contract"] == LEGACY_HUMAN_HOLDOUT_CONTRACT
+        else FEATURE_SCHEMA_VERSION
+    )
+    if manifest["feature_schema_version"] != expected_schema:
         raise ValueError("Human holdout feature schema is incompatible.")
     if manifest["feature_columns"] != list(FEATURE_COLS):
         raise ValueError("Human holdout feature order is incompatible.")

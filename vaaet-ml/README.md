@@ -1,4 +1,4 @@
-# VAAET ML 4.5.4
+# VAAET ML 4.6.0
 
 PostgreSQL se organiza en `vaaet_raw`, `vaaet_ml`, `vaaet_feedback` y
 `vaaet_ops`. Este último registra el ciclo de cada workflow sin almacenar
@@ -86,7 +86,7 @@ por separado.
 
 ## Contrato del modelo
 
-El bundle v2 contiene `traffic_classifier.keras`, `feature_scaler.joblib`, `label_mapping.joblib` y `model-manifest.json`. El MLP aprende `Normal`, `Reduced` y `Congested`; una sospecha de incidente conserva `Congested` y sólo una confirmación humana validada puede publicar `Accident`. El manifiesto fija las 19 features, calibración, política temporal, modo de entrenamiento, política de entrada, etapa de despliegue, elegibilidad, procedencia, checksums y descriptor del input lock. Consultá el [contrato de artefactos](../docs/ml/model-artifact-contract.md), [ADR-0014](../docs/architecture/decisions/0014-hierarchical-traffic-state-and-incident-policy.md), [ADR-0017](../docs/architecture/decisions/0017-seed-bootstrap-and-hitl-retraining.md) y [ADR-0019](../docs/architecture/decisions/0019-immutable-seed-and-hitl-datasets.md).
+El bundle v3 contiene `traffic_classifier.keras`, `feature_scaler.joblib`, `label_mapping.joblib` y `model-manifest.json`. El MLP aprende `Normal`, `Reduced` y `Congested`; una sospecha de incidente conserva `Congested` y sólo una confirmación humana validada puede publicar `Accident`. El manifiesto fija las 19 features, `model_revision`, calibración, política temporal, modo de entrenamiento, política de entrada, etapa de despliegue, elegibilidad, procedencia, checksums y descriptor del input lock. Consultá el [contrato de artefactos](../docs/ml/model-artifact-contract.md), [ADR-0014](../docs/architecture/decisions/0014-hierarchical-traffic-state-and-incident-policy.md), [ADR-0019](../docs/architecture/decisions/0019-immutable-seed-and-hitl-datasets.md) y [ADR-0026](../docs/architecture/decisions/0026-temporal-continuity-and-immutable-model-revisions.md).
 
 Cada entrenamiento puede persistir un informe inmutable con su input lock,
 métricas agregadas, diagnósticos y una comparación compatible opcional. La
@@ -94,7 +94,7 @@ decisión de promoción sigue siendo humana; consultá la [guía de observabilid
 
 Los aproximadamente 2.068 registros históricos permiten crear un bundle
 `pilot` mediante weak supervision. Ese resultado reproduce reglas preliminares,
-pero no acredita calidad real de producción: carece de telemetría v2 completa,
+pero no acredita calidad real de producción: carece de telemetría v3 completa,
 holdout humano y accidentes reales. Los reentrenamientos HITL consumen features
 ya calculadas y sustituyen progresivamente la memoria proxy por etiquetas
 humanas; cada artefacto sigue siendo candidato hasta cumplir los gates.
@@ -110,7 +110,7 @@ bundles sólo tras validar sus manifiestos y exige el ZIP exacto del holdout cuy
 fingerprint ambos declaran. Compara exclusivamente los tres estados estables,
 aplica la cadena de serving de cada bundle y presenta diferencias emparejadas;
 no modifica DVC, artefactos, PostgreSQL ni la decisión humana de promoción. Su
-EDA de drift requiere cohortes `traffic-features-v2` y puede leer telemetría v2
+EDA de drift requiere cohortes `traffic-features-v3` y puede leer telemetría v3
 acotada con el perfil `training` de sólo lectura.
 
 La futura Web App pertenece a `../vaaet-app/` y consumirá exclusivamente una API

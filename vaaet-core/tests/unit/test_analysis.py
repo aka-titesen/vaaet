@@ -215,11 +215,13 @@ def test_analyze_video_returns_canonical_empty_frames_for_short_clip(
     assert result.classifications.empty
     assert tuple(result.classifications.columns) == (
         "clip_id",
+        "continuity_id",
         "record_time",
         "traffic_state",
         "state_label",
         "confidence",
         "evidence",
+        "incident_candidate",
     )
     assert result.complete_minutes == 0
     assert result.processed_duration_seconds == 16.0

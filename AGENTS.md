@@ -103,7 +103,7 @@ Drive ni rutas de artefactos. Los workers futuros usarán `vaaet-core`, no
 - El MLP tiene tres salidas aprendidas: `Normal`, `Reduced` y `Congested`. Los
   cuatro estados públicos se conservan, pero `Accident` nunca se publica de
   forma automática.
-- El manifiesto del bundle v2 y sus checksums se validan antes de deserializar
+- El manifiesto del bundle v3 y sus checksums se validan antes de deserializar
   `.keras` o `.joblib`. Consultá el
   [contrato del bundle](docs/ml/model-artifact-contract.md).
 - Git identifica versiones; DVC almacena el bundle atómico. Existe una sola raíz
@@ -122,6 +122,10 @@ Drive ni rutas de artefactos. Los workers futuros usarán `vaaet-core`, no
   mixto; no se inventan perfiles ni se reidentifican vehículos entre vistas.
   Consultá
   [ADR-0025](docs/architecture/decisions/0025-calibrated-multi-view-video-segments.md).
+- `continuity_id` separa tramos físicos continuos y `model_revision` identifica
+  un bundle exacto. Ningún estado, incidente o revisión puede atravesar esos
+  límites o sobrescribir historia. Consultá
+  [ADR-0026](docs/architecture/decisions/0026-temporal-continuity-and-immutable-model-revisions.md).
 - La visión mantiene un pipeline Pipe-and-Filter síncrono y ordenado. No
   introduzcas threads, procesos, colas o Producer--Consumer sin mediciones
   comparables en Colab y aprobación explícita.

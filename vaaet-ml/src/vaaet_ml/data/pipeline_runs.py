@@ -28,13 +28,13 @@ _START_RUN_SQL = """
 SELECT vaaet_ops.start_pipeline_run(
     CAST(:id AS UUID), :workflow, :application_version, :git_commit,
     :telemetry_schema_version, :feature_schema_version, :model_version,
-    :source_kind, :clip_id, :input_rows
+    :model_revision, :source_kind, :clip_id, :input_rows
 )
 """
 
 _FINISH_RUN_SQL = """
 SELECT vaaet_ops.finish_pipeline_run(
-    CAST(:id AS UUID), :status, :output_rows, :error_category
+    CAST(:id AS UUID), :status, :output_rows, :error_category, :model_revision
 )
 """
 
@@ -60,6 +60,7 @@ class PipelineRunMetadata:
     telemetry_schema_version: str | None = TELEMETRY_SCHEMA_VERSION
     feature_schema_version: str | None = FEATURE_SCHEMA_VERSION
     model_version: str | None = MODEL_VERSION
+    model_revision: str | None = None
 
     def __post_init__(self) -> None:
         if self.input_rows is not None and self.input_rows < 0:
@@ -68,10 +69,15 @@ class PipelineRunMetadata:
             r"[0-9a-fA-F]{7,40}", self.git_commit
         ):
             raise ValueError("git_commit must be a 7-40 character hexadecimal revision.")
+        if self.model_revision is not None and not re.fullmatch(
+            r"[0-9a-f]{64}", self.model_revision
+        ):
+            raise ValueError("model_revision must be a lowercase SHA-256 value.")
         for value, label in (
             (self.git_commit, "git_commit"),
             (self.source_kind, "source_kind"),
             (self.clip_id, "clip_id"),
+            (self.model_revision, "model_revision"),
         ):
             if value is not None and any(token in value.lower() for token in ("password=", "://")):
                 raise ValueError(f"{label} may not contain credentials or a connection URL.")
@@ -88,11 +94,19 @@ class PipelineRunHandle:
     id: UUID
     metadata: PipelineRunMetadata
     output_rows: int | None = None
+    model_revision: str | None = None
 
     def set_output_rows(self, rows: int) -> None:
         if rows < 0:
             raise ValueError("Pipeline output_rows cannot be negative.")
         self.output_rows = rows
+
+    def set_model_revision(self, revision: str) -> None:
+        """Asocia el bundle exacto recién validado antes de cerrar la corrida."""
+
+        if not re.fullmatch(r"[0-9a-f]{64}", revision):
+            raise ValueError("model_revision must be a lowercase SHA-256 value.")
+        self.model_revision = revision
 
 
 def _utc_now() -> str:
@@ -108,6 +122,7 @@ def _local_payload(
 ) -> dict[str, object]:
     metadata = asdict(handle.metadata)
     metadata["workflow"] = handle.metadata.workflow.value
+    metadata["model_revision"] = handle.model_revision
     return {
         "id": str(handle.id),
         "status": status,
@@ -139,7 +154,11 @@ def start_pipeline_run(
 ) -> tuple[PipelineRunHandle, str]:
     """Inicia una corrida con ID opcional para sellar inputs antes del cómputo."""
 
-    handle = PipelineRunHandle(UUID(str(run_id)) if run_id is not None else uuid4(), metadata)
+    handle = PipelineRunHandle(
+        UUID(str(run_id)) if run_id is not None else uuid4(),
+        metadata,
+        model_revision=metadata.model_revision,
+    )
     started_at = _utc_now()
     if engine is not None:
         payload = {
@@ -150,6 +169,7 @@ def start_pipeline_run(
             "telemetry_schema_version": metadata.telemetry_schema_version,
             "feature_schema_version": metadata.feature_schema_version,
             "model_version": metadata.model_version,
+            "model_revision": metadata.model_revision,
             "source_kind": metadata.source_kind,
             "clip_id": metadata.clip_id,
             "input_rows": metadata.input_rows,
@@ -184,6 +204,7 @@ def finish_pipeline_run(
                     "status": status,
                     "output_rows": handle.output_rows,
                     "error_category": error_category,
+                    "model_revision": handle.model_revision,
                 },
             )
         return None

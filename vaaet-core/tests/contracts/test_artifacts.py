@@ -18,23 +18,28 @@ def valid_bundle(tmp_path: Path) -> Path:
         (tmp_path / name).write_bytes(name.encode())
     create_manifest(
         tmp_path,
-        metrics={"f1_macro": 0.85, "production_eligible": True},
+        metrics={
+            "direct_f1_macro": 0.85,
+            "final_f1_macro": 0.86,
+            "unavailable_metric": float("nan"),
+            "production_eligible": True,
+        },
         data_provenance={
             "origin": "test",
             "record_count": 1,
             "synthetic_data_included": False,
-            "telemetry_v2_coverage": 1.0,
+            "telemetry_v3_coverage": 1.0,
             "human_holdout": True,
             "production_eligible": True,
             "promotion_blockers": [],
         },
         training_lifecycle=build_training_lifecycle(
             TrainingMode.HITL_RETRAINING,
-            ModelInputPolicy.CANONICAL_V2,
+            ModelInputPolicy.CANONICAL_V3,
             production_eligible=True,
         ),
         human_holdout={
-            "contract": "vaaet-human-holdout-v1",
+            "contract": "vaaet-human-holdout-v2",
             "snapshot_id": "12345678-1234-5678-1234-567812345678",
             "generation": 1,
             "fingerprint": "a" * 64,
@@ -60,15 +65,17 @@ def _write_manifest(bundle: Path, payload: object) -> None:
 
 def test_valid_bundle(valid_bundle: Path) -> None:
     manifest = validate_manifest(valid_bundle)
-    assert manifest["contract_version"] == 2
+    assert manifest["contract_version"] == 3
+    assert len(manifest["model_revision"]) == 64
     assert manifest["model_output_mapping"] == {
         "0": "Normal",
         "1": "Reduced",
         "2": "Congested",
     }
     assert manifest["decision_policy"]["automatic_accident_state_allowed"] is False
+    assert manifest["metrics"]["unavailable_metric"] is None
     assert manifest["training_lifecycle"]["deployment_stage"] == "production"
-    assert manifest["training_lifecycle"]["input_policy"] == "canonical-v2"
+    assert manifest["training_lifecycle"]["input_policy"] == "canonical-v3"
     assert manifest["training_input_lock"]["fingerprint"] == "b" * 64
 
 
@@ -350,7 +357,7 @@ def test_rejects_invalid_dependency_version(valid_bundle: Path) -> None:
 
 def test_rejects_invalid_f1_metric(valid_bundle: Path) -> None:
     payload = _manifest(valid_bundle)
-    payload["metrics"]["f1_macro"] = 2.0
+    payload["metrics"]["direct_f1_macro"] = 2.0
     _write_manifest(valid_bundle, payload)
     with pytest.raises(ArtifactValidationError, match="f1_macro"):
         validate_manifest(valid_bundle)
@@ -358,7 +365,7 @@ def test_rejects_invalid_f1_metric(valid_bundle: Path) -> None:
 
 def test_rejects_invalid_provenance_coverage(valid_bundle: Path) -> None:
     payload = _manifest(valid_bundle)
-    payload["data_provenance"]["telemetry_v2_coverage"] = True
+    payload["data_provenance"]["telemetry_v3_coverage"] = True
     _write_manifest(valid_bundle, payload)
     with pytest.raises(ArtifactValidationError, match="coverage must be numeric"):
         validate_manifest(valid_bundle)

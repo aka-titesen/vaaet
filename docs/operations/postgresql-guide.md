@@ -1,4 +1,4 @@
-# Operación PostgreSQL portable — VAAET ML 4.5.4
+# Operación PostgreSQL portable — VAAET ML 4.6.0
 
 PostgreSQL es opcional y pertenece exclusivamente a `vaaet-ml`. VAAET admite
 AWS RDS, Supabase, Neon o un servidor propio sólo si exponen las capacidades
@@ -58,6 +58,12 @@ alembic upgrade head
 Alembic usa `DatabaseAdminSettings`, URL estructurada, TLS y `NullPool`; las
 revisiones explícitas son la única autoridad DDL. No uses modelos ORM para crear
 tablas, `create_all`, `drop_all` ni autogeneración.
+
+La revisión `20260905_0003` migra a `vaaet-db-v3`: agrega continuidad e
+identidad exacta del modelo, conserva filas y validaciones legacy y reemplaza
+las claves de predicción sin ejecutar `UPDATE` durante inferencias futuras.
+Creá y probá un backup antes de aplicarla. Su downgrade es intencionalmente
+irreversible; un rollback operativo restaura ese backup en una base aislada.
 
 Luego ejecutá el provisionamiento versionado con el mismo endpoint y usuario.
 Las variables `PG*` existen sólo en el proceso de `psql`; no reemplazan la
@@ -124,9 +130,9 @@ sólo en una base aislada:
 ```bash
 pg_dump --format=custom --no-owner --no-acl \
   --schema=vaaet_raw --schema=vaaet_ml --schema=vaaet_feedback --schema=vaaet_ops \
-  --file=vaaet-db-v2.backup
+  --file=vaaet-db-v3.backup
 
-pg_restore -l vaaet-db-v2.backup
+pg_restore -l vaaet-db-v3.backup
 ```
 
 El notebook de entrenamiento inspecciona el catálogo y extrae exclusivamente

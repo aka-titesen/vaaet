@@ -14,7 +14,7 @@ from pathlib import Path, PurePosixPath
 
 import pandas as pd
 from vaaet.artifacts import FEATURE_SCHEMA_VERSION
-from vaaet.timestamps import normalize_timestamp_series
+from vaaet.continuity import normalize_continuity_frame
 
 from vaaet_ml.data.artifact_serialization import (
     atomic_json_write,
@@ -196,7 +196,8 @@ def _validate_catalog_entry_identity(
 ) -> str:
     required = {
         "package_id", "path", "created_at", "pipeline_run_id", "sha256", "fingerprint", "clips",
-        "rows", "human_support", "status", "feature_schema_version", "vaaet_version",
+        "rows", "human_support", "status", "feature_schema_version", "model_revision",
+        "vaaet_version",
     }
     if missing := sorted(required - entry.keys()):
         raise ValueError(f"HITL catalog entry is incomplete: {missing}")
@@ -216,6 +217,8 @@ def _validate_catalog_entry_identity(
 def _validate_catalog_entry_integrity(entry: Mapping[str, object]) -> None:
     if not is_sha256(entry["sha256"]) or not is_sha256(entry["fingerprint"]):
         raise ValueError("HITL catalog checksums must be SHA-256.")
+    if not is_sha256(entry["model_revision"]):
+        raise ValueError("HITL catalog model_revision must be SHA-256.")
 
 
 def _validate_catalog_entry_lifecycle(entry: Mapping[str, object]) -> None:
@@ -335,7 +338,14 @@ def _resolve_feedback(
     if not set(validations["prediction_id"].astype(str)).issubset(set(predictions["id"].astype(str))):
         raise ValueError("Catalog validations reference missing prediction UUIDs.")
     latest = _resolve_validation_graph(validations)
-    projection = predictions[["id", "telemetry_feature_id", "model_version"]]
+    required_prediction_columns = {
+        "id", "telemetry_feature_id", "model_version", "model_revision"
+    }
+    if missing := sorted(required_prediction_columns - set(predictions.columns)):
+        raise ValueError(f"Catalog predictions are missing fields: {missing}")
+    projection = predictions[
+        ["id", "telemetry_feature_id", "model_version", "model_revision"]
+    ]
     feedback = features.merge(
         projection,
         left_on="id",
@@ -344,8 +354,7 @@ def _resolve_feedback(
     ).merge(latest, left_on="id_prediction", right_on="prediction_id")
     feedback["traffic_state"] = pd.to_numeric(feedback["validated_state"], errors="raise").astype(int)
     feedback["is_human_validated"] = True
-    feedback["record_time"] = normalize_timestamp_series(feedback["record_time"])
-    return feedback
+    return normalize_continuity_frame(feedback)
 
 
 def _deduplicate_uuid_rows(frame: pd.DataFrame, *, name: str) -> pd.DataFrame:

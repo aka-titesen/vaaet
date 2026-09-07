@@ -26,7 +26,7 @@ la [instalación headless de Ultralytics](https://docs.ultralytics.com/quickstar
 3. Ejecutá `vaaet-ml/notebooks/evaluation/evaluate_models_and_eda.ipynb` para comparar un
    Champion y un Challenger con el ZIP exacto del holdout humano congelado; sus
    métricas son read-only y la promoción sigue siendo manual.
-4. Ejecutá inferencia con un clip y un bundle v2 validado. Un piloto requiere
+4. Ejecutá inferencia con un clip y un bundle v3 validado. Un piloto requiere
    `ALLOW_PILOT_BUNDLE=True`; un candidato no aprobado requiere una autorización
    experimental independiente.
 
@@ -212,7 +212,7 @@ credenciales, DSN, certificados ni mensajes de excepción.
 
 El notebook de evaluación no es un workflow operacional ni registra
 `pipeline_run`: sólo carga bundles y cohortes declaradas. Para drift acepta un
-CSV/ZIP con `traffic-features-v2` o consulta `vaaet_raw.traffic_data` con el
+CSV/ZIP con `traffic-features-v3` o consulta `vaaet_raw.traffic_data` con el
 perfil `training`, intervalo UTC `[inicio, fin)` y filtros explícitos de clips o
 ejecuciones. Nunca acepta `current.json` como sustituto del ZIP de holdout exacto.
 

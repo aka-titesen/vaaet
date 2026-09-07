@@ -1,4 +1,4 @@
-# Política de seguridad y privacidad — VAAET ML 4.5.4
+# Política de seguridad y privacidad — VAAET ML 4.6.0
 
 PostgreSQL usa identidades separadas por workflow, TLS `verify-full`, permisos
 mínimos y funciones operativas con `search_path` fijo. La base exclusiva revoca
@@ -36,7 +36,7 @@ ML. Rotar por separado cada credencial de workflow si se sospecha exposición.
 | Perfil | Acceso |
 |---|---|
 | collection | SELECT/INSERT en `vaaet_raw.traffic_data` |
-| inference | SELECT/INSERT/UPDATE en features y predicciones |
+| inference | SELECT/INSERT en features y predicciones inmutables |
 | training | SELECT en los tres schemas |
 | review | SELECT de cola e INSERT append-only en validaciones |
 | administrator | Alembic, roles y grants; prohibido en Colab |

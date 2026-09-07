@@ -68,5 +68,5 @@ def test_raw_telemetry_requires_v2_before_feature_engineering() -> None:
     raw = _cohort().drop(columns=["feature_schema_version"])
     raw["telemetry_schema_version"] = "traffic-telemetry-v1"
 
-    with pytest.raises(ValueError, match="traffic-telemetry-v2"):
+    with pytest.raises(ValueError, match="traffic-telemetry-v3"):
         build_feature_cohort_from_raw_telemetry(raw, name="legacy-raw")

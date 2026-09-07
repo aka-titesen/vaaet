@@ -10,6 +10,7 @@ import pandas as pd
 from sqlalchemy import bindparam, text
 from sqlalchemy.engine import Engine
 from sqlalchemy.exc import ProgrammingError
+from vaaet.artifacts import FEATURE_SCHEMA_VERSION
 
 from vaaet_ml.data.database_connection import get_engine
 from vaaet_ml.data.database_settings import DatabaseSettings
@@ -18,7 +19,7 @@ RAW_TABLE = "vaaet_raw.traffic_data"
 EFFECTIVE_LABELS_VIEW = "vaaet_feedback.effective_human_labels"
 
 TELEMETRY_QUERY = f"""
-SELECT id, pipeline_run_id, clip_id, record_time, avg_speed,
+SELECT id, pipeline_run_id, clip_id, continuity_id, record_time, avg_speed,
        count_car, count_truck, count_bus, count_motorcycle, count_bicycle,
        total_vehicles, near_zero_motion_count, stationary_confirmed_count,
        rejected_speed_count, recovered_track_count, speed_sample_count,
@@ -36,7 +37,7 @@ ORDER BY clip_id, record_time
 """
 
 HUMAN_GROUND_TRUTH_QUERY = f"""
-SELECT id, source_record_id, pipeline_run_id, clip_id, record_time,
+SELECT id, source_record_id, pipeline_run_id, clip_id, continuity_id, record_time,
        feature_schema_version, avg_speed, total_vehicles, count_car,
        count_truck, count_bus, count_motorcycle, count_bicycle,
        heavy_vehicle_ratio, delta_speed, delta_count, transition_flag,
@@ -47,14 +48,16 @@ SELECT id, source_record_id, pipeline_run_id, clip_id, record_time,
        rejected_speed_count, recovered_track_count, speed_sample_count,
        telemetry_schema_version, data_origin, synthetic_scenario,
        hour_of_day, weather_condition, created_at, prediction_id,
-       model_version, traffic_state, is_human_validated, reviewer_id,
+       model_version, model_revision, traffic_state, is_human_validated, reviewer_id,
        reviewed_at, notes
 FROM {EFFECTIVE_LABELS_VIEW}
+WHERE (:feature_schema_version IS NULL OR feature_schema_version = :feature_schema_version)
 ORDER BY clip_id, record_time
 """
 
 _LEGACY_MISSING_COLUMNS = (
     "pipeline_run_id",
+    "continuity_id",
     "near_zero_motion_count",
     "stationary_confirmed_count",
     "rejected_speed_count",
@@ -70,7 +73,7 @@ def load_telemetry(
     settings: DatabaseSettings | Mapping[str, str] | None = None,
     engine: Engine | None = None,
 ) -> pd.DataFrame:
-    """Carga telemetría v2 y agrega columnas nulas al fallback legado explícito."""
+    """Carga telemetría canónica y agrega columnas nulas al fallback legado explícito."""
 
     owns_engine = engine is None
     active_engine = engine or get_engine(settings)
@@ -96,7 +99,7 @@ def load_telemetry_window(
     settings: DatabaseSettings | Mapping[str, str] | None = None,
     engine: Engine | None = None,
 ) -> pd.DataFrame:
-    """Carga una cohorte v2 acotada usando un intervalo UTC semiabierto y parámetros SQL."""
+    """Carga una cohorte raw acotada usando un intervalo UTC semiabierto y parámetros SQL."""
 
     start_time = pd.Timestamp(start)
     end_time = pd.Timestamp(end)
@@ -119,7 +122,7 @@ def load_telemetry_window(
         params["clip_ids"] = list(clip_ids)
     statement = text(
         f"""
-SELECT id, pipeline_run_id, clip_id, record_time, avg_speed,
+SELECT id, pipeline_run_id, clip_id, continuity_id, record_time, avg_speed,
        count_car, count_truck, count_bus, count_motorcycle, count_bicycle,
        total_vehicles, near_zero_motion_count, stationary_confirmed_count,
        rejected_speed_count, recovered_track_count, speed_sample_count,
@@ -147,13 +150,19 @@ ORDER BY clip_id, record_time
 def load_human_ground_truth(
     settings: DatabaseSettings | Mapping[str, str] | None = None,
     engine: Engine | None = None,
+    *,
+    feature_schema_version: str | None = FEATURE_SCHEMA_VERSION,
 ) -> pd.DataFrame:
-    """Carga sólo etiquetas humanas efectivas y sus 19 features, en modo read-only."""
+    """Carga etiquetas efectivas de un schema explícito, en modo read-only."""
 
     owns_engine = engine is None
     active_engine = engine or get_engine(settings)
     try:
-        return pd.read_sql(text(HUMAN_GROUND_TRUTH_QUERY), active_engine)
+        return pd.read_sql(
+            text(HUMAN_GROUND_TRUTH_QUERY),
+            active_engine,
+            params={"feature_schema_version": feature_schema_version},
+        )
     finally:
         if owns_engine:
             active_engine.dispose()

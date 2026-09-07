@@ -74,8 +74,16 @@ class MinuteTelemetryAccumulator:
         """Indica si el minuto contiene información para materializar."""
         return bool(self.observed_track_ids or self.minute_speeds or any(self.minute_counts.values()))
 
-    def build_record(self, record_time: datetime) -> dict[str, object]:
+    def build_record(
+        self,
+        record_time: datetime,
+        *,
+        continuity_id: str | None = None,
+    ) -> dict[str, object]:
         """Materializa el minuto actual como registro de telemetría."""
+        resolved_continuity = continuity_id or f"{self.clip_id}:continuity-0001"
+        if not resolved_continuity.strip():
+            raise ValueError("continuity_id is required for every telemetry minute.")
         total = sum(self.minute_counts.values())
         speed_sample_count = len(self.reliable_speed_track_ids)
         rejected_ids = self.rejected_speed_track_ids - self.reliable_speed_track_ids
@@ -95,6 +103,7 @@ class MinuteTelemetryAccumulator:
 
         return {
             "clip_id": self.clip_id,
+            "continuity_id": resolved_continuity,
             "record_time": record_time,
             "avg_speed": round(avg_speed, 2),
             "count_car": self.minute_counts.get("car", 0),

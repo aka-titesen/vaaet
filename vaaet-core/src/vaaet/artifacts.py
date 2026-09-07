@@ -7,6 +7,7 @@ from __future__ import annotations
 import hashlib
 import importlib.metadata
 import json
+import math
 import re
 import subprocess
 from collections.abc import Mapping
@@ -26,8 +27,10 @@ from vaaet.settings import (
     WORSENING_PERSISTENCE_MINUTES,
 )
 
-CONTRACT_VERSION = 2
-FEATURE_SCHEMA_VERSION = "traffic-features-v2"
+CONTRACT_VERSION = 3
+FEATURE_SCHEMA_VERSION = "traffic-features-v3"
+LEGACY_CONTRACT_VERSION = 2
+LEGACY_FEATURE_SCHEMA_VERSION = "traffic-features-v2"
 MODEL_FILE = "traffic_classifier.keras"
 SCALER_FILE = "feature_scaler.joblib"
 LABEL_MAPPING_FILE = "label_mapping.joblib"
@@ -37,6 +40,7 @@ REQUIRED_FIELDS = {
     "contract_version",
     "feature_schema_version",
     "model_version",
+    "model_revision",
     "generated_at",
     "git_commit",
     "feature_columns",
@@ -54,7 +58,6 @@ REQUIRED_PROVENANCE_FIELDS = {
     "origin",
     "record_count",
     "synthetic_data_included",
-    "telemetry_v2_coverage",
     "human_holdout",
     "production_eligible",
     "promotion_blockers",
@@ -73,11 +76,12 @@ _SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 
 
 class TrafficBundleManifest(TypedDict):
-    """Estructura validada del manifiesto v2 consumida antes de deserializar."""
+    """Estructura validada del manifiesto consumida antes de deserializar."""
 
     contract_version: int
     feature_schema_version: str
     model_version: str
+    model_revision: str
     generated_at: str
     git_commit: str
     feature_columns: list[str]
@@ -118,6 +122,37 @@ def _git_commit(path: Path) -> str:
     return result.stdout.strip() or "unknown"
 
 
+def _portable_json_value(value: object) -> object:
+    """Convierte evidencia no disponible a JSON estándar antes de publicar."""
+
+    if isinstance(value, float) and not math.isfinite(value):
+        return None
+    if isinstance(value, Mapping):
+        return {str(key): _portable_json_value(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_portable_json_value(item) for item in value]
+    return value
+
+
+def calculate_model_revision(
+    *,
+    file_hashes: Mapping[str, str],
+    decision_policy: Mapping[str, object],
+    feature_schema_version: str,
+    training_input_lock: Mapping[str, object] | None,
+) -> str:
+    """Identifica de forma inmutable pesos, transformación y política exactos."""
+
+    payload = {
+        "files": {name: file_hashes[name] for name in sorted(file_hashes)},
+        "decision_policy": dict(decision_policy),
+        "feature_schema_version": feature_schema_version,
+        "training_input_lock": dict(training_input_lock or {}),
+    }
+    canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
 def create_manifest(
     bundle_dir: str | Path,
     *,
@@ -149,10 +184,18 @@ def create_manifest(
     if decision_policy:
         policy.update(dict(decision_policy))
     lifecycle = dict(training_lifecycle)
+    file_hashes = {name: _sha256(directory / name) for name in REQUIRED_FILES}
+    model_revision = calculate_model_revision(
+        file_hashes=file_hashes,
+        decision_policy=policy,
+        feature_schema_version=FEATURE_SCHEMA_VERSION,
+        training_input_lock=training_input_lock,
+    )
     manifest: dict[str, object] = {
         "contract_version": CONTRACT_VERSION,
         "feature_schema_version": FEATURE_SCHEMA_VERSION,
         "model_version": MODEL_VERSION,
+        "model_revision": model_revision,
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "git_commit": _git_commit(directory),
         "feature_columns": list(FEATURE_COLS),
@@ -161,7 +204,7 @@ def create_manifest(
             str(key): value for key, value in MODEL_STATE_LABELS.items()
         },
         "decision_policy": policy,
-        "files": {name: {"sha256": _sha256(directory / name)} for name in REQUIRED_FILES},
+        "files": {name: {"sha256": digest} for name, digest in file_hashes.items()},
         "dependencies": {
             name: _installed_version(name) or "unknown" for name in REQUIRED_DEPENDENCIES
         },
@@ -173,14 +216,20 @@ def create_manifest(
             dict(training_input_lock) if training_input_lock is not None else None
         ),
     }
+    portable_manifest = _portable_json_value(manifest)
+    if not isinstance(portable_manifest, dict):  # Protege la raíz contractual.
+        raise TypeError("Bundle manifest must serialize as a JSON object.")
     output = directory / MANIFEST_FILE
-    output.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    output.write_text(
+        json.dumps(portable_manifest, indent=2, sort_keys=True, allow_nan=False) + "\n",
+        encoding="utf-8",
+    )
     validate_manifest(directory)
     return output
 
 
 def validate_manifest(bundle_dir: str | Path) -> TrafficBundleManifest:
-    """Valida compatibilidad e integridad antes de cargar un bundle v2."""
+    """Valida compatibilidad e integridad antes de cargar un bundle soportado."""
     # La importación diferida mantiene la fachada pública libre de un ciclo de
     # importación: los validadores sólo necesitan el contrato ya definido arriba.
     from vaaet.artifact_validation import validate_manifest as _validate_manifest

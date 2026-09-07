@@ -10,6 +10,8 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
+from vaaet.artifacts import FEATURE_SCHEMA_VERSION
+
 from vaaet_ml.data.artifact_serialization import (
     atomic_json_write,
     json_safe,
@@ -36,6 +38,7 @@ class TrainingInputLock:
             "contract": TRAINING_INPUT_LOCK_CONTRACT,
             "lock_id": str(self.document["lock_id"]),
             "fingerprint": str(self.document["fingerprint"]),
+            "feature_schema_version": str(self.document["feature_schema_version"]),
         }
 
 
@@ -55,6 +58,7 @@ def create_training_input_lock(
     run_id = str(uuid.UUID(str(training_pipeline_run_id)))
     fingerprint_payload = json_safe(
         {
+            "feature_schema_version": FEATURE_SCHEMA_VERSION,
             "training_mode": training_mode,
             "seed_snapshot": dict(seed_snapshot) if seed_snapshot is not None else None,
             "hitl_catalog": dict(hitl_catalog) if hitl_catalog is not None else None,

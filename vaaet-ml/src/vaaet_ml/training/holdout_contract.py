@@ -12,13 +12,15 @@ from pathlib import Path
 
 import pandas as pd
 from vaaet.artifacts import FEATURE_SCHEMA_VERSION
+from vaaet.continuity import normalize_continuity_frame
 from vaaet.settings import FEATURE_COLS, MODEL_STATE_LABELS
 from vaaet.timestamps import normalize_timestamp_series
 
 from vaaet_ml.data.datasets import build_group_ids
 
-HUMAN_HOLDOUT_CONTRACT = "vaaet-human-holdout-v1"
-HUMAN_HOLDOUT_POINTER_CONTRACT = "vaaet-human-holdout-pointer-v1"
+HUMAN_HOLDOUT_CONTRACT = "vaaet-human-holdout-v2"
+HUMAN_HOLDOUT_POINTER_CONTRACT = "vaaet-human-holdout-pointer-v2"
+LEGACY_HUMAN_HOLDOUT_CONTRACT = "vaaet-human-holdout-v1"
 HOLDOUT_MANIFEST_FILE = "holdout-manifest.json"
 VALIDATION_RECORDS_FILE = "validation-records.csv"
 TEST_RECORDS_FILE = "test-records.csv"
@@ -28,12 +30,13 @@ PARTITION_FILES = {
     "validation": VALIDATION_RECORDS_FILE,
     "test": TEST_RECORDS_FILE,
 }
-IDENTITY_COLUMNS = ("clip_id", "record_time", "feature_schema_version")
+IDENTITY_COLUMNS = ("clip_id", "continuity_id", "record_time", "feature_schema_version")
 OPTIONAL_METADATA_COLUMNS = (
     "id",
     "source_record_id",
     "prediction_id",
     "model_version",
+    "model_revision",
     "reviewer_id",
     "reviewed_at",
     "notes",
@@ -41,6 +44,7 @@ OPTIONAL_METADATA_COLUMNS = (
 )
 HOLDOUT_RECORD_COLUMNS = (
     "clip_id",
+    "continuity_id",
     "record_time",
     "group_id",
     "feature_schema_version",
@@ -49,6 +53,9 @@ HOLDOUT_RECORD_COLUMNS = (
     "is_human_validated",
     *OPTIONAL_METADATA_COLUMNS,
     *FEATURE_COLS,
+)
+LEGACY_HOLDOUT_RECORD_COLUMNS = tuple(
+    column for column in HOLDOUT_RECORD_COLUMNS if column not in {"continuity_id", "model_revision"}
 )
 
 
@@ -105,10 +112,10 @@ class HumanHoldoutSnapshot:
 
     @property
     def descriptor(self) -> dict[str, object]:
-        """Expone la identidad mínima que puede acompañar a un bundle v2."""
+        """Expone la identidad mínima que puede acompañar a un bundle v3."""
 
         return {
-            "contract": HUMAN_HOLDOUT_CONTRACT,
+            "contract": str(self.manifest["contract"]),
             "snapshot_id": str(self.manifest["snapshot_id"]),
             "generation": int(self.manifest["generation"]),
             "fingerprint": str(self.manifest["fingerprint"]),
@@ -129,10 +136,7 @@ def prepare_records(frame: pd.DataFrame) -> pd.DataFrame:
     """Normaliza y valida filas humanas antes de asignarlas a un holdout."""
 
     _validate_holdout_source(frame)
-    result = frame.copy()
-    result["record_time"] = normalize_timestamp_series(
-        result["record_time"], field_name="holdout.record_time"
-    )
+    result = normalize_continuity_frame(frame)
     result["traffic_state"] = pd.to_numeric(
         result["traffic_state"], errors="raise"
     ).astype(int)
@@ -265,6 +269,8 @@ __all__ = [
     "HOLDOUT_RECORD_COLUMNS",
     "HUMAN_HOLDOUT_CONTRACT",
     "HUMAN_HOLDOUT_POINTER_CONTRACT",
+    "LEGACY_HOLDOUT_RECORD_COLUMNS",
+    "LEGACY_HUMAN_HOLDOUT_CONTRACT",
     "HumanHoldoutAction",
     "HumanHoldoutConfig",
     "HumanHoldoutSnapshot",

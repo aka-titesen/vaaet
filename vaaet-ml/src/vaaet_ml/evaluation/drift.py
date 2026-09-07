@@ -64,7 +64,7 @@ def _require_feature_schema(frame: pd.DataFrame) -> str:
     versions = set(frame["feature_schema_version"].dropna().astype(str))
     if versions != {FEATURE_SCHEMA_VERSION}:
         raise ValueError(
-            "Feature cohort is not compatible with traffic-features-v2: "
+            "Feature cohort is not compatible with traffic-features-v3: "
             f"{sorted(versions) or ['missing']}"
         )
     return FEATURE_SCHEMA_VERSION
@@ -152,7 +152,7 @@ def build_feature_cohort_from_raw_telemetry(
     versions = set(telemetry["telemetry_schema_version"].dropna().astype(str))
     if versions != {TELEMETRY_SCHEMA_VERSION}:
         raise ValueError(
-            "Raw telemetry cohort is not compatible with traffic-telemetry-v2: "
+            "Raw telemetry cohort is not compatible with traffic-telemetry-v3: "
             f"{sorted(versions) or ['missing']}"
         )
     features = engineer_features(telemetry).copy()

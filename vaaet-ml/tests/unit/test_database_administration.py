@@ -43,7 +43,7 @@ def test_administrator_uses_shared_typed_endpoint_outside_colab(
     settings = load_database_admin_settings(allow_legacy=False)
 
     assert settings.host == "localhost"
-    assert settings.application == "vaaet-migration-4.5.4"
+    assert settings.application == "vaaet-migration-4.6.0"
     assert "not-a-real-secret" not in repr(settings)
 
 
@@ -182,7 +182,7 @@ def test_admin_engine_uses_null_pool_and_common_tls_arguments(
     assert captured["poolclass"] is NullPool
     assert captured["connect_args"] == {
         "connect_timeout": 10,
-        "application_name": "vaaet-migration-4.5.4",
+        "application_name": "vaaet-migration-4.6.0",
         "sslmode": "disable",
     }
 
@@ -195,3 +195,17 @@ def test_alembic_environment_uses_typed_admin_settings_and_injected_connections(
     assert 'config.attributes.get("connection")' in source
     assert "create_admin_engine" in source
     assert "VAAET_DATABASE_ADMIN_URL" not in source
+
+
+def test_role_provisioning_matches_v3_functions_and_immutable_inference() -> None:
+    provisioning = Path(__file__).parents[2] / "migrations" / "provision-roles.sql"
+    source = provisioning.read_text(encoding="utf-8")
+
+    assert (
+        "start_pipeline_run(UUID, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, "
+        "TEXT, BIGINT)" in source
+    )
+    assert "finish_pipeline_run(UUID, TEXT, BIGINT, TEXT, TEXT)" in source
+    assert "REVOKE UPDATE, DELETE ON vaaet_ml.telemetry_features" in source
+    assert "GRANT SELECT, INSERT ON vaaet_ml.telemetry_features" in source
+    assert "GRANT SELECT, INSERT, UPDATE ON vaaet_ml.telemetry_features" not in source

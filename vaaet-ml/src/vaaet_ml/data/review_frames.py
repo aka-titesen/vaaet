@@ -11,10 +11,10 @@ from datetime import datetime
 
 import pandas as pd
 from vaaet.artifacts import FEATURE_SCHEMA_VERSION
+from vaaet.continuity import normalize_continuity_frame
 from vaaet.settings import FEATURE_COLS
-from vaaet.timestamps import normalize_timestamp_series
 
-from vaaet_ml.data.artifact_serialization import stable_uuid, valid_uuid
+from vaaet_ml.data.artifact_serialization import is_sha256, stable_uuid, valid_uuid
 
 
 def normalize_review_frames(
@@ -63,8 +63,7 @@ def _normalize_features(classified: pd.DataFrame, run_id: str) -> pd.DataFrame:
     required = {"clip_id", "record_time", *FEATURE_COLS}
     if missing := sorted(required - set(classified.columns)):
         raise ValueError(f"Classified review rows are missing fields: {missing}")
-    features = classified.copy().reset_index(drop=True)
-    features["record_time"] = normalize_timestamp_series(features["record_time"])
+    features = normalize_continuity_frame(classified).reset_index(drop=True)
     existing_ids = features.get("id", pd.Series(pd.NA, index=features.index)).astype("string")
     features["id"] = [
         str(value)
@@ -101,13 +100,17 @@ def _normalize_predictions(
     run_id: str,
     model_version: str,
 ) -> tuple[pd.DataFrame, pd.Series]:
+    revisions = set(classified.get("model_revision", pd.Series(dtype=str)).dropna().astype(str))
+    if len(revisions) != 1 or not is_sha256(next(iter(revisions), "")):
+        raise ValueError("Classified review rows require one exact SHA-256 model_revision.")
+    model_revision = next(iter(revisions))
     source_ids = classified.get(
         "prediction_id", pd.Series(range(1, len(classified) + 1), index=classified.index)
     )
     prediction_ids = [
         value
         if valid_uuid(value)
-        else stable_uuid("prediction", run_id, feature_id, model_version)
+        else stable_uuid("prediction", run_id, feature_id, model_revision)
         for value, feature_id in zip(source_ids.astype(str), features["id"], strict=False)
     ]
     prediction_columns = [
@@ -128,6 +131,7 @@ def _normalize_predictions(
         if column in classified
     ]
     predictions = classified[prediction_columns].copy()
+    predictions.insert(0, "model_revision", model_revision)
     predictions.insert(0, "model_version", model_version)
     predictions.insert(0, "telemetry_feature_id", features["id"].tolist())
     predictions.insert(0, "id", prediction_ids)

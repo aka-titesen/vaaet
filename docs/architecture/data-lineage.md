@@ -1,4 +1,4 @@
-# Linaje de datos — VAAET ML 4.5.4
+# Linaje de datos — VAAET ML 4.6.0
 
 ## Flujo operacional
 
@@ -21,7 +21,7 @@ flowchart LR
     H --> HO["Frozen human holdout"]
     HO --> T
     T --> L["Training input lock"]
-    L --> B["Bundle v2 candidate"]
+    L --> B["Bundle v3 candidate"]
 ```
 
 Cada ejecución operacional de adquisición, entrenamiento o inferencia genera un
@@ -33,6 +33,9 @@ El mismo contrato se aplica en memoria, CSV, backups, paquetes y sintéticos:
 `record_time` siempre es timezone-aware en UTC. La hora argentina se recupera
 únicamente para las features circadianas y la presentación, sin alterar el
 instante persistido.
+`continuity_id` segmenta cada clip ante cambios de vista o huecos superiores a
+90 segundos. Features, histéresis e incidentes reinician su memoria en ese
+límite.
 
 Desde 4.2.0 el UUID referencia `vaaet_ops.pipeline_runs`, que registra workflow,
 estado, commit, contratos y conteos sin secretos. Cuando PostgreSQL es opcional,
@@ -56,6 +59,9 @@ revisión explícita del contexto. Sin base disponible se exporta
 un paquete inmutable `vaaet-training-dataset-v1.zip` por sesión. El paquete se
 registra en `vaaet-dataset-catalog-v1`; los registros omitidos permanecen como no
 supervisados y nunca son targets.
+Cada predicción conserva `model_version` como etiqueta y `model_revision` como
+SHA-256 del bundle exacto. Una reinferencia crea otra feature y predicción por
+ejecución; no modifica la fila a la que apunta una validación humana.
 
 ## Entrenamiento
 
@@ -76,7 +82,8 @@ entre validaciones efectivas detienen el entrenamiento. Sintéticos sólo aparec
 en train y siempre permanecen identificados.
 
 Con `HUMAN_HOLDOUT_FROZEN=True`, validation y test se materializan como
-`vaaet-human-holdout-v1` bajo Google Drive. El snapshot conserva las features y
+`vaaet-human-holdout-v2` bajo Google Drive. El snapshot conserva `continuity_id`,
+`model_revision`, las features y
 etiquetas exactas, mientras `current.json` selecciona la generación activa. Sus
 grupos se excluyen de train; actualizar el benchmark crea una nueva generación
 sin sobrescribir la anterior. PostgreSQL continúa siendo la autoridad del
@@ -97,3 +104,7 @@ Antes de exportar el bundle, entrenamiento escribe `vaaet-training-input-lock-v1
 con el snapshot semilla, revisión exacta del catálogo, fingerprints de cada ZIP y
 holdout utilizado. El lock aporta linaje reproducible; no contiene pesos ni
 reemplaza PostgreSQL.
+
+La exportación construye los cuatro archivos del bundle en un directorio
+temporal, calcula `model_revision`, valida el manifiesto y sólo entonces
+reemplaza de manera atómica la copia de trabajo seguida por DVC.

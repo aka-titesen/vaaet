@@ -5,7 +5,7 @@
 | Campo | Detalle |
 |---|---|
 | Proyecto | VAAET ML — Video Advanced Analysis of Traffic |
-| Versión | 4.5.4 |
+| Versión | 4.6.0 |
 | Runtime objetivo | Python 3.10–3.13; Google Colab |
 | Responsable | Facundo Nicolás González |
 | Última revisión | 2026-08-27 |
@@ -31,7 +31,7 @@ no crea `pipeline_run` ni persiste datos.
 
 La lógica operativa reutilizable vive en `../vaaet-core/src/vaaet/`; este
 componente la consume como `vaaet`. La Web App futura sólo consumirá una API
-que usará el core y validará el bundle v2. El MLP aprende tres estados estables;
+que usará el core y validará el bundle v3. El MLP aprende tres estados estables;
 Accident es un estado público exclusivamente humano conforme a ADR-0014.
 ADR-0021 gobierna esta frontera junto con los ADRs de datos, HITL y holdouts.
 

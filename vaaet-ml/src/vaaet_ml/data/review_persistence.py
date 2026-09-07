@@ -17,8 +17,8 @@ from vaaet_ml.data.pipeline_runs import PipelineRunMetadata, PipelineWorkflow, p
 from vaaet_ml.data.review_domain import HumanValidation, select_review_queue
 
 REVIEW_QUEUE_QUERY = """
-SELECT prediction_id, pipeline_run_id, clip_id, record_time, traffic_state,
-       state_label, confidence, model_version, probability_margin,
+SELECT prediction_id, pipeline_run_id, clip_id, continuity_id, record_time, traffic_state,
+       state_label, confidence, model_version, model_revision, probability_margin,
        decision_abstained, measurement_reliable, accident_rule_triggered,
        accident_alert_started, accident_evidence_score, latest_validation_id,
        current_validated_state, current_reviewer_id, current_reviewed_at

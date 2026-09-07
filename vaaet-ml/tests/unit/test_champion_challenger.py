@@ -77,8 +77,10 @@ def _bundle(name: str, holdout, *, offset: int = 0, fingerprint: str | None = No
     if fingerprint is not None:
         descriptor["fingerprint"] = fingerprint
     manifest: dict[str, object] = {
-        "model_version": "mlp-v2.1",
-        "training_lifecycle": {"input_policy": "canonical-v2"},
+        "contract_version": 3,
+        "model_version": "mlp-v3.0",
+        "model_revision": "a" * 64 if name == "champion" else "b" * 64,
+        "training_lifecycle": {"input_policy": "canonical-v3"},
         "decision_policy": {
             "temperature": 1.0,
             "class_thresholds": {"0": 0.55, "1": 0.55, "2": 0.55},
@@ -95,6 +97,16 @@ def _bundle(name: str, holdout, *, offset: int = 0, fingerprint: str | None = No
     )
 
 
+def test_evaluation_rejects_different_bundle_contract_generations(tmp_path: Path) -> None:
+    holdout = _holdout(tmp_path)
+    champion = _bundle("champion", holdout)
+    challenger = _bundle("challenger", holdout)
+    challenger.manifest["contract_version"] = 2
+
+    with pytest.raises(ValueError, match="different bundle contract"):
+        validate_evaluation_pair(champion, challenger, holdout)
+
+
 def test_evaluation_compares_only_stable_states_and_preserves_no_accident(tmp_path: Path) -> None:
     holdout = _holdout(tmp_path)
     comparison = evaluate_champion_challenger(
@@ -104,12 +116,19 @@ def test_evaluation_compares_only_stable_states_and_preserves_no_accident(tmp_pa
         bootstrap_samples=20,
     )
 
-    assert set(comparison.summary["metric"]) >= {"f1_macro", "ece", "brier_score"}
-    assert set(comparison.bootstrap_intervals["metric"]) == {
-        "f1_macro",
-        "recall_normal",
-        "recall_reduced",
-        "recall_congested",
+    assert set(comparison.summary["metric"]) >= {
+        "direct_f1_macro",
+        "final_f1_macro",
+        "ece",
+        "brier_score",
+    }
+    assert set(comparison.bootstrap_intervals["metric"]) >= {
+        "direct_f1_macro",
+        "direct_recall_congested",
+        "direct_normal_congested_error",
+        "final_f1_macro",
+        "final_recall_congested",
+        "final_normal_congested_error",
     }
     assert not comparison.champion.classified["traffic_state"].eq(3).any()
     assert not comparison.challenger.classified["traffic_state"].eq(3).any()

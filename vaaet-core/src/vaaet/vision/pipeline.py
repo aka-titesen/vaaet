@@ -319,6 +319,7 @@ class VisionPipelineSession:
     )
     _view_progress: list[_ViewSegmentProgress] = field(default_factory=list, init=False)
     _active_view_index: int | None = field(default=None, init=False)
+    _continuity_sequence: int = field(default=1, init=False)
     _active_calibration: CameraCalibration | None = field(default=None, init=False)
     _skip_current_minute: bool = field(default=False, init=False)
     _discarding_progress: _ViewSegmentProgress | None = field(default=None, init=False)
@@ -518,7 +519,10 @@ class VisionPipelineSession:
                 self._discarding_progress.discard_reason = "transition_crossed_minute"
                 self._discarding_progress = None
             return
-        record = self.accumulator.build_record(packet.motion.tracking.perception.frame.capture_time)
+        record = self.accumulator.build_record(
+            packet.motion.tracking.perception.frame.capture_time,
+            continuity_id=self._current_continuity_id(),
+        )
         self._records.append(record)
         if self._view_progress:
             self._view_progress[-1].valid_minutes += 1
@@ -543,6 +547,7 @@ class VisionPipelineSession:
         segment = self.view_plan.segments[view_index]
         if self._active_view_index is not None:
             self._reset_for_view_transition()
+            self._continuity_sequence += 1
             if not self._starts_minute(packet.frame_index):
                 self.accumulator.discard_minute()
                 self._skip_current_minute = True
@@ -585,6 +590,10 @@ class VisionPipelineSession:
     def _starts_minute(self, frame_index: int) -> bool:
         """Indica si el frame abre un bucket temporal nuevo de la fuente."""
         return (frame_index - 1) % self.frames_per_minute == 0
+
+    def _current_continuity_id(self) -> str:
+        """Identifica el tramo visual continuo sin exponerlo como feature."""
+        return f"{self.clip_id}:continuity-{self._continuity_sequence:04d}"
 
 
 def _nearest_detection_bbox(
@@ -648,9 +657,11 @@ def _prediction_record(
 ) -> dict[str, object]:
     return {
         "clip_id": telemetry_record["clip_id"],
+        "continuity_id": telemetry_record["continuity_id"],
         "record_time": telemetry_record["record_time"],
         "traffic_state": prediction.state,
         "state_label": prediction.label,
         "confidence": prediction.confidence,
         "evidence": prediction.evidence,
+        "incident_candidate": prediction.incident_candidate,
     }

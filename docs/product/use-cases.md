@@ -9,7 +9,7 @@ implementado; su frontera está definida por ADR-0021.
 
 | Campo | Detalle |
 |---|---|
-| Versión del laboratorio | 4.5.4 |
+| Versión del laboratorio | 4.6.0 |
 | Última revisión | 2026-08-27 |
 
 ## CU-001 — Procesar video
@@ -32,7 +32,7 @@ filas posteriores.
 | Campo | Detalle |
 |---|---|
 | Actor | Operador o investigador |
-| Precondición | Telemetría v2 y bundle v2 validado manifest-first |
+| Precondición | Telemetría v3 y bundle v3 validado manifest-first |
 | Resultado | Estado estable por minuto completo, confianza y evidencia |
 
 La cadena construye las 19 features, escala con el bundle y predice tres

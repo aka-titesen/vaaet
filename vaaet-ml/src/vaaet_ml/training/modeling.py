@@ -19,7 +19,7 @@ def build_traffic_state_mlp(
     """Construye y compila el MLP tabular canónico de tres estados.
 
     Las validaciones impiden que una personalización del notebook produzca en
-    silencio un modelo incompatible con el pipeline de bundle v2.
+    silencio un modelo incompatible con el pipeline de bundle v3.
     """
     if input_features != len(FEATURE_COLS):
         raise ValueError(

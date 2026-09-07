@@ -39,7 +39,7 @@ class TestMinuteTelemetryAccumulator:
         assert record["count_car"] == 1
         assert record["speed_sample_count"] == 1
         assert record["speed_measurement_quality"] == 1.0
-        assert record["telemetry_schema_version"] == "traffic-telemetry-v2"
+        assert record["telemetry_schema_version"] == "traffic-telemetry-v3"
 
     def test_quality_tracks_rejected_and_stationary_events(self) -> None:
         accumulator = MinuteTelemetryAccumulator(clip_id="clip_001")

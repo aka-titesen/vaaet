@@ -23,6 +23,7 @@ class ModelInputPolicy(str, Enum):
 
     LEGACY_V1_BOOTSTRAP = "legacy-v1-bootstrap"
     CANONICAL_V2 = "canonical-v2"
+    CANONICAL_V3 = "canonical-v3"
 
 
 LEGACY_NEUTRAL_FEATURES: tuple[str, ...] = (

@@ -12,6 +12,7 @@ from vaaet.inference.traffic_state import (
     CLASSIFICATION_RESULT_COLUMNS,
     apply_conservative_accident_gate,
     apply_stable_state_policy,
+    assert_progressive_batch_parity,
     classify_raw_telemetry,
     classify_telemetry_dataframe,
 )
@@ -64,6 +65,7 @@ def _feature_rows(**overrides) -> pd.DataFrame:
             "hour_of_day": [8, 8, 8],
             "weather_condition": [0, 0, 0],
             "clip_id": ["clip_a", "clip_a", "clip_a"],
+            "continuity_id": ["clip_a:continuity-0001"] * 3,
             "optical_flow_tracking_ratio": [0.9, 0.9, 0.9],
             "record_time": pd.date_range("2025-05-01 08:00:00", periods=3, freq="1min"),
         }
@@ -77,6 +79,7 @@ def _raw_minutes(count: int) -> pd.DataFrame:
     return pd.DataFrame(
         {
             "clip_id": ["clip_a"] * count,
+            "continuity_id": ["clip_a:continuity-0001"] * count,
             "record_time": pd.date_range(
                 "2025-05-01T11:00:00Z",
                 periods=count,
@@ -132,6 +135,7 @@ class TestApplyConservativeAccidentGate:
     def test_incident_alert_has_deduplicated_start_and_exit_hysteresis(self) -> None:
         df = pd.concat([_feature_rows().iloc[[0]]] * 6, ignore_index=True)
         df["clip_id"] = "clip_a"
+        df["record_time"] = pd.date_range("2025-05-01T11:00:00Z", periods=6, freq="1min")
         df["traffic_state"] = 2
         df["state_label"] = "Congested"
         df["confidence"] = 0.7
@@ -141,7 +145,27 @@ class TestApplyConservativeAccidentGate:
         df["stationary_confirmed_ratio"] = [0.3, 0.3, 0.3, 0.0, 0.0, 0.0]
         gated = apply_conservative_accident_gate(df)
         assert gated["accident_alert_started"].sum() == 1
-        assert gated["accident_rule_triggered"].tolist() == [False, False, True, True, True, False]
+        assert gated["accident_rule_triggered"].tolist() == [False, True, True, True, True, False]
+
+    def test_incident_memory_resets_after_a_long_gap(self) -> None:
+        df = pd.concat([_feature_rows().iloc[[0]]] * 3, ignore_index=True)
+        df["record_time"] = pd.to_datetime(
+            ["2025-05-01T11:00:00Z", "2025-05-01T11:01:00Z", "2025-05-01T11:05:00Z"]
+        )
+        df["traffic_state"] = 2
+        df["state_label"] = "Congested"
+        df["confidence"] = 0.7
+        df["avg_speed"] = 1.0
+        df["delta_speed"] = [-20.0, 0.0, -20.0]
+        df["cumulative_delta_speed"] = -20.0
+        df["low_speed_persistence"] = [2.0, 3.0, 2.0]
+        df["near_zero_motion_ratio"] = 0.5
+        df["stationary_confirmed_ratio"] = 0.3
+
+        gated = apply_conservative_accident_gate(df)
+
+        assert gated["accident_rule_triggered"].tolist() == [False, True, False]
+        assert gated["continuity_id"].nunique() == 2
 
     def test_gate_does_not_apply_without_motion_evidence(self) -> None:
         df = _feature_rows(
@@ -305,7 +329,13 @@ class TestClassifyRawTelemetry:
 
 class TestStableStatePolicy:
     def test_transitions_are_adjacent_and_persistent(self) -> None:
-        df = pd.DataFrame({"clip_id": ["a"] * 7})
+        df = pd.DataFrame(
+            {
+                "clip_id": ["a"] * 7,
+                "continuity_id": ["a:continuity-0001"] * 7,
+                "record_time": pd.date_range("2025-05-01T11:00:00Z", periods=7, freq="1min"),
+            }
+        )
         probabilities = np.array(
             [
                 [0.95, 0.03, 0.02],
@@ -322,16 +352,72 @@ class TestStableStatePolicy:
         assert not (result["traffic_state"].diff().abs().dropna() > 1).any()
 
     def test_low_margin_keeps_last_stable_state(self) -> None:
-        df = pd.DataFrame({"clip_id": ["a", "a"]})
+        df = pd.DataFrame(
+            {
+                "clip_id": ["a", "a"],
+                "continuity_id": ["a:continuity-0001"] * 2,
+                "record_time": pd.date_range("2025-05-01T11:00:00Z", periods=2, freq="1min"),
+            }
+        )
         probabilities = np.array([[0.95, 0.03, 0.02], [0.34, 0.33, 0.33]])
         result = apply_stable_state_policy(df, probabilities)
         assert result["traffic_state"].tolist() == [0, 0]
         assert bool(result["decision_abstained"].iloc[-1]) is True
 
     def test_state_memory_resets_for_each_clip(self) -> None:
-        df = pd.DataFrame({"clip_id": ["a", "a", "b"]})
+        df = pd.DataFrame(
+            {
+                "clip_id": ["a", "a", "b"],
+                "continuity_id": ["a:continuity-0001", "a:continuity-0001", "b:continuity-0001"],
+                "record_time": pd.to_datetime(
+                    ["2025-05-01T11:00:00Z", "2025-05-01T11:01:00Z", "2025-05-01T11:00:00Z"]
+                ),
+            }
+        )
         probabilities = np.array(
             [[0.95, 0.03, 0.02], [0.03, 0.95, 0.02], [0.02, 0.03, 0.95]]
         )
         result = apply_stable_state_policy(df, probabilities)
         assert result["traffic_state"].tolist() == [0, 0, 1]
+
+    def test_state_memory_resets_after_a_long_gap(self) -> None:
+        df = pd.DataFrame(
+            {
+                "clip_id": ["a"] * 4,
+                "continuity_id": ["a:continuity-0001"] * 4,
+                "record_time": pd.to_datetime(
+                    [
+                        "2025-05-01T11:00:00Z",
+                        "2025-05-01T11:01:00Z",
+                        "2025-05-01T11:02:00Z",
+                        "2025-05-01T11:05:00Z",
+                    ]
+                ),
+            }
+        )
+        probabilities = np.array(
+            [[0.02, 0.03, 0.95], [0.02, 0.03, 0.95], [0.02, 0.03, 0.95], [0.95, 0.03, 0.02]]
+        )
+
+        result = apply_stable_state_policy(df, probabilities)
+
+        assert result["traffic_state"].tolist() == [1, 1, 2, 0]
+        assert result["continuity_id"].nunique() == 2
+
+
+def test_progressive_batch_parity_detects_divergence() -> None:
+    batch = classify_telemetry_dataframe(
+        _feature_rows(),
+        _DummyModel(np.array([0.9, 0.08, 0.02])),
+        _DummyScaler(len(FEATURE_COLS)),
+        model_revision="a" * 64,
+    )
+    progressive = batch[
+        ["clip_id", "continuity_id", "record_time", "traffic_state", "state_label", "confidence"]
+    ].copy()
+    progressive["incident_candidate"] = batch["accident_rule_triggered"].astype(bool)
+
+    assert_progressive_batch_parity(progressive, batch)
+    progressive.loc[progressive.index[-1], "traffic_state"] = 1
+    with pytest.raises(RuntimeError, match="diverged"):
+        assert_progressive_batch_parity(progressive, batch)

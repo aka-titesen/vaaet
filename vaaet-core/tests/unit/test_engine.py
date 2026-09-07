@@ -26,6 +26,7 @@ def _raw_minutes(count: int) -> pd.DataFrame:
     return pd.DataFrame(
         {
             "clip_id": ["clip-a"] * count,
+            "continuity_id": ["clip-a:continuity-0001"] * count,
             "record_time": pd.date_range("2025-05-01T11:00:00Z", periods=count, freq="1min"),
             "avg_speed": [30.0] * count,
             "total_vehicles": [5] * count,
@@ -48,7 +49,7 @@ def _engine() -> TrafficStateEngine:
     return TrafficStateEngine(
         LoadedTrafficBundle(
             manifest={
-                "model_version": "mlp-traffic-v2",
+                "model_version": "mlp-v3.0",
                 "decision_policy": {
                     "class_thresholds": {"0": 0.5, "1": 0.5, "2": 0.5},
                     "minimum_probability_margin": 0.05,
@@ -61,7 +62,8 @@ def _engine() -> TrafficStateEngine:
             scaler=_IdentityScaler(),
             label_mapping=dict(STATE_LABELS),
             deployment_stage="production",
-            input_policy="canonical-v2",
+            input_policy="canonical-v3",
+            model_revision="a" * 64,
         )
     )
 

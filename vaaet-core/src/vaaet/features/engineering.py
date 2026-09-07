@@ -11,8 +11,10 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from vaaet.settings import FEATURE_COLS, FEATURE_MAX_GAP_MINUTES, LABELING_THRESHOLDS
-from vaaet.timestamps import normalize_timestamp_series, traffic_local_hour
+from vaaet.artifacts import FEATURE_SCHEMA_VERSION
+from vaaet.continuity import CONTINUITY_COLUMN, normalize_continuity_frame
+from vaaet.settings import FEATURE_COLS, LABELING_THRESHOLDS
+from vaaet.timestamps import traffic_local_hour
 
 __all__ = [
     "engineer_features",
@@ -42,17 +44,7 @@ def _validate_and_order(df: pd.DataFrame) -> pd.DataFrame:
     if missing:
         raise ValueError(f"Telemetry is missing required columns: {missing}")
 
-    out = df.copy()
-    if out["clip_id"].isna().any() or out["clip_id"].astype(str).str.strip().eq("").any():
-        raise ValueError("clip_id must be present for every telemetry record.")
-    out["record_time"] = normalize_timestamp_series(out["record_time"])
-    if out.duplicated(["clip_id", "record_time"]).any():
-        raise ValueError("Duplicate (clip_id, record_time) telemetry records are not allowed.")
-
-    for clip_id, group in out.groupby("clip_id", sort=False):
-        if not group["record_time"].is_monotonic_increasing:
-            raise ValueError(f"record_time must be monotonic within clip_id={clip_id!r}.")
-    return out.sort_values(["clip_id", "record_time"], kind="stable").reset_index(drop=True)
+    return normalize_continuity_frame(df)
 
 
 def engineer_features(df: pd.DataFrame) -> pd.DataFrame:
@@ -67,11 +59,7 @@ def engineer_features(df: pd.DataFrame) -> pd.DataFrame:
         return out
 
     out = _validate_and_order(out)
-    gap_limit = pd.Timedelta(minutes=FEATURE_MAX_GAP_MINUTES)
-    time_delta = out.groupby("clip_id", sort=False)["record_time"].diff()
-    segment_start = time_delta.isna() | time_delta.gt(gap_limit)
-    out["_continuity_segment"] = segment_start.groupby(out["clip_id"]).cumsum().astype(int)
-    group_keys = [out["clip_id"], out["_continuity_segment"]]
+    group_keys = [out["clip_id"], out[CONTINUITY_COLUMN]]
 
     out["heavy_vehicle_ratio"] = (out["count_truck"] + out["count_bus"]) / out[
         "total_vehicles"
@@ -152,8 +140,6 @@ def engineer_features(df: pd.DataFrame) -> pd.DataFrame:
     out = out.dropna(
         subset=["delta_speed", "delta_count", "cumulative_delta_speed"]
     ).reset_index(drop=True)
-    out = out.drop(columns=["_continuity_segment"])
-
     for col in FEATURE_COLS:
         if col not in out.columns:
             out[col] = np.nan
@@ -164,5 +150,6 @@ def engineer_features(df: pd.DataFrame) -> pd.DataFrame:
         "weather_condition",
     ):
         out[col] = out[col].astype(int)
+    out["feature_schema_version"] = FEATURE_SCHEMA_VERSION
 
     return out

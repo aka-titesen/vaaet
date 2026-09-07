@@ -13,7 +13,7 @@ cinemática multi-vista
 
 | Campo | Detalle |
 |---|---|
-| Versión del laboratorio | 4.5.4 |
+| Versión del laboratorio | 4.6.0 |
 | Última revisión | 2026-08-30 |
 | Responsable técnico | Facundo Nicolás González |
 
@@ -36,7 +36,7 @@ hasta una revisión explícita.
 - Plan opcional de segmentos multi-vista offline, con calibración local por
   referencias medidas, reinicio temporal y descarte de minutos mixtos.
 - Telemetría v2 por minutos completos, video anotado y métricas de pipeline.
-- Ingeniería de 19 features, MLP de tres salidas, política temporal y bundle v2
+- Ingeniería de 19 features, MLP de tres salidas, política temporal y bundle v3
   validado antes de deserializar.
 - Cuatro notebooks: adquisición, entrenamiento, inferencia y evaluación
   Champion--Challenger read-only.

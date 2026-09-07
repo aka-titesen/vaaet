@@ -1,7 +1,7 @@
 # Documentación de VAAET
 
-VAAET es un monorepo con `vaaet-core` (`vaaet`, versión interna 0.1.0),
-`vaaet-ml` (`vaaet_ml`, versión 4.5.4) y `vaaet-app` reservado. La topología y
+VAAET es un monorepo con `vaaet-core` (`vaaet`, versión interna 0.2.0),
+`vaaet-ml` (`vaaet_ml`, versión 4.6.0) y `vaaet-app` reservado. La topología y
 los límites vigentes están definidos por [ADR-0021](architecture/decisions/0021-portable-core-and-ml-laboratory-boundary.md).
 
 ## Estado y precedencia documental
@@ -11,7 +11,7 @@ los límites vigentes están definidos por [ADR-0021](architecture/decisions/002
 - **Hipótesis futura**: Canvas, SOW y personas conservan ideas de producto sin
   prometer API, Web App, costos, plazos ni servicios disponibles.
 - **Histórico**: changelog y planes fechados registran su momento; los ADRs
-  conservan sus decisiones originales. ADR-0021, ADR-0022, ADR-0023 y ADR-0024
+  conservan sus decisiones originales. ADR-0021 a ADR-0026
   prevalecen para la topología, serving con YOLO, registro DVC, operación
   PostgreSQL y segmentos de video calibrados actuales.
 
@@ -33,6 +33,7 @@ y el [checklist AGPL](governance/agpl-demo-release-checklist.md).
 - [ADR-0023: registro DVC portable por configuración local](architecture/decisions/0023-provider-neutral-dvc-registry.md)
 - [ADR-0024: PostgreSQL portable y migraciones como código](architecture/decisions/0024-provider-neutral-postgresql-and-schema-as-code.md)
 - [ADR-0025: segmentos multi-vista con calibración explícita](architecture/decisions/0025-calibrated-multi-view-video-segments.md)
+- [ADR-0026: continuidad temporal y revisiones inmutables](architecture/decisions/0026-temporal-continuity-and-immutable-model-revisions.md)
 - [Contrato del bundle](ml/model-artifact-contract.md)
 - [Guía del registro DVC](ml/dvc-guide.md)
 - [ADR de inicio semilla y HITL](architecture/decisions/0017-seed-bootstrap-and-hitl-retraining.md)

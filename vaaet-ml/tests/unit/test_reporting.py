@@ -13,6 +13,8 @@ from vaaet_ml.evaluation.reporting import (
     build_classification_support_table,
     expected_calibration_error,
     expected_confusion_cost,
+    false_alert_rate_upper_bound,
+    grouped_classification_intervals,
     select_validation_decision_policy,
     summarize_data_origin,
     summarize_resampled_balance,
@@ -42,7 +44,13 @@ def test_metrics_reject_invalid_shapes_and_compute_calibration_error() -> None:
 
 
 def test_decision_policy_is_selected_from_validation_probabilities() -> None:
-    frame = pd.DataFrame({"clip_id": ["a"] * 4})
+    frame = pd.DataFrame(
+        {
+            "clip_id": ["a"] * 4,
+            "continuity_id": ["a:continuity-0001"] * 4,
+            "record_time": pd.date_range("2026-01-01T00:00:00Z", periods=4, freq="1min"),
+        }
+    )
     probabilities = np.array(
         [[0.9, 0.08, 0.02], [0.1, 0.85, 0.05], [0.05, 0.1, 0.85], [0.05, 0.1, 0.85]]
     )
@@ -51,6 +59,39 @@ def test_decision_policy_is_selected_from_validation_probabilities() -> None:
     )
     assert set(policy["class_thresholds"]) == {"0", "1", "2"}
     assert policy["temperature"] == 1.2
+
+
+def test_grouped_intervals_are_deterministic_and_report_calibration() -> None:
+    truth = np.array([0, 1, 2, 0, 1, 2])
+    predicted = truth.copy()
+    clips = np.array(["a", "a", "a", "b", "b", "b"])
+    probabilities = np.eye(3)[truth] * 0.9 + (1 - np.eye(3)[truth]) * 0.05
+
+    first = grouped_classification_intervals(
+        truth, predicted, clips, probabilities=probabilities, samples=50, random_state=7
+    )
+    second = grouped_classification_intervals(
+        truth, predicted, clips, probabilities=probabilities, samples=50, random_state=7
+    )
+
+    pd.testing.assert_frame_equal(first, second)
+    assert {"ece", "brier_score"}.issubset(set(first["metric"]))
+    assert first["sufficient"].all()
+
+
+def test_grouped_intervals_mark_rare_class_as_insufficient() -> None:
+    intervals = grouped_classification_intervals(
+        [0, 0, 1, 2], [0, 0, 1, 2], ["normal", "normal", "reduced", "congested"],
+        samples=100,
+        random_state=11,
+    ).set_index("metric")
+
+    assert not bool(intervals.loc["recall_congested", "sufficient"])
+
+
+def test_zero_false_alerts_need_about_three_hundred_negative_hours() -> None:
+    assert false_alert_rate_upper_bound(0, 300.0) < 0.01
+    assert false_alert_rate_upper_bound(0, 299.0) > 0.01
 
 
 class TestSummarizeDataOrigin:

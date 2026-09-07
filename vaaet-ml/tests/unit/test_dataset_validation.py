@@ -21,10 +21,10 @@ def _labeled_groups(raw_telemetry_df: pd.DataFrame) -> pd.DataFrame:
     return frame
 
 
-def test_v2_dataset_is_audited_as_eligible(raw_telemetry_df: pd.DataFrame) -> None:
+def test_v3_dataset_is_audited_as_eligible(raw_telemetry_df: pd.DataFrame) -> None:
     audit = audit_training_dataset(raw_telemetry_df)
     assert audit.production_eligible is True
-    assert audit.report["telemetry_v2_coverage"] == 1.0
+    assert audit.report["telemetry_v3_coverage"] == 1.0
     assert audit.report["timezone"] == "UTC"
     assert audit.report["traffic_local_timezone"] == "America/Argentina/Buenos_Aires"
 

@@ -36,7 +36,49 @@ __all__ = [
     "apply_stable_state_policy",
     "classify_raw_telemetry",
     "classify_telemetry_dataframe",
+    "assert_progressive_batch_parity",
 ]
+
+
+def assert_progressive_batch_parity(
+    progressive: pd.DataFrame,
+    batch: pd.DataFrame,
+) -> None:
+    """Detiene la inferencia si el HUD y la salida persistible no coinciden."""
+
+    if progressive.empty and batch.empty:
+        return
+    if len(progressive) != len(batch):
+        raise RuntimeError(
+            "Progressive HUD and batch inference produced a different number of states."
+        )
+    required_progressive = {
+        "clip_id",
+        "continuity_id",
+        "record_time",
+        "traffic_state",
+        "state_label",
+        "confidence",
+        "incident_candidate",
+    }
+    if missing := sorted(required_progressive - set(progressive.columns)):
+        raise RuntimeError(f"Progressive HUD output is missing parity fields: {missing}")
+    left = progressive.loc[:, sorted(required_progressive)].copy()
+    right = batch.assign(
+        incident_candidate=batch["accident_rule_triggered"].astype(bool)
+    ).loc[:, sorted(required_progressive)]
+    for frame in (left, right):
+        frame["record_time"] = pd.to_datetime(frame["record_time"], utc=True)
+        frame["confidence"] = pd.to_numeric(frame["confidence"], errors="raise").round(4)
+        frame["traffic_state"] = pd.to_numeric(
+            frame["traffic_state"], errors="raise"
+        ).astype(int)
+    left = left.sort_values(["clip_id", "continuity_id", "record_time"]).reset_index(drop=True)
+    right = right.sort_values(["clip_id", "continuity_id", "record_time"]).reset_index(drop=True)
+    if not left.equals(right):
+        raise RuntimeError(
+            "Progressive HUD state diverged from batch inference; results were not persisted."
+        )
 
 
 def _empty_classification_result(frame: pd.DataFrame) -> pd.DataFrame:
@@ -49,7 +91,7 @@ def _ensure_feature_compatibility(scaler: FeatureScaler, feature_cols: list[str]
     expected = getattr(scaler, "n_features_in_", None)
     if expected is not None and int(expected) != len(feature_cols):
         raise ValueError(
-            "Scaler feature count does not match FEATURE_COLS. Re-run training with bundle v2."
+            "Scaler feature count does not match FEATURE_COLS. Re-run training with bundle v3."
         )
 
 
@@ -73,8 +115,9 @@ def classify_telemetry_dataframe(
     label_mapping: Mapping[int, str] | None = None,
     feature_cols: list[str] | None = None,
     model_version: str = MODEL_VERSION,
+    model_revision: str | None = None,
     decision_policy: Mapping[str, object] | None = None,
-    input_policy: ModelInputPolicy | str = ModelInputPolicy.CANONICAL_V2,
+    input_policy: ModelInputPolicy | str = ModelInputPolicy.CANONICAL_V3,
 ) -> pd.DataFrame:
     """Ejecuta el MLP de tres clases y la cadena de decisión de producción."""
 
@@ -84,7 +127,7 @@ def classify_telemetry_dataframe(
     active_features = feature_cols or FEATURE_COLS
     _ensure_feature_compatibility(scaler, active_features)
     if active_features != FEATURE_COLS:
-        raise ValueError("Custom feature order is not supported by bundle v2.")
+        raise ValueError("Custom feature order is not supported by bundle v3.")
     model_matrix = apply_model_input_policy(df_features, input_policy)
     probabilities = _validate_probabilities(
         model.predict(scaler.transform(model_matrix.to_numpy()), verbose=0), len(df_features)
@@ -108,6 +151,7 @@ def classify_telemetry_dataframe(
         ),
     )
     result["model_version"] = model_version
+    result["model_revision"] = model_revision
     result = apply_conservative_accident_gate(result)
     result["traffic_state"] = result["traffic_state"].astype(int)
     result["state_label"] = result["traffic_state"].map(STATE_LABELS)
@@ -122,9 +166,10 @@ def classify_raw_telemetry(
     label_mapping: Mapping[int, str] | None = None,
     feature_cols: list[str] | None = None,
     model_version: str = MODEL_VERSION,
+    model_revision: str | None = None,
     inference_mode: str = "stable",
     decision_policy: Mapping[str, object] | None = None,
-    input_policy: ModelInputPolicy | str = ModelInputPolicy.CANONICAL_V2,
+    input_policy: ModelInputPolicy | str = ModelInputPolicy.CANONICAL_V3,
 ) -> pd.DataFrame:
     """Genera features de minutos completos y los clasifica de manera segura."""
 
@@ -148,6 +193,7 @@ def classify_raw_telemetry(
         label_mapping=label_mapping,
         feature_cols=feature_cols,
         model_version=model_version,
+        model_revision=model_revision,
         decision_policy=decision_policy,
         input_policy=input_policy,
     )

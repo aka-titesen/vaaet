@@ -21,6 +21,8 @@ from vaaet_ml.data.ingestion import create_dataset_package
 from vaaet_ml.data.review import HumanValidation
 from vaaet_ml.settings import FEATURE_COLS
 
+MODEL_REVISION = "a" * 64
+
 
 def _feature_values(value: float = 1.0) -> dict[str, float]:
     return {column: value + index / 100 for index, column in enumerate(FEATURE_COLS)}
@@ -49,12 +51,14 @@ def _classified_frame(*, clip_id: str = "clip-a") -> pd.DataFrame:
         rows.append(
             {
                 "clip_id": clip_id,
+                "continuity_id": f"{clip_id}:continuity-0001",
                 "record_time": pd.Timestamp("2026-08-10T18:00:00Z")
                 + pd.Timedelta(minutes=index),
                 "traffic_state": state,
                 "state_label": ("Normal", "Reduced")[state],
                 "confidence": 0.9,
-                "model_version": "mlp-v2.1",
+                "model_version": "mlp-v3.0",
+                "model_revision": MODEL_REVISION,
                 **_feature_values(10.0 + index),
             }
         )
@@ -136,6 +140,7 @@ def test_catalog_rejects_unsafe_relative_path(tmp_path: Path) -> None:
                         "human_support": {},
                         "status": "active",
                         "feature_schema_version": FEATURE_SCHEMA_VERSION,
+                        "model_revision": MODEL_REVISION,
                         "vaaet_version": "4.5.0",
                     }
                 ],
@@ -164,6 +169,7 @@ def test_catalog_rejects_platform_specific_unsafe_paths(
         "human_support": {},
         "status": "active",
         "feature_schema_version": FEATURE_SCHEMA_VERSION,
+        "model_revision": MODEL_REVISION,
         "vaaet_version": "4.5.0",
     }
     with pytest.raises(ValueError, match="Unsafe"):
@@ -188,7 +194,14 @@ def test_catalog_rejects_cross_package_validation_branch(tmp_path: Path) -> None
         ]
     )
     predictions = pd.DataFrame(
-        [{"id": prediction_id, "telemetry_feature_id": feature_id, "model_version": "mlp-v2.1"}]
+        [
+            {
+                "id": prediction_id,
+                "telemetry_feature_id": feature_id,
+                "model_version": "mlp-v3.0",
+                "model_revision": MODEL_REVISION,
+            }
+        ]
     )
     validations = pd.DataFrame(
         [
@@ -242,6 +255,7 @@ def test_catalog_rejects_cross_package_validation_branch(tmp_path: Path) -> None
         "human_support": {},
         "status": "active",
         "feature_schema_version": FEATURE_SCHEMA_VERSION,
+        "model_revision": MODEL_REVISION,
         "vaaet_version": "4.5.0",
     }
     HitlReviewCatalog(root / "catalog.json").register(entry)
@@ -268,7 +282,14 @@ def test_catalog_resolves_valid_cross_package_correction_chain(tmp_path: Path) -
         ]
     )
     predictions = pd.DataFrame(
-        [{"id": prediction_id, "telemetry_feature_id": feature_id, "model_version": "mlp-v2.1"}]
+        [
+            {
+                "id": prediction_id,
+                "telemetry_feature_id": feature_id,
+                "model_version": "mlp-v3.0",
+                "model_revision": MODEL_REVISION,
+            }
+        ]
     )
     validation_frames = [
         pd.DataFrame(
@@ -320,6 +341,7 @@ def test_catalog_resolves_valid_cross_package_correction_chain(tmp_path: Path) -
                 "human_support": {},
                 "status": "active",
                 "feature_schema_version": FEATURE_SCHEMA_VERSION,
+                "model_revision": MODEL_REVISION,
                 "vaaet_version": "4.5.0",
             }
         )

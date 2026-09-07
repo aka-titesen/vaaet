@@ -12,6 +12,7 @@ from pathlib import Path
 
 import pandas as pd
 from vaaet.artifacts import FEATURE_SCHEMA_VERSION
+from vaaet.continuity import CONTINUITY_COLUMN, normalize_continuity_frame
 from vaaet.settings import FEATURE_COLS
 from vaaet.timestamps import (
     count_naive_timestamps,
@@ -56,6 +57,7 @@ class FeedbackPolicy(str, Enum):
 @dataclass(frozen=True)
 class PostgresSource:
     settings: DatabaseSettings
+    feature_schema_version: str | None = FEATURE_SCHEMA_VERSION
 
 
 @dataclass(frozen=True)
@@ -131,7 +133,14 @@ def _load_seed_features(source: SeedDatasetPackageSource) -> pd.DataFrame:
     frame = frames.get("features", pd.DataFrame())
     if frame.empty:
         raise ValueError("Explicit seed package contains zero processed feature rows.")
-    required = {"clip_id", "record_time", "traffic_state", *FEATURE_COLS}
+    required = {
+        "clip_id",
+        CONTINUITY_COLUMN,
+        "record_time",
+        "feature_schema_version",
+        "traffic_state",
+        *FEATURE_COLS,
+    }
     if missing := required - set(frame.columns):
         raise ValueError(f"Seed feature package is missing fields: {sorted(missing)}")
     feature_order = [column for column in frame.columns if column in FEATURE_COLS]
@@ -141,10 +150,9 @@ def _load_seed_features(source: SeedDatasetPackageSource) -> pd.DataFrame:
         raise ValueError("Seed package may contain only stable proxy labels 0, 1, and 2.")
     if "is_human_validated" in frame and frame["is_human_validated"].fillna(False).any():
         raise ValueError("Seed package cannot contain human-validated rows.")
-    if "feature_schema_version" in frame:
-        versions = set(frame["feature_schema_version"].dropna().astype(str))
-        if versions and versions != {FEATURE_SCHEMA_VERSION}:
-            raise ValueError(f"Incompatible seed feature schema versions: {sorted(versions)}")
+    versions = set(frame["feature_schema_version"].dropna().astype(str))
+    if versions != {FEATURE_SCHEMA_VERSION}:
+        raise ValueError(f"Incompatible seed feature schema versions: {sorted(versions)}")
     package_provenance = frame.attrs.get("vaaet_package_provenance", {})
     package_contract = frame.attrs.get("vaaet_package_contract")
     if package_provenance.get("training_mode") != TrainingMode.SEED_BOOTSTRAP.value or (
@@ -189,8 +197,11 @@ def _latest_validated_feedback(frames: dict[str, pd.DataFrame]) -> pd.DataFrame:
     validations["reviewed_at"] = pd.to_datetime(validations["reviewed_at"], utc=True)
     ordering = ["reviewed_at", "id"] if "id" in validations else ["reviewed_at"]
     latest = validations.sort_values(ordering).drop_duplicates("prediction_id", keep="last")
+    prediction_columns = ["id", "telemetry_feature_id", "model_version"]
+    if "model_revision" in predictions:
+        prediction_columns.append("model_revision")
     joined = features.merge(
-        predictions[["id", "telemetry_feature_id", "model_version"]],
+        predictions[prediction_columns],
         left_on="id",
         right_on="telemetry_feature_id",
         suffixes=("", "_prediction"),
@@ -306,7 +317,10 @@ def _load_raw(source: TrainingSource) -> pd.DataFrame:
 
 def _load_feedback(source: TrainingSource) -> pd.DataFrame:
     if isinstance(source, PostgresSource):
-        return load_human_ground_truth(settings=source.settings)
+        return load_human_ground_truth(
+            settings=source.settings,
+            feature_schema_version=source.feature_schema_version,
+        )
     if isinstance(source, DatasetPackageSource):
         return _latest_validated_feedback(load_dataset_package(source.path))
     if isinstance(source, PostgresBackupSource):
@@ -366,20 +380,10 @@ def _deduplicate_feedback(
     required = {"clip_id", "record_time", "traffic_state", *FEATURE_COLS}
     if missing := required - set(combined.columns):
         raise ValueError(f"Validated feedback is missing fields: {sorted(missing)}")
-    feature_order = [column for column in combined.columns if column in FEATURE_COLS]
-    if feature_order != list(FEATURE_COLS):
-        raise ValueError("Validated feedback does not preserve the exact 19-feature order.")
-    if (
-        require_human_validation
-        and "is_human_validated" in combined
-        and not combined["is_human_validated"].fillna(False).all()
-    ):
-        raise ValueError("Feedback sources contain unvalidated predictions.")
-    if "feature_schema_version" in combined:
-        versions = set(combined["feature_schema_version"].dropna().astype(str))
-        if versions and versions != {FEATURE_SCHEMA_VERSION}:
-            raise ValueError(f"Incompatible feature schema versions: {sorted(versions)}")
-    combined["record_time"] = normalize_timestamp_series(combined["record_time"])
+    versions = _validate_processed_frame_contract(combined, require_human_validation)
+    normalized_frames = [normalize_continuity_frame(frame) for frame in non_empty]
+    combined = pd.concat(normalized_frames, ignore_index=True)
+    combined.attrs["legacy_feature_schema"] = versions == {"traffic-features-v2"}
     combined["traffic_state"] = pd.to_numeric(combined["traffic_state"], errors="raise").astype(int)
     for _, group in combined.groupby(["clip_id", "record_time"], dropna=False):
         if group["traffic_state"].nunique() > 1 or len(
@@ -397,6 +401,36 @@ def _deduplicate_feedback(
     incidents = combined.loc[combined["traffic_state"].eq(3)].reset_index(drop=True)
     stable = combined.loc[combined["traffic_state"].isin((0, 1, 2))].reset_index(drop=True)
     return stable, incidents
+
+
+def _validate_processed_frame_contract(
+    frame: pd.DataFrame, require_human_validation: bool
+) -> set[str]:
+    """Valida schema, orden y lineage antes de consolidar fuentes procesadas."""
+
+    feature_order = [column for column in frame.columns if column in FEATURE_COLS]
+    if feature_order != list(FEATURE_COLS):
+        raise ValueError("Validated feedback does not preserve the exact 19-feature order.")
+    if require_human_validation:
+        if "is_human_validated" not in frame:
+            raise ValueError("Feedback sources must explicitly prove human validation.")
+        if not frame["is_human_validated"].fillna(False).all():
+            raise ValueError("Feedback sources contain unvalidated predictions.")
+    if "feature_schema_version" not in frame:
+        raise ValueError("Processed feedback requires feature_schema_version.")
+    versions = set(frame["feature_schema_version"].dropna().astype(str))
+    accepted = {FEATURE_SCHEMA_VERSION, "traffic-features-v2"}
+    if len(versions) != 1 or not versions.issubset(accepted):
+        raise ValueError(f"Incompatible feature schema versions: {sorted(versions)}")
+    if versions == {FEATURE_SCHEMA_VERSION} and CONTINUITY_COLUMN not in frame:
+        raise ValueError("Current processed feedback requires continuity_id.")
+    if (
+        require_human_validation
+        and versions == {FEATURE_SCHEMA_VERSION}
+        and "model_revision" not in frame
+    ):
+        raise ValueError("Current processed feedback requires model_revision lineage.")
+    return versions
 
 
 def compose_supervised_dataset(

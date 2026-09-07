@@ -188,7 +188,7 @@ class DatabaseSettings:
     def application(self) -> str:
         """Devuelve una identidad segura para observabilidad del cliente SQL."""
 
-        return self.application_name or f"vaaet-{self.profile.value}-4.5.4"
+        return self.application_name or f"vaaet-{self.profile.value}-4.6.0"
 
 
 @dataclass(frozen=True, repr=False)
@@ -252,7 +252,7 @@ class DatabaseAdminSettings:
     def application(self) -> str:
         """Identifica las sesiones administrativas sin revelar el proveedor."""
 
-        return self.application_name or "vaaet-migration-4.5.4"
+        return self.application_name or "vaaet-migration-4.6.0"
 
 
 def _colab_secret(name: str) -> str | None:

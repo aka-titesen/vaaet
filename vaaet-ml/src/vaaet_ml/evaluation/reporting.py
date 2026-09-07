@@ -6,6 +6,8 @@ from vaaet_ml.evaluation.reporting_metrics import (
     build_classification_support_table,
     expected_calibration_error,
     expected_confusion_cost,
+    false_alert_rate_upper_bound,
+    grouped_classification_intervals,
     select_validation_decision_policy,
 )
 from vaaet_ml.evaluation.reporting_summaries import (
@@ -26,6 +28,8 @@ __all__ = [
     "build_classification_support_table",
     "expected_calibration_error",
     "expected_confusion_cost",
+    "false_alert_rate_upper_bound",
+    "grouped_classification_intervals",
     "plot_training_evaluation",
     "plot_training_history",
     "select_validation_decision_policy",

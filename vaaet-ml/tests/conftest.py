@@ -119,7 +119,7 @@ def raw_telemetry_df() -> pd.DataFrame:
     df["speed_sample_count"] = 4
     df["speed_measurement_quality"] = 0.8
     df["optical_flow_tracking_ratio"] = 0.9
-    df["telemetry_schema_version"] = "traffic-telemetry-v2"
+    df["telemetry_schema_version"] = "traffic-telemetry-v3"
     return df
 
 

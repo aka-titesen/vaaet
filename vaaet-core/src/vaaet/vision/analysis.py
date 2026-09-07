@@ -43,11 +43,13 @@ __all__ = [
 
 _CLASSIFICATION_COLUMNS: tuple[str, ...] = (
     "clip_id",
+    "continuity_id",
     "record_time",
     "traffic_state",
     "state_label",
     "confidence",
     "evidence",
+    "incident_candidate",
 )
 
 

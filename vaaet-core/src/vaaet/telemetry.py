@@ -24,7 +24,10 @@ TELEMETRY_QUALITY_COLUMNS: tuple[str, ...] = (
     "optical_flow_tracking_ratio",
 )
 
-TELEMETRY_METADATA_COLUMNS: tuple[str, ...] = ("telemetry_schema_version",)
+TELEMETRY_METADATA_COLUMNS: tuple[str, ...] = (
+    "continuity_id",
+    "telemetry_schema_version",
+)
 
 CANONICAL_RAW_TELEMETRY_COLUMNS: tuple[str, ...] = (
     *BASE_RAW_TELEMETRY_COLUMNS,

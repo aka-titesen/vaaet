@@ -9,6 +9,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import pytest
 
 from vaaet_ml.data.hitl_catalog import (
     HitlCatalogSource,
@@ -33,12 +34,14 @@ def _classified_frame(*, clip_id: str = "clip-a") -> pd.DataFrame:
         [
             {
                 "clip_id": clip_id,
+                "continuity_id": f"{clip_id}:continuity-0001",
                 "record_time": pd.Timestamp("2026-08-10T18:00:00Z")
                 + pd.Timedelta(minutes=index),
                 "traffic_state": state,
                 "state_label": ("Normal", "Reduced")[state],
                 "confidence": 0.9,
-                "model_version": "mlp-v2.1",
+                "model_version": "mlp-v3.0",
+                "model_revision": "a" * 64,
                 **_feature_values(10.0 + index),
             }
             for index, state in enumerate((0, 1))
@@ -93,6 +96,22 @@ def test_hitl_package_preserves_high_precision_features(tmp_path: Path) -> None:
     assert len(feedback) == 1
     for column in FEATURE_COLS:
         assert feedback.iloc[0][column] == expected[column]
+
+
+def test_review_finalization_rejects_non_sha_model_revision(tmp_path: Path) -> None:
+    classified = _classified_frame()
+    classified["model_revision"] = "x" * 64
+
+    with pytest.raises(ValueError, match="SHA-256 model_revision"):
+        finalize_review_session(
+            classified=classified,
+            validations=[],
+            pipeline_run_id=str(uuid.uuid4()),
+            model_version="mlp-v3.0",
+            git_commit="abc",
+            vaaet_version="4.6.0",
+            local_root=tmp_path / "local",
+        )
 
 
 def test_legacy_hitl_package_is_imported_explicitly(tmp_path: Path) -> None:

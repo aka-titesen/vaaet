@@ -11,7 +11,6 @@ from types import MappingProxyType
 
 import numpy as np
 import pandas as pd
-from sklearn.metrics import classification_report
 
 from vaaet_ml.data.datasets import build_group_ids
 from vaaet_ml.training.lifecycle import TrainingMode
@@ -49,56 +48,48 @@ def evaluate_candidate_eligibility(
     test_frame: pd.DataFrame,
     actual: Sequence[int],
     predicted: Sequence[int],
+    direct_predicted: Sequence[int] | None = None,
     f1_macro: float,
     direct_normal_congested_error: float,
+    final_normal_congested_error: float | None = None,
     expected_calibration_error: float,
     negative_exposure_hours: float,
     false_candidates_per_hour: float,
+    direct_intervals: pd.DataFrame | None = None,
+    final_intervals: pd.DataFrame | None = None,
+    false_candidates_upper_95: float | None = None,
 ) -> CandidateEligibility:
-    """Aplica los mismos umbrales del notebook sin crear criterios nuevos."""
+    """Aplica gates conservadores sobre límites agrupados del 95 %."""
 
     mode = TrainingMode(training_mode)
     truth = np.asarray(actual, dtype=int)
     final = np.asarray(predicted, dtype=int)
-    if truth.ndim != 1 or truth.shape != final.shape or len(truth) != len(test_frame):
-        raise ValueError("Eligibility requires aligned one-dimensional test targets and predictions.")
-    if not np.isin(truth, (0, 1, 2)).all() or not np.isin(final, (0, 1, 2)).all():
-        raise ValueError("Eligibility is defined only for the three stable model states.")
-    _validate_metric("f1_macro", f1_macro)
-    _validate_metric("direct_normal_congested_error", direct_normal_congested_error)
-    _validate_metric("expected_calibration_error", expected_calibration_error)
-    _validate_metric("negative_exposure_hours", negative_exposure_hours)
+    direct = final if direct_predicted is None else np.asarray(direct_predicted, dtype=int)
+    _validate_eligibility_inputs(test_frame, truth, direct, final)
+    final_extreme = (
+        direct_normal_congested_error
+        if final_normal_congested_error is None
+        else final_normal_congested_error
+    )
+    for name, value in (
+        ("f1_macro", f1_macro),
+        ("direct_normal_congested_error", direct_normal_congested_error),
+        ("final_normal_congested_error", final_extreme),
+        ("expected_calibration_error", expected_calibration_error),
+        ("negative_exposure_hours", negative_exposure_hours),
+    ):
+        _validate_metric(name, value)
     if negative_exposure_hours > 0:
         _validate_metric("false_candidates_per_hour", false_candidates_per_hour)
 
-    classification = classification_report(
-        truth,
-        final,
-        labels=[0, 1, 2],
-        output_dict=True,
-        zero_division=0,
-    )
-    metric_gates = {
-        "f1_macro": f1_macro >= _MINIMUM_F1_MACRO,
-        **{
-            f"{label}_precision": classification[str(state)]["precision"]
-            >= _MINIMUM_PRECISION[state]
-            for state, label in ((0, "normal"), (1, "reduced"), (2, "congested"))
-        },
-        **{
-            f"{label}_recall": classification[str(state)]["recall"] >= _MINIMUM_RECALL[state]
-            for state, label in ((0, "normal"), (1, "reduced"), (2, "congested"))
-        },
-        "direct_normal_congested_error": (
-            direct_normal_congested_error <= _MAXIMUM_DIRECT_NORMAL_CONGESTED_ERROR
-        ),
-        "ece": expected_calibration_error <= _MAXIMUM_ECE,
-    }
+    metric_gates = _interval_gates(direct_intervals, final_intervals)
     blockers = list(dataset_blockers)
     if mode is TrainingMode.SEED_BOOTSTRAP:
         blockers.append("seed bootstrap uses weak proxy supervision and is pilot-only")
     if not human_holdout:
         blockers.append("validation/test are not a frozen human-validated holdout")
+    if direct_intervals is None or final_intervals is None:
+        blockers.append("grouped 95% confidence intervals are missing")
     blockers.extend(f"metric gate failed: {name}" for name, passed in metric_gates.items() if not passed)
 
     congested_minutes = int((truth == 2).sum())
@@ -114,7 +105,9 @@ def evaluate_candidate_eligibility(
         blockers.append(
             f"incident negative exposure insufficient: {negative_exposure_hours:.2f}/300 h"
         )
-    elif false_candidates_per_hour >= _MAXIMUM_FALSE_CANDIDATES_PER_HOUR:
+    elif false_candidates_upper_95 is None:
+        blockers.append("incident false-alert upper 95% bound is missing")
+    elif false_candidates_upper_95 >= _MAXIMUM_FALSE_CANDIDATES_PER_HOUR:
         blockers.append("incident candidate rate is not below 1 per 100 hours")
     return CandidateEligibility(
         metric_gates=metric_gates,
@@ -131,6 +124,71 @@ def _congested_clip_count(test_frame: pd.DataFrame, truth: np.ndarray) -> int:
     return 0 if congested.empty else int(build_group_ids(congested).nunique())
 
 
+def _validate_eligibility_inputs(
+    test_frame: pd.DataFrame,
+    truth: np.ndarray,
+    direct: np.ndarray,
+    final: np.ndarray,
+) -> None:
+    if (
+        truth.ndim != 1
+        or truth.shape != final.shape
+        or direct.shape != truth.shape
+        or len(truth) != len(test_frame)
+    ):
+        raise ValueError("Eligibility requires aligned one-dimensional test targets and predictions.")
+    if (
+        not np.isin(truth, (0, 1, 2)).all()
+        or not np.isin(direct, (0, 1, 2)).all()
+        or not np.isin(final, (0, 1, 2)).all()
+    ):
+        raise ValueError("Eligibility is defined only for the three stable model states.")
+
+
 def _validate_metric(name: str, value: float) -> None:
     if not isfinite(float(value)) or float(value) < 0:
         raise ValueError(f"{name} must be a finite non-negative value.")
+
+
+def _interval_gates(
+    direct: pd.DataFrame | None,
+    final: pd.DataFrame | None,
+) -> dict[str, bool]:
+    gates: dict[str, bool] = {}
+    thresholds = {
+        "f1_macro": _MINIMUM_F1_MACRO,
+        **{f"precision_{label}": _MINIMUM_PRECISION[state] for state, label in ((0, "normal"), (1, "reduced"), (2, "congested"))},
+        **{f"recall_{label}": _MINIMUM_RECALL[state] for state, label in ((0, "normal"), (1, "reduced"), (2, "congested"))},
+    }
+    for scope, intervals in (("direct", direct), ("final", final)):
+        lookup = _interval_lookup(intervals)
+        for metric, threshold in thresholds.items():
+            row = lookup.get(metric)
+            gates[f"{scope}_{metric}"] = bool(
+                row is not None
+                and row["sufficient"]
+                and float(row["ci_95_low"]) >= threshold
+            )
+        extreme = lookup.get("normal_congested_error")
+        gates[f"{scope}_normal_congested_error"] = bool(
+            extreme is not None
+            and extreme["sufficient"]
+            and float(extreme["ci_95_high"]) <= _MAXIMUM_DIRECT_NORMAL_CONGESTED_ERROR
+        )
+    final_lookup = _interval_lookup(final)
+    ece = final_lookup.get("ece")
+    gates["final_ece"] = bool(
+        ece is not None
+        and ece["sufficient"]
+        and float(ece["ci_95_high"]) <= _MAXIMUM_ECE
+    )
+    return gates
+
+
+def _interval_lookup(frame: pd.DataFrame | None) -> dict[str, dict[str, object]]:
+    if frame is None or frame.empty:
+        return {}
+    required = {"metric", "ci_95_low", "ci_95_high", "sufficient"}
+    if missing := sorted(required - set(frame.columns)):
+        raise ValueError(f"Grouped interval evidence is missing fields: {missing}")
+    return {str(row["metric"]): row for row in frame.to_dict(orient="records")}

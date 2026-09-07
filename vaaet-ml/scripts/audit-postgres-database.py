@@ -104,7 +104,14 @@ def audit_database(connection: Connection) -> dict[str, Any]:
                     " WHEN 1 THEN 'Reduced' WHEN 2 THEN 'Congested' END) "
                     "AS invalid_prediction_labels, "
                     "(SELECT count(*) FROM vaaet_ml.traffic_predictions "
-                    " WHERE traffic_state = 3) AS automatic_accident_states"
+                    " WHERE traffic_state = 3) AS automatic_accident_states, "
+                    "(SELECT count(*) FROM vaaet_raw.traffic_data "
+                    " WHERE btrim(continuity_id) = '') AS invalid_raw_continuity, "
+                    "(SELECT count(*) FROM vaaet_ml.telemetry_features "
+                    " WHERE btrim(continuity_id) = '') AS invalid_feature_continuity, "
+                    "(SELECT count(*) FROM vaaet_ml.traffic_predictions "
+                    " WHERE model_revision !~ '^[0-9a-f]{64}$') "
+                    "AS invalid_model_revisions"
                 )
             ).mappings().one()
         ),
@@ -121,6 +128,13 @@ def audit_database(connection: Connection) -> dict[str, Any]:
                     "FROM vaaet_feedback.review_queue "
                     "WHERE pipeline_run_id = CAST('00000000-0000-0000-0000-000000000000' AS UUID) "
                     "ORDER BY record_time"
+                )
+            ).scalar_one(),
+            "prediction_by_exact_revision": connection.execute(
+                text(
+                    "EXPLAIN (FORMAT JSON) SELECT id, telemetry_feature_id, traffic_state "
+                    "FROM vaaet_ml.traffic_predictions "
+                    "WHERE model_revision = repeat('0', 64)"
                 )
             ).scalar_one(),
         },

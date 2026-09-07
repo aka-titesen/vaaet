@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import os
 import shutil
 import uuid
@@ -154,6 +155,8 @@ def import_legacy_hitl_package(
         raise ValueError("Legacy HITL package must contain exactly one model version.")
     model_version = next(iter(model_versions))
     classified["model_version"] = model_version
+    legacy_revision = hashlib.sha256(f"legacy:{model_version}".encode()).hexdigest()
+    classified["model_revision"] = legacy_revision
     classified = classified.drop(columns=["telemetry_feature_id", "imported_model_version"])
     return finalize_review_session(
         classified=classified,
@@ -186,6 +189,7 @@ def _session_metadata(
         "finalized_at": finalized_at.isoformat(),
         "fingerprint": fingerprint,
         "model_version": model_version,
+        "model_revision": str(predictions["model_revision"].iloc[0]),
         "git_commit": git_commit,
         "vaaet_version": vaaet_version,
         "clips": sorted(frames["features"]["clip_id"].astype(str).unique().tolist()),
@@ -345,6 +349,7 @@ def _publish_to_catalog(
         "human_support": dict(metadata["human_support"]),
         "status": "active",
         "feature_schema_version": FEATURE_SCHEMA_VERSION,
+        "model_revision": str(metadata["model_revision"]),
         "vaaet_version": vaaet_version,
     }
     return canonical_path, catalog.register(entry)

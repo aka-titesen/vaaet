@@ -64,6 +64,7 @@ class ModelEvaluation:
 
     name: str
     metrics: Mapping[str, float]
+    direct_support_table: pd.DataFrame
     support_table: pd.DataFrame
     classified: pd.DataFrame
     probabilities: np.ndarray
@@ -172,9 +173,17 @@ def validate_evaluation_pair(
     holdout: HumanHoldoutSnapshot,
 ) -> None:
     """Comprueba que ambos bundles usen exactamente el benchmark congelado."""
+    if champion.manifest.get("contract_version") != challenger.manifest.get(
+        "contract_version"
+    ):
+        raise ValueError("Champion and challenger use different bundle contract generations.")
     champion_holdout = _holdout_descriptor(champion.manifest)
     challenger_holdout = _holdout_descriptor(challenger.manifest)
     require_comparable_holdouts(champion_holdout, challenger_holdout)
+
+    snapshot_contract = holdout.descriptor.get("contract")
+    if snapshot_contract != champion_holdout.get("contract"):
+        raise ValueError("Configured holdout contract does not match the evaluated bundles.")
 
     expected_fingerprint = champion_holdout.get("fingerprint")
     actual_fingerprint = holdout.descriptor.get("fingerprint")
@@ -210,6 +219,7 @@ def _evaluate_bundle(bundle: EvaluationBundle, test: pd.DataFrame) -> ModelEvalu
         bundle.model,
         bundle.scaler,
         model_version=_bundle_model_version(bundle),
+        model_revision=str(bundle.manifest["model_revision"]),
         decision_policy=_bundle_decision_policy(bundle),
         input_policy=_bundle_input_policy(bundle),
     )
@@ -217,17 +227,21 @@ def _evaluate_bundle(bundle: EvaluationBundle, test: pd.DataFrame) -> ModelEvalu
     final_predictions = classified["traffic_state"].to_numpy(dtype=int)
     direct_predictions = classified["model_traffic_state"].to_numpy(dtype=int)
     metrics = {
-        "f1_macro": float(
+        "final_f1_macro": float(
             f1_score(truth, final_predictions, labels=[0, 1, 2], average="macro", zero_division=0)
         ),
-        "expected_confusion_cost": expected_confusion_cost(truth, final_predictions),
+        "final_expected_confusion_cost": expected_confusion_cost(truth, final_predictions),
         "ece": expected_calibration_error(truth, probabilities),
         "brier_score": multiclass_brier_score(truth, probabilities),
-        "normal_congested_error": float(
+        "final_normal_congested_error": float(
             (((truth == 0) & (final_predictions == 2)) | ((truth == 2) & (final_predictions == 0))).mean()
         ),
         "direct_f1_macro": float(
             f1_score(truth, direct_predictions, labels=[0, 1, 2], average="macro", zero_division=0)
+        ),
+        "direct_expected_confusion_cost": expected_confusion_cost(truth, direct_predictions),
+        "direct_normal_congested_error": float(
+            (((truth == 0) & (direct_predictions == 2)) | ((truth == 2) & (direct_predictions == 0))).mean()
         ),
     }
     if classified["traffic_state"].eq(3).any():
@@ -235,7 +249,12 @@ def _evaluate_bundle(bundle: EvaluationBundle, test: pd.DataFrame) -> ModelEvalu
     return ModelEvaluation(
         name=bundle.name,
         metrics=metrics,
-        support_table=build_classification_support_table(truth, final_predictions),
+        direct_support_table=build_classification_support_table(
+            truth, direct_predictions, clip_ids=test["clip_id"].astype(str).to_numpy()
+        ),
+        support_table=build_classification_support_table(
+            truth, final_predictions, clip_ids=test["clip_id"].astype(str).to_numpy()
+        ),
         classified=classified,
         probabilities=probabilities,
     )
@@ -254,6 +273,16 @@ def _metric_values(truth: np.ndarray, predictions: np.ndarray) -> dict[str, floa
             if support
             else 0.0
         )
+        predicted_count = int((predictions == state).sum())
+        values[f"precision_{label.lower()}"] = (
+            float(((truth == state) & (predictions == state)).sum() / predicted_count)
+            if predicted_count
+            else 0.0
+        )
+    values["normal_congested_error"] = float(
+        (((truth == 0) & (predictions == 2)) | ((truth == 2) & (predictions == 0))).mean()
+    )
+    values["expected_confusion_cost"] = expected_confusion_cost(truth, predictions)
     return values
 
 
@@ -262,6 +291,7 @@ def paired_bootstrap_intervals(
     champion_predictions: np.ndarray | list[int],
     challenger_predictions: np.ndarray | list[int],
     *,
+    clip_ids: np.ndarray | list[object] | None = None,
     samples: int = 1_000,
     random_state: int = RANDOM_SEED,
 ) -> pd.DataFrame:
@@ -278,18 +308,26 @@ def paired_bootstrap_intervals(
     if not set(truth).union(champion, challenger).issubset(MODEL_STATE_LABELS):
         raise ValueError("Bootstrap comparison accepts only the three stable traffic states.")
 
+    groups = np.arange(len(truth), dtype=object) if clip_ids is None else np.asarray(clip_ids, dtype=object)
+    if groups.shape != truth.shape:
+        raise ValueError("Bootstrap clip_ids must align with predictions.")
+    unique_groups = pd.unique(groups)
+    indices_by_group = {group: np.flatnonzero(groups == group) for group in unique_groups}
     champion_metrics = _metric_values(truth, champion)
     challenger_metrics = _metric_values(truth, challenger)
     deltas = {name: [] for name in champion_metrics}
     generator = np.random.default_rng(random_state)
-    for indices in generator.integers(0, len(truth), size=(samples, len(truth))):
+    for _ in range(samples):
+        sampled_groups = generator.choice(unique_groups, size=len(unique_groups), replace=True)
+        indices = np.concatenate([indices_by_group[group] for group in sampled_groups])
         sample_truth = truth[indices]
         sample_champion = _metric_values(sample_truth, champion[indices])
         sample_challenger = _metric_values(sample_truth, challenger[indices])
         for name in deltas:
             deltas[name].append(sample_challenger[name] - sample_champion[name])
 
-    return pd.DataFrame(
+    lower_is_better = {"normal_congested_error", "expected_confusion_cost"}
+    result = pd.DataFrame(
         {
             "metric": list(champion_metrics),
             "champion": [champion_metrics[name] for name in champion_metrics],
@@ -301,30 +339,56 @@ def paired_bootstrap_intervals(
             "ci_95_high": [float(np.quantile(deltas[name], 0.975)) for name in champion_metrics],
         }
     )
+    result["direction"] = result["metric"].map(
+        lambda name: "lower-is-better" if name in lower_is_better else "higher-is-better"
+    )
+    result["challenger_favorable"] = result.apply(
+        lambda row: row["delta_challenger_minus_champion"] < 0
+        if row["direction"] == "lower-is-better"
+        else row["delta_challenger_minus_champion"] > 0,
+        axis=1,
+    )
+    return result
 
 
 def plot_champion_challenger_confusion(
     comparison: ChampionChallengerComparison,
     y_true: np.ndarray | list[int],
 ) -> None:
-    """Grafica matrices finales de estados estables para revisión humana."""
+    """Grafica matrices directas y finales para ambos bundles comparables."""
     import matplotlib.pyplot as plt
     import seaborn as sns
     from sklearn.metrics import confusion_matrix
 
     truth = np.asarray(y_true, dtype=int)
-    champion = comparison.champion.classified["traffic_state"].to_numpy(dtype=int)
-    challenger = comparison.challenger.classified["traffic_state"].to_numpy(dtype=int)
-    if champion.shape != truth.shape or challenger.shape != truth.shape:
+    predictions = (
+        (
+            f"{comparison.champion.name} · directa",
+            comparison.champion.classified["model_traffic_state"].to_numpy(dtype=int),
+        ),
+        (
+            f"{comparison.champion.name} · final",
+            comparison.champion.classified["traffic_state"].to_numpy(dtype=int),
+        ),
+        (
+            f"{comparison.challenger.name} · directa",
+            comparison.challenger.classified["model_traffic_state"].to_numpy(dtype=int),
+        ),
+        (
+            f"{comparison.challenger.name} · final",
+            comparison.challenger.classified["traffic_state"].to_numpy(dtype=int),
+        ),
+    )
+    if any(prediction.shape != truth.shape for _, prediction in predictions):
         raise ValueError("Confusion-matrix truth and prediction lengths must match.")
     labels = list(MODEL_STATE_LABELS)
     names = [MODEL_STATE_LABELS[label] for label in labels]
-    matrices = (
-        (comparison.champion.name, confusion_matrix(truth, champion, labels=labels)),
-        (comparison.challenger.name, confusion_matrix(truth, challenger, labels=labels)),
+    matrices = tuple(
+        (name, confusion_matrix(truth, prediction, labels=labels))
+        for name, prediction in predictions
     )
-    figure, axes = plt.subplots(1, 2, figsize=(15, 6))
-    for axis, (name, matrix) in zip(axes, matrices, strict=True):
+    figure, axes = plt.subplots(2, 2, figsize=(15, 12))
+    for axis, (name, matrix) in zip(axes.flat, matrices, strict=True):
         sns.heatmap(
             matrix,
             annot=True,
@@ -334,7 +398,7 @@ def plot_champion_challenger_confusion(
             yticklabels=names,
             ax=axis,
         )
-        axis.set(title=name, xlabel="Predicción final", ylabel="Estado humano")
+        axis.set(title=name, xlabel="Predicción", ylabel="Estado humano")
     figure.tight_layout()
     plt.show()
 
@@ -362,13 +426,29 @@ def evaluate_champion_challenger(
     summary["delta_challenger_minus_champion"] = (
         summary[challenger.name] - summary[champion.name]
     )
-    bootstrap = paired_bootstrap_intervals(
-        test["traffic_state"].to_numpy(dtype=int),
-        champion_result.classified["traffic_state"].to_numpy(dtype=int),
-        challenger_result.classified["traffic_state"].to_numpy(dtype=int),
-        samples=bootstrap_samples,
-        random_state=random_state,
+    lower_is_better = summary["metric"].str.contains("cost|error|ece|brier", regex=True)
+    summary["direction"] = np.where(lower_is_better, "lower-is-better", "higher-is-better")
+    summary["challenger_favorable"] = np.where(
+        lower_is_better,
+        summary["delta_challenger_minus_champion"] < 0,
+        summary["delta_challenger_minus_champion"] > 0,
     )
+    bootstrap_frames: list[pd.DataFrame] = []
+    for output_name, prediction_column in (
+        ("direct", "model_traffic_state"),
+        ("final", "traffic_state"),
+    ):
+        output_intervals = paired_bootstrap_intervals(
+            test["traffic_state"].to_numpy(dtype=int),
+            champion_result.classified[prediction_column].to_numpy(dtype=int),
+            challenger_result.classified[prediction_column].to_numpy(dtype=int),
+            clip_ids=test["clip_id"].astype(str).to_numpy(),
+            samples=bootstrap_samples,
+            random_state=random_state,
+        )
+        output_intervals["metric"] = output_name + "_" + output_intervals["metric"]
+        bootstrap_frames.append(output_intervals)
+    bootstrap = pd.concat(bootstrap_frames, ignore_index=True)
     return ChampionChallengerComparison(
         champion=champion_result,
         challenger=challenger_result,

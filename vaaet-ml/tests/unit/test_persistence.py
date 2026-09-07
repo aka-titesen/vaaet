@@ -8,9 +8,9 @@ import pandas as pd
 import pytest
 
 from vaaet_ml.data.persistence import (
+    INSERT_FEATURE_SQL,
+    INSERT_PREDICTION_SQL,
     INSERT_RAW_SQL,
-    UPSERT_FEATURE_SQL,
-    UPSERT_PREDICTION_SQL,
     _feature_payload,
     _prediction_payload,
     _raw_payload,
@@ -19,10 +19,12 @@ from vaaet_ml.data.persistence import (
 
 def test_queries_use_versioned_schemas() -> None:
     assert "vaaet_raw.traffic_data" in INSERT_RAW_SQL
-    assert "vaaet_ml.telemetry_features" in UPSERT_FEATURE_SQL
-    assert "vaaet_ml.traffic_predictions" in UPSERT_PREDICTION_SQL
-    assert "is_human_validated" not in UPSERT_PREDICTION_SQL
-    assert "human_override_state" not in UPSERT_PREDICTION_SQL
+    assert "vaaet_ml.telemetry_features" in INSERT_FEATURE_SQL
+    assert "vaaet_ml.traffic_predictions" in INSERT_PREDICTION_SQL
+    assert "is_human_validated" not in INSERT_PREDICTION_SQL
+    assert "human_override_state" not in INSERT_PREDICTION_SQL
+    assert "DO UPDATE" not in INSERT_FEATURE_SQL
+    assert "DO UPDATE" not in INSERT_PREDICTION_SQL
 
 
 def test_raw_payload_localizes_historical_buenos_aires_time() -> None:
@@ -54,7 +56,7 @@ def test_feature_payload_uses_source_id_and_schema_version() -> None:
     )
     payload = _feature_payload(row, "00000000-0000-0000-0000-000000000001")
     assert payload["source_record_id"] == 7
-    assert payload["feature_schema_version"] == "traffic-features-v2"
+    assert payload["feature_schema_version"] == "traffic-features-v3"
 
 
 def test_prediction_rejects_automatic_accident() -> None:
@@ -71,7 +73,8 @@ def test_prediction_rejects_automatic_accident() -> None:
             row,
             feature_id=10,
             pipeline_run_id="00000000-0000-0000-0000-000000000001",
-            model_version="mlp-v2.0",
+            model_version="mlp-v3.0",
+            model_revision="a" * 64,
         )
 
 
@@ -91,7 +94,8 @@ def test_prediction_preserves_incident_candidate_as_congested() -> None:
         row,
         feature_id=10,
         pipeline_run_id="00000000-0000-0000-0000-000000000001",
-        model_version="mlp-v2.0",
+        model_version="mlp-v3.0",
+        model_revision="a" * 64,
     )
     assert payload["traffic_state"] == 2
     assert payload["accident_rule_triggered"] is True

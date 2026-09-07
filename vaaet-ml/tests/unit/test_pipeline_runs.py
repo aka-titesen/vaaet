@@ -51,6 +51,19 @@ def test_pipeline_run_preserves_a_preallocated_training_identifier(tmp_path) -> 
     assert (tmp_path / f"{run_id}.json").is_file()
 
 
+def test_training_run_records_revision_resolved_after_bundle_validation(tmp_path) -> None:
+    revision = "a" * 64
+
+    with pipeline_run(
+        PipelineRunMetadata(workflow=PipelineWorkflow.TRAINING),
+        local_manifest_directory=tmp_path,
+    ) as run:
+        run.set_model_revision(revision)
+
+    payload = json.loads((tmp_path / f"{run.id}.json").read_text(encoding="utf-8"))
+    assert payload["model_revision"] == revision
+
+
 def test_local_pipeline_run_records_only_exception_category(tmp_path) -> None:
     metadata = PipelineRunMetadata(workflow=PipelineWorkflow.INFERENCE)
 

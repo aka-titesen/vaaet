@@ -15,13 +15,35 @@ Todos los cambios relevantes del proyecto VAAET se documentan en este archivo, s
 
 ## [Unreleased]
 
+## [4.6.0] - 2026-09-05
+
 ### Añadido
 
-- Notebook read-only de evaluación Champion–Challenger para bundles MLP v2,
+- `continuity_id` contractual para reiniciar features, estados e incidentes
+  ante cambios de vista o huecos superiores a 90 segundos.
+- `model_revision` SHA-256 para distinguir bundles exactos y preservar
+  predicciones y validaciones históricas.
+- Notebook read-only de evaluación Champion–Challenger para bundles MLP v3,
   con validación del holdout humano congelado, métricas comparables e intervalos
-  bootstrap reproducibles.
+  bootstrap reproducibles por clip.
 - Perfil y comparación de deriva de covariables para cohortes
-  `traffic-features-v2`, con controles de calidad, PSI y procedencia.
+  `traffic-features-v3`, con controles de calidad, PSI y procedencia.
+- Alembic `0003`, holdout humano v2, bundle v3, telemetría/features v3 y
+  exportación atómica validada antes de reemplazar la copia DVC.
+
+### Cambiado
+
+- Las métricas distinguen salida `direct_*` del MLP y estado `final_*` después
+  de calibración, umbrales e histéresis.
+- Los gates de promoción utilizan límites conservadores del 95 % agrupados por
+  clip y exposición negativa para las alertas de incidente.
+- Las fuentes procesadas sólo aportan targets cuando demuestran validación
+  humana explícita; una predicción no revisada no puede convertirse en etiqueta.
+- El rol de inferencia conserva únicamente lectura e inserción sobre features y
+  predicciones inmutables; ya no puede actualizarlas ni eliminarlas.
+- La serialización del manifiesto rechaza JSON no estándar y representa métricas
+  no disponibles como `null`, evitando bundles con `NaN` no portable.
+- `vaaet-core` se publica como 0.2.0 y `vaaet-ml` como 4.6.0.
 
 ## [4.5.4] - 2026-09-02
 

@@ -233,3 +233,49 @@ def test_view_transition_resets_state_and_discards_crossed_minute() -> None:
     assert isinstance(session.flow_estimator, _FakeFlow)
     assert session.flow_estimator.reset_calls == 1
     assert len(session.tracker.active_tracks[0].history) == 10
+
+
+def test_view_transition_on_minute_boundary_starts_a_clean_continuity() -> None:
+    calibration = CameraCalibration(
+        profile_id="cam-a",
+        revision="v1",
+        frame_size=(64, 48),
+        references=(
+            CalibrationReference("far", (0.0, 10.0), (10.0, 10.0), 1.0),
+            CalibrationReference("near", (0.0, 40.0), (20.0, 40.0), 1.0),
+        ),
+    )
+    plan = VideoViewPlan(
+        profiles=(calibration,),
+        segments=(VideoViewSegment(1, 5, "cam-a"), VideoViewSegment(5, None, "cam-a")),
+    )
+    session = VisionPipelineSession(
+        clip_id="boundary-clip",
+        recording_start=datetime(2025, 5, 1, tzinfo=timezone.utc),
+        fps=1.0,
+        frame_height=48,
+        frames_per_minute=4,
+        detector=_FakeDetector(),
+        tracker=SORTTracker(max_lost=0),
+        flow_estimator=_FakeFlow(),  # type: ignore[arg-type]
+        speed_tracker=SmoothedSpeedTracker(),
+        motion_tracker=TrackMotionStateTracker(),
+        accumulator=MinuteTelemetryAccumulator(clip_id="boundary-clip"),
+        prediction_provider=None,
+        hud_config=HudConfig(),
+        view_plan=plan,
+        clock=lambda: 1.0,
+    )
+
+    output = session.run(
+        _FakeCapture([np.zeros((48, 64, 3), dtype=np.uint8) for _ in range(8)]),
+        _FakeWriter(),
+        max_frames=None,
+    )
+
+    assert len(output.telemetry_records) == 2
+    assert [row["continuity_id"] for row in output.telemetry_records] == [
+        "boundary-clip:continuity-0001",
+        "boundary-clip:continuity-0002",
+    ]
+    assert sum(segment.discarded_minutes for segment in output.view_segments) == 0

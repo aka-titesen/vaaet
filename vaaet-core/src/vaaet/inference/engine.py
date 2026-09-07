@@ -32,6 +32,7 @@ class TrafficStateEngine:
             self.bundle.scaler,
             label_mapping=self.bundle.label_mapping,
             model_version=str(self.bundle.manifest["model_version"]),
+            model_revision=self.bundle.model_revision,
             input_policy=self.bundle.input_policy,
             decision_policy=self.bundle.manifest["decision_policy"],
         )

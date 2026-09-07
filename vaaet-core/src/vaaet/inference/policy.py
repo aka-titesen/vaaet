@@ -10,6 +10,7 @@ from dataclasses import dataclass
 import numpy as np
 import pandas as pd
 
+from vaaet.continuity import CONTINUITY_COLUMN, normalize_continuity_frame
 from vaaet.features.labeling import build_accident_signal_frame
 from vaaet.settings import (
     ACCIDENT_GATE_MIN_EVIDENCE_SCORE,
@@ -34,6 +35,7 @@ CLASSIFICATION_RESULT_COLUMNS: tuple[str, ...] = (
     "state_label",
     "confidence",
     "model_version",
+    "model_revision",
     "accident_low_speed",
     "accident_recent_braking",
     "accident_cumulative_braking",
@@ -59,6 +61,7 @@ _CLASSIFICATION_RESULT_DTYPES: Mapping[str, str] = {
     "state_label": "string",
     "confidence": "float64",
     "model_version": "string",
+    "model_revision": "string",
     "accident_low_speed": "bool",
     "accident_recent_braking": "bool",
     "accident_cumulative_braking": "bool",
@@ -175,16 +178,16 @@ def _stabilize_codes(
     worsening_persistence: int,
     recovery_persistence: int,
 ) -> tuple[np.ndarray, np.ndarray]:
-    clips = frame.get("clip_id", pd.Series("all", index=frame.index)).astype(str).to_numpy()
+    continuity = _continuity_keys(frame)
     machine = _StableStateMachine()
-    prior_clip: str | None = None
+    prior_continuity: str | None = None
     stable_codes = np.empty(len(frame), dtype=int)
     abstained = np.zeros(len(frame), dtype=bool)
     for position, (clip_id, raw_code, score, margin) in enumerate(
-        zip(clips, raw_codes, confidence, margins, strict=False)
+        zip(continuity, raw_codes, confidence, margins, strict=True)
     ):
-        if clip_id != prior_clip:
-            prior_clip = clip_id
+        if clip_id != prior_continuity:
+            prior_continuity = clip_id
             machine.reset()
         stable_codes[position], abstained[position] = machine.advance(
             int(raw_code), float(score), float(margin), thresholds=thresholds,
@@ -206,17 +209,21 @@ def apply_stable_state_policy(
     """Aplica confianza, adyacencia, persistencia e histéresis por clip."""
     if df.empty:
         return df.copy()
-    validated_probabilities = _validate_policy_probabilities(probabilities, len(df))
+    source = df.copy()
+    source["_policy_source_position"] = np.arange(len(source))
+    result = normalize_continuity_frame(source)
+    validated_probabilities = _validate_policy_probabilities(probabilities, len(result))
+    positions = result.pop("_policy_source_position").astype(int).to_numpy()
+    validated_probabilities = validated_probabilities[positions]
     thresholds = dict(DEFAULT_CLASS_THRESHOLDS)
     if class_thresholds:
         thresholds.update({int(key): float(value) for key, value in class_thresholds.items()})
     raw_codes, raw_confidence, margins = _probability_summary(validated_probabilities)
     stable_codes, abstained = _stabilize_codes(
-        df, raw_codes, raw_confidence, margins, thresholds=thresholds,
+        result, raw_codes, raw_confidence, margins, thresholds=thresholds,
         minimum_margin=minimum_margin, worsening_persistence=worsening_persistence,
         recovery_persistence=recovery_persistence,
     )
-    result = df.copy()
     result["model_traffic_state"] = raw_codes
     result["model_state_label"] = pd.Series(raw_codes, index=result.index).map(MODEL_STATE_LABELS)
     result["model_confidence"] = np.round(raw_confidence, 4)
@@ -262,7 +269,6 @@ def _incident_strength(frame: pd.DataFrame, signals: pd.DataFrame) -> tuple[pd.S
     quality_reliable = signals["accident_quality_ok"] & optical_flow.ge(OPTICAL_FLOW_QUALITY_MIN)
     strong = (
         signals["accident_evidence_score"].ge(ACCIDENT_GATE_MIN_EVIDENCE_SCORE)
-        & signals["accident_persistent_low_speed"]
         & (signals["accident_recent_braking"] | signals["accident_cumulative_braking"])
         & signals["accident_motion_evidence"]
         & quality_reliable
@@ -278,6 +284,14 @@ def _persistent_incidents(strong: pd.Series, group_key: pd.Series) -> pd.Series:
             min_periods=INCIDENT_PERSISTENCE_MINUTES,
         ).sum()
     ).ge(INCIDENT_PERSISTENCE_MINUTES)
+
+
+def _continuity_keys(frame: pd.DataFrame) -> np.ndarray:
+    return (
+        frame["clip_id"].astype(str)
+        + "\x1f"
+        + frame[CONTINUITY_COLUMN].astype(str)
+    ).to_numpy()
 
 
 def _incident_activity(
@@ -308,11 +322,11 @@ def apply_conservative_accident_gate(
     """Emite candidatos persistentes sin publicar ``Accident`` automáticamente."""
     if df.empty:
         return df.copy()
-    result = df.copy()
+    result = normalize_continuity_frame(df)
     signals = build_accident_signal_frame(result)
     result = pd.concat([result, signals], axis=1)
     strong, quality_reliable = _incident_strength(result, signals)
-    group_key = result.get("clip_id", pd.Series("all", index=result.index))
+    group_key = pd.Series(_continuity_keys(result), index=result.index)
     persistent = _persistent_incidents(strong, group_key)
     active_values, started_values = _incident_activity(
         group_key.astype(str).to_numpy(), persistent.to_numpy(), strong.to_numpy()

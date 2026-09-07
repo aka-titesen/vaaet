@@ -169,7 +169,7 @@ def test_notebooks_handle_clips_without_complete_minutes() -> None:
 
     assert "mínimo: 60.0s" in collection
     assert "mínimo: 60.0s" in inference
-    assert "df_classified = None" in inference
+    assert "df_classified = empty_classification_result(pd.DataFrame())" in inference
     assert "if df_classified.empty:" in inference
     assert "Se necesitan dos ventanas consecutivas de 60 segundos" in inference
     assert inference.index("if df_classified.empty:") < inference.index(
@@ -274,9 +274,9 @@ def test_training_prepares_postgres_backup_reader_in_colab() -> None:
     assert '"postgresql-client-17"' in restore_module
     assert "https://apt.postgresql.org/pub/repos/apt" in restore_module
     assert "https://www.postgresql.org/media/keys/ACCC4CF8.asc" in restore_module
-    assert "PostgresBackupSource(BACKUP_PATH" in code
+    assert "PostgresBackupSource(RESOLVED_SEED_RAW_SOURCE_PATH" in code
     assert "Path(PG_RESTORE_PATH) if PG_RESTORE_PATH else None" in code
-    assert "for fname in uploaded" in code
+    assert "if len(uploaded) != 1:" in code
     assert "Datos inmutables en Drive" in code
     assert "Detected backup table" in code
     assert "archive_table" in code
@@ -474,7 +474,8 @@ def test_notebook_transfers_require_explicit_configuration() -> None:
     assert "if IN_COLAB and WORKFLOW_CONFIG.download_annotated_video:" in inference
     assert "TrainingPreset.SEED_UPLOAD" in WORKFLOW_PRESET_MODULE
     assert "elif not WORKFLOW_CONFIG.copy_bundle_to_drive:" in training
-    assert "validate_manifest(_bundle_directory)" in training
+    assert "build_and_publish_bundle(" in training
+    assert "publish_bundle_copy(_bundle_directory, _drive_destination)" in training
     assert "No se pudo copiar el bundle validado a Drive" in training
     assert "except Exception as e:" not in training
 

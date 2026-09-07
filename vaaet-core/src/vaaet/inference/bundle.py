@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: 2026 VAAET Contributors
 # SPDX-License-Identifier: AGPL-3.0-only
-"""Carga manifest-first del bundle v2 de estados de tránsito."""
+"""Carga manifest-first de bundles compatibles de estados de tránsito."""
 
 from __future__ import annotations
 
@@ -30,6 +30,7 @@ class LoadedTrafficBundle:
     label_mapping: dict[int, str]
     deployment_stage: str
     input_policy: str
+    model_revision: str
 
 
 def authorize_bundle(
@@ -92,4 +93,5 @@ def load_traffic_bundle(
         label_mapping=dict(label_mapping),
         deployment_stage=stage,
         input_policy=input_policy,
+        model_revision=str(manifest["model_revision"]),
     )

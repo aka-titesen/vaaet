@@ -9,14 +9,14 @@ contratos y ADRs vigentes prevalecen ante cualquier resumen.
 
 | Campo | Detalle |
 |---|---|
-| Versión del laboratorio | 4.5.4 |
+| Versión del laboratorio | 4.6.0 |
 | Última revisión | 2026-08-30 |
 | Responsable técnico | Facundo Nicolás González |
 
 ## Arquitectura y restricciones
 
-VAAET es un monorepo con dos distribuciones internas: `vaaet-core==0.1.0`
-(import `vaaet`) y `vaaet-ml==4.5.4` (import `vaaet_ml`). El core procesa
+VAAET es un monorepo con dos distribuciones internas: `vaaet-core==0.2.0`
+(import `vaaet`) y `vaaet-ml==4.6.0` (import `vaaet_ml`). El core procesa
 videos finitos con Pipe-and-Filter síncrono y ordenado; el laboratorio conserva
 entrenamiento, evaluación, Colab, DVC y PostgreSQL. La aplicación futura no
 tiene código y sólo podrá usar una API HTTP versionada.

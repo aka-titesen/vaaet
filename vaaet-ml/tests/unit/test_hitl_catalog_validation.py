@@ -35,7 +35,8 @@ def _entry(**overrides: object) -> dict[str, object]:
         "human_support": {"validated": 1},
         "status": "active",
         "feature_schema_version": FEATURE_SCHEMA_VERSION,
-        "vaaet_version": "4.5.3",
+        "model_revision": "c" * 64,
+        "vaaet_version": "4.6.0",
     }
     return {**entry, **overrides}
 

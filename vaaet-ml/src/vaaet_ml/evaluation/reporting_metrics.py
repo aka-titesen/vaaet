@@ -10,6 +10,9 @@ from math import sqrt
 
 import numpy as np
 import pandas as pd
+from scipy.stats import chi2
+from sklearn.metrics import f1_score, precision_score, recall_score
+from vaaet.calibration import multiclass_brier_score
 from vaaet.settings import STATE_LABELS
 
 CONFUSION_COST = np.array(
@@ -28,20 +31,28 @@ def _wilson_interval(successes: int, total: int, z: float = 1.96) -> tuple[float
 
 
 def build_classification_support_table(
-    y_true: Sequence[int], y_pred: Sequence[int]
+    y_true: Sequence[int], y_pred: Sequence[int], *, clip_ids: Sequence[object] | None = None
 ) -> pd.DataFrame:
-    """Reporta soporte y Wilson 95% por cada estado aprendible."""
+    """Reporta soporte por filas y clips para cada estado aprendible."""
 
     truth = np.asarray(y_true, dtype=int)
     predicted = np.asarray(y_pred, dtype=int)
+    groups = np.asarray(clip_ids, dtype=object) if clip_ids is not None else None
+    if groups is not None and groups.shape != truth.shape:
+        raise ValueError("clip_ids must align with y_true.")
     rows = [
-        _support_row(code, truth, predicted)
+        _support_row(code, truth, predicted, groups)
         for code in (0, 1, 2)
     ]
     return pd.DataFrame(rows)
 
 
-def _support_row(code: int, truth: np.ndarray, predicted: np.ndarray) -> dict[str, object]:
+def _support_row(
+    code: int,
+    truth: np.ndarray,
+    predicted: np.ndarray,
+    groups: np.ndarray | None,
+) -> dict[str, object]:
     true_positive = int(((truth == code) & (predicted == code)).sum())
     actual = int((truth == code).sum())
     predicted_count = int((predicted == code).sum())
@@ -51,12 +62,135 @@ def _support_row(code: int, truth: np.ndarray, predicted: np.ndarray) -> dict[st
         "traffic_state": code,
         "state_label": STATE_LABELS[code],
         "support": actual,
+        "support_clips": (
+            int(len(set(groups[truth == code].tolist()))) if groups is not None else pd.NA
+        ),
         "predicted": predicted_count,
         "precision": precision,
         "precision_ci_95": _wilson_interval(true_positive, predicted_count),
         "recall": recall,
         "recall_ci_95": _wilson_interval(true_positive, actual),
     }
+
+
+def grouped_classification_intervals(
+    y_true: Sequence[int],
+    y_pred: Sequence[int],
+    clip_ids: Sequence[object],
+    *,
+    probabilities: np.ndarray | None = None,
+    samples: int = 2_000,
+    random_state: int = 42,
+) -> pd.DataFrame:
+    """Estima intervalos del 95 % remuestreando clips completos.
+
+    Una métrica por clase sólo es suficiente si al menos el 95 % de las
+    réplicas contiene el soporte necesario para calcularla.
+    """
+
+    truth = np.asarray(y_true, dtype=int)
+    predicted = np.asarray(y_pred, dtype=int)
+    groups = np.asarray(clip_ids, dtype=object)
+    if truth.ndim != 1 or predicted.shape != truth.shape or groups.shape != truth.shape:
+        raise ValueError("Grouped bootstrap inputs must be aligned one-dimensional arrays.")
+    if samples < 1 or not len(truth):
+        raise ValueError("Grouped bootstrap requires records and at least one sample.")
+    probability_values = None if probabilities is None else np.asarray(probabilities, dtype=float)
+    if probability_values is not None and probability_values.shape != (len(truth), 3):
+        raise ValueError("probabilities must have shape (records, 3).")
+    unique_groups = pd.unique(groups)
+    indices_by_group = {group: np.flatnonzero(groups == group) for group in unique_groups}
+    generator = np.random.default_rng(random_state)
+    values: dict[str, list[float]] = {name: [] for name in _metric_names(probability_values)}
+    for _ in range(samples):
+        sampled_groups = generator.choice(unique_groups, size=len(unique_groups), replace=True)
+        indices = np.concatenate([indices_by_group[group] for group in sampled_groups])
+        for name, value in _classification_metrics(
+            truth[indices],
+            predicted[indices],
+            None if probability_values is None else probability_values[indices],
+        ).items():
+            if value is not None and np.isfinite(value):
+                values[name].append(float(value))
+    point = _classification_metrics(truth, predicted, probability_values)
+    rows: list[dict[str, object]] = []
+    for name, point_value in point.items():
+        metric_values = values[name]
+        evaluable_fraction = len(metric_values) / samples
+        rows.append(
+            {
+                "metric": name,
+                "value": point_value,
+                "ci_95_low": (
+                    float(np.quantile(metric_values, 0.025)) if metric_values else np.nan
+                ),
+                "ci_95_high": (
+                    float(np.quantile(metric_values, 0.975)) if metric_values else np.nan
+                ),
+                "evaluable_fraction": evaluable_fraction,
+                "sufficient": evaluable_fraction >= 0.95,
+                "direction": (
+                    "lower-is-better"
+                    if name in {"normal_congested_error", "ece", "brier_score"}
+                    else "higher-is-better"
+                ),
+            }
+        )
+    return pd.DataFrame(rows)
+
+
+def false_alert_rate_upper_bound(alerts: int, negative_exposure_hours: float) -> float:
+    """Calcula el límite superior unilateral del 95 % para una tasa Poisson."""
+
+    if alerts < 0 or negative_exposure_hours <= 0:
+        raise ValueError("False-alert evidence requires non-negative alerts and positive hours.")
+    upper_count = 0.5 * float(chi2.ppf(0.95, 2 * (alerts + 1)))
+    return upper_count / float(negative_exposure_hours)
+
+
+def _metric_names(probabilities: np.ndarray | None) -> tuple[str, ...]:
+    base = (
+        "f1_macro", "precision_normal", "precision_reduced", "precision_congested",
+        "recall_normal", "recall_reduced", "recall_congested",
+        "normal_congested_error",
+    )
+    return (*base, "ece", "brier_score") if probabilities is not None else base
+
+
+def _classification_metrics(
+    truth: np.ndarray,
+    predicted: np.ndarray,
+    probabilities: np.ndarray | None,
+) -> dict[str, float | None]:
+    result: dict[str, float | None] = {
+        "f1_macro": (
+            float(f1_score(truth, predicted, labels=[0, 1, 2], average="macro", zero_division=0))
+            if set(truth) == {0, 1, 2}
+            else None
+        ),
+        "normal_congested_error": (
+            float(
+                (((truth == 0) & (predicted == 2)) | ((truth == 2) & (predicted == 0))).mean()
+            )
+            if {0, 2}.issubset(set(truth))
+            else None
+        ),
+    }
+    for code, label in ((0, "normal"), (1, "reduced"), (2, "congested")):
+        result[f"precision_{label}"] = (
+            float(precision_score(truth, predicted, labels=[code], average="macro", zero_division=0))
+            if (predicted == code).any()
+            else None
+        )
+        result[f"recall_{label}"] = (
+            float(recall_score(truth, predicted, labels=[code], average="macro", zero_division=0))
+            if (truth == code).any()
+            else None
+        )
+    if probabilities is not None:
+        result["ece"] = expected_calibration_error(truth, probabilities)
+        result["brier_score"] = multiclass_brier_score(truth, probabilities)
+    return result
 
 
 def expected_confusion_cost(y_true: Sequence[int], y_pred: Sequence[int]) -> float:
@@ -134,5 +268,7 @@ __all__ = [
     "build_classification_support_table",
     "expected_calibration_error",
     "expected_confusion_cost",
+    "false_alert_rate_upper_bound",
+    "grouped_classification_intervals",
     "select_validation_decision_policy",
 ]

@@ -14,25 +14,30 @@ procedencia; el consumidor le entrega un directorio local ya aprobado.
 | `label_mapping.joblib` | Mapping de los cuatro códigos canónicos |
 | `model-manifest.json` | Compatibilidad, integridad y procedencia |
 
-El contrato v2 distingue `model_output_mapping` —Normal, Reduced y Congested—
+El contrato v3 distingue `model_output_mapping` —Normal, Reduced y Congested—
 de los cuatro estados públicos. También contiene la política jerárquica,
 temperatura de calibración, umbrales por clase, margen, histéresis, prohibición de Accident automático,
 confirmación humana obligatoria, elegibilidad, bloqueos de promoción y
-checksums SHA-256.
+checksums SHA-256. `model_revision` identifica los hashes exactos del modelo,
+scaler y mapping junto con la política, el schema de features y el training
+input lock. `model_version` continúa siendo una etiqueta semántica reutilizable.
 
 `training_lifecycle` vuelve explícitos cuatro datos de serving:
 
 - `training_mode`: `seed-bootstrap` o `hitl-retraining`.
 - `supervision`: `weak-proxy` o `human-validated`.
-- `input_policy`: `legacy-v1-bootstrap` o `canonical-v2`.
+- `input_policy`: `legacy-v1-bootstrap` o `canonical-v3`; `canonical-v2` se
+  admite únicamente para bundles históricos.
 - `deployment_stage`: `pilot`, `candidate` o `production`.
 
 Desde VAAET 4.4.0, un modelo que declara `data_provenance.human_holdout=true`
-debe incluir también `human_holdout`: contrato `vaaet-human-holdout-v1`, UUID del
+debe incluir también `human_holdout`: contrato `vaaet-human-holdout-v2`, UUID del
 snapshot, generación, fingerprint SHA-256 y filas de validation/test. Un modelo
 sin benchmark congelado utiliza `null`. El descriptor no incorpora el dataset;
 sólo permite auditar con qué fotografía humana se midió el candidato y rechazar
 comparaciones automáticas entre fingerprints distintos.
+El contrato v2 de holdout incorpora `continuity_id` y `model_revision`. Los
+holdouts v1 sólo comparan bundles v2 históricos.
 
 Desde VAAET 4.5.0, `training_input_lock` puede incorporar el descriptor
 `vaaet-training-input-lock-v1`: UUID del lock y fingerprint SHA-256 de la selección
@@ -81,3 +86,5 @@ La semántica jerárquica está gobernada por [ADR-0014](../architecture/decisio
 El ciclo semilla/HITL está gobernado por [ADR-0017](../architecture/decisions/0017-seed-bootstrap-and-hitl-retraining.md).
 El benchmark humano congelado está gobernado por [ADR-0018](../architecture/decisions/0018-versioned-frozen-human-holdouts.md).
 La gestión inmutable de datasets está gobernada por [ADR-0019](../architecture/decisions/0019-immutable-seed-and-hitl-datasets.md).
+La continuidad y la identidad exacta del bundle están gobernadas por
+[ADR-0026](../architecture/decisions/0026-temporal-continuity-and-immutable-model-revisions.md).

@@ -15,6 +15,8 @@ from vaaet.artifacts import (
     _SHA256_PATTERN,
     CONTRACT_VERSION,
     FEATURE_SCHEMA_VERSION,
+    LEGACY_CONTRACT_VERSION,
+    LEGACY_FEATURE_SCHEMA_VERSION,
     MANIFEST_FILE,
     MODEL_VERSION,
     REQUIRED_DEPENDENCIES,
@@ -24,6 +26,7 @@ from vaaet.artifacts import (
     REQUIRED_PROVENANCE_FIELDS,
     TrafficBundleManifest,
     _sha256,
+    calculate_model_revision,
 )
 from vaaet.exceptions import ArtifactNotFoundError, ArtifactValidationError
 from vaaet.lifecycle import ModelInputPolicy, TrainingMode
@@ -31,7 +34,7 @@ from vaaet.settings import FEATURE_COLS, MODEL_STATE_LABELS, STATE_LABELS
 
 
 def validate_manifest(bundle_dir: str | Path) -> TrafficBundleManifest:
-    """Valida compatibilidad e integridad antes de cargar un bundle v2."""
+    """Valida compatibilidad e integridad antes de cargar un bundle soportado."""
 
     directory = Path(bundle_dir).resolve()
     manifest = _load_manifest(directory)
@@ -45,6 +48,20 @@ def validate_manifest(bundle_dir: str | Path) -> TrafficBundleManifest:
     _validate_input_lock(manifest)
     _validate_eligibility(lifecycle, metrics, provenance)
     _validate_files(directory, files)
+    if manifest["contract_version"] == LEGACY_CONTRACT_VERSION:
+        manifest["model_revision"] = calculate_model_revision(
+            file_hashes={
+                name: str(cast(dict[str, object], files[name])["sha256"])
+                for name in REQUIRED_FILES
+            },
+            decision_policy=_require_section(manifest, "decision_policy"),
+            feature_schema_version=str(manifest["feature_schema_version"]),
+            training_input_lock=(
+                cast(dict[str, object], manifest["training_input_lock"])
+                if isinstance(manifest.get("training_input_lock"), dict)
+                else None
+            ),
+        )
     return cast(TrafficBundleManifest, manifest)
 
 
@@ -69,7 +86,10 @@ def _require_section(manifest: Mapping[str, object], field_name: str) -> dict[st
 
 
 def _validate_identity(manifest: Mapping[str, object]) -> None:
-    missing_fields = sorted(REQUIRED_FIELDS - manifest.keys())
+    required_fields = set(REQUIRED_FIELDS)
+    if manifest.get("contract_version") == LEGACY_CONTRACT_VERSION:
+        required_fields.discard("model_revision")
+    missing_fields = sorted(required_fields - manifest.keys())
     if missing_fields:
         raise ArtifactValidationError(f"Missing manifest fields: {', '.join(missing_fields)}")
     _validate_versions(manifest)
@@ -86,12 +106,23 @@ def _validate_identity(manifest: Mapping[str, object]) -> None:
 
 
 def _validate_versions(manifest: Mapping[str, object]) -> None:
-    if type(manifest["contract_version"]) is not int or manifest["contract_version"] != CONTRACT_VERSION:
+    contract = manifest["contract_version"]
+    if type(contract) is not int or contract not in {LEGACY_CONTRACT_VERSION, CONTRACT_VERSION}:
         raise ArtifactValidationError("Unsupported artifact contract version.")
-    if manifest["feature_schema_version"] != FEATURE_SCHEMA_VERSION:
+    expected_schema = (
+        FEATURE_SCHEMA_VERSION if contract == CONTRACT_VERSION else LEGACY_FEATURE_SCHEMA_VERSION
+    )
+    if manifest["feature_schema_version"] != expected_schema:
         raise ArtifactValidationError("Unsupported feature schema version.")
-    if manifest["model_version"] != MODEL_VERSION:
+    if not isinstance(manifest["model_version"], str) or not manifest["model_version"]:
         raise ArtifactValidationError("Artifact model version is incompatible with VAAET.")
+    if contract == CONTRACT_VERSION and manifest["model_version"] != MODEL_VERSION:
+        raise ArtifactValidationError("Artifact model version is incompatible with VAAET.")
+    revision = manifest.get("model_revision")
+    if contract == CONTRACT_VERSION and (
+        not isinstance(revision, str) or not _SHA256_PATTERN.fullmatch(revision)
+    ):
+        raise ArtifactValidationError("Bundle v3 requires a SHA-256 model_revision.")
 
 
 def _validate_generated_at(value: object) -> None:
@@ -123,7 +154,12 @@ def _validate_lifecycle(manifest: Mapping[str, object]) -> dict[str, object]:
         input_policy = ModelInputPolicy(lifecycle["input_policy"])
     except (TypeError, ValueError) as exc:
         raise ArtifactValidationError("Unsupported training lifecycle mode or input policy.") from exc
-    _validate_lifecycle_values(lifecycle, training_mode, input_policy)
+    _validate_lifecycle_values(
+        lifecycle,
+        training_mode,
+        input_policy,
+        contract_version=cast(int, manifest["contract_version"]),
+    )
     return lifecycle
 
 
@@ -131,6 +167,8 @@ def _validate_lifecycle_values(
     lifecycle: Mapping[str, object],
     training_mode: TrainingMode,
     input_policy: ModelInputPolicy,
+    *,
+    contract_version: int,
 ) -> None:
     if lifecycle["deployment_stage"] not in {"pilot", "candidate", "production"}:
         raise ArtifactValidationError("Unsupported bundle deployment stage.")
@@ -152,6 +190,13 @@ def _validate_lifecycle_values(
         or lifecycle["supervision"] != "human-validated-with-proxy-memory"
     ):
         raise ArtifactValidationError("HITL bundles must be human-validated candidates or production.")
+    if (
+        training_mode is TrainingMode.HITL_RETRAINING
+        and lifecycle.get("production_eligible")
+        and contract_version == CONTRACT_VERSION
+        and input_policy is not ModelInputPolicy.CANONICAL_V3
+    ):
+        raise ArtifactValidationError("Production bundles require the canonical-v3 input policy.")
 
 
 def _validate_policy(manifest: Mapping[str, object]) -> dict[str, object]:
@@ -162,9 +207,9 @@ def _validate_policy(manifest: Mapping[str, object]) -> dict[str, object]:
             f"Missing decision policy fields: {', '.join(missing_fields)}"
         )
     if policy["automatic_accident_state_allowed"] is not False:
-        raise ArtifactValidationError("Bundle v2 must prohibit automatic Accident states.")
+        raise ArtifactValidationError("The bundle must prohibit automatic Accident states.")
     if policy["human_confirmation_required_for_accident"] is not True:
-        raise ArtifactValidationError("Bundle v2 must require human confirmation for Accident.")
+        raise ArtifactValidationError("The bundle must require human confirmation for Accident.")
     _validate_class_thresholds(policy["class_thresholds"])
     _validate_temperature(policy["temperature"])
     return policy
@@ -206,13 +251,30 @@ def _validate_dependencies_and_metrics(
         version = dependencies.get(name)
         if not isinstance(version, str) or not version:
             raise ArtifactValidationError(f"Missing or invalid dependency version: {name}")
-    f1_macro = metrics.get("f1_macro")
-    if isinstance(f1_macro, bool) or not isinstance(f1_macro, (int, float)) or not 0 <= f1_macro <= 1:
-        raise ArtifactValidationError("Manifest metrics.f1_macro must be a number between 0 and 1.")
+    metric_names = (
+        ("direct_f1_macro", "final_f1_macro")
+        if {"direct_f1_macro", "final_f1_macro"}.issubset(metrics)
+        else ("f1_macro",)
+    )
+    for metric_name in metric_names:
+        value = metrics.get(metric_name)
+        if (
+            isinstance(value, bool)
+            or not isinstance(value, (int, float))
+            or not 0 <= value <= 1
+        ):
+            raise ArtifactValidationError(
+                f"Manifest metrics.{metric_name} must be a number between 0 and 1."
+            )
 
 
 def _validate_provenance(manifest: Mapping[str, object], provenance: Mapping[str, object]) -> None:
-    missing_fields = sorted(REQUIRED_PROVENANCE_FIELDS - provenance.keys())
+    coverage_field = (
+        "telemetry_v3_coverage"
+        if manifest["contract_version"] == CONTRACT_VERSION
+        else "telemetry_v2_coverage"
+    )
+    missing_fields = sorted((REQUIRED_PROVENANCE_FIELDS | {coverage_field}) - provenance.keys())
     if missing_fields:
         raise ArtifactValidationError(
             f"Missing data provenance fields: {', '.join(missing_fields)}"
@@ -225,7 +287,7 @@ def _validate_provenance(manifest: Mapping[str, object], provenance: Mapping[str
         raise ArtifactValidationError(
             "Manifest data_provenance.synthetic_data_included must be a boolean."
         )
-    _validate_coverage(provenance["telemetry_v2_coverage"])
+    _validate_coverage(provenance[coverage_field], coverage_field)
     for name in ("human_holdout", "production_eligible"):
         if type(provenance[name]) is not bool:
             raise ArtifactValidationError(f"Manifest data_provenance.{name} must be boolean.")
@@ -235,11 +297,11 @@ def _validate_provenance(manifest: Mapping[str, object], provenance: Mapping[str
         raise ArtifactValidationError("promotion_blockers must be a list of strings.")
 
 
-def _validate_coverage(value: object) -> None:
+def _validate_coverage(value: object, field_name: str) -> None:
     if isinstance(value, bool) or not isinstance(value, (int, float)):
-        raise ArtifactValidationError("telemetry_v2_coverage must be numeric.")
+        raise ArtifactValidationError(f"{field_name} must be numeric.")
     if not 0.0 <= float(value) <= 1.0:
-        raise ArtifactValidationError("telemetry_v2_coverage must be between 0 and 1.")
+        raise ArtifactValidationError(f"{field_name} must be between 0 and 1.")
 
 
 def _validate_human_holdout(manifest: Mapping[str, object], provenance: Mapping[str, object]) -> None:
@@ -260,7 +322,12 @@ def _validate_human_holdout(manifest: Mapping[str, object], provenance: Mapping[
         {"contract", "snapshot_id", "generation", "fingerprint", "validation_rows", "test_rows"},
         "human holdout descriptor",
     )
-    if descriptor["contract"] != "vaaet-human-holdout-v1":
+    expected_contract = (
+        "vaaet-human-holdout-v2"
+        if manifest["contract_version"] == CONTRACT_VERSION
+        else "vaaet-human-holdout-v1"
+    )
+    if descriptor["contract"] != expected_contract:
         raise ArtifactValidationError("Unsupported human holdout contract.")
     _validate_uuid(descriptor["snapshot_id"], "Human holdout snapshot_id")
     if type(descriptor["generation"]) is not int or descriptor["generation"] < 1:
@@ -341,3 +408,21 @@ def _validate_files(directory: Path, files: Mapping[str, object]) -> None:
             raise ArtifactValidationError(f"Invalid SHA-256 entry for artifact file: {name}")
         if _sha256(path) != expected:
             raise ArtifactValidationError(f"Checksum mismatch for artifact file: {name}")
+    manifest = _load_manifest(directory)
+    if manifest["contract_version"] == CONTRACT_VERSION:
+        file_hashes = {
+            name: str(cast(dict[str, object], files[name])["sha256"])
+            for name in REQUIRED_FILES
+        }
+        expected_revision = calculate_model_revision(
+            file_hashes=file_hashes,
+            decision_policy=_require_section(manifest, "decision_policy"),
+            feature_schema_version=str(manifest["feature_schema_version"]),
+            training_input_lock=(
+                cast(dict[str, object], manifest["training_input_lock"])
+                if isinstance(manifest.get("training_input_lock"), dict)
+                else None
+            ),
+        )
+        if manifest["model_revision"] != expected_revision:
+            raise ArtifactValidationError("Bundle model_revision does not match its exact contents.")

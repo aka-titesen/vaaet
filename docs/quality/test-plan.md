@@ -2,8 +2,8 @@
 
 ## Contexto
 
-VAAET es un monorepo con `vaaet-core==0.1.0` (import `vaaet`) y
-`vaaet-ml==4.5.4` (import `vaaet_ml`). [ADR-0021](../architecture/decisions/0021-portable-core-and-ml-laboratory-boundary.md)
+VAAET es un monorepo con `vaaet-core==0.2.0` (import `vaaet`) y
+`vaaet-ml==4.6.0` (import `vaaet_ml`). [ADR-0021](../architecture/decisions/0021-portable-core-and-ml-laboratory-boundary.md)
 define los límites; las reglas para agentes están en
 [AGENTS.md](../../AGENTS.md) y [llms.txt](../../llms.txt). Este plan cubre
 validación automática y evidencia manual; no reemplaza contratos de datos,
@@ -18,7 +18,7 @@ remoto, videos privados ni credenciales personales.
 ## Objetivos
 
 - Preservar los contratos del core: visión, telemetría, 19 features, estados,
-  bundle v2 e inferencia manifest-first.
+  bundle v3 e inferencia manifest-first.
 - Verificar el modo opcional de vistas calibradas: plan continuo, referencias
   geométricas válidas, reinicio por transición y descarte de minutos mixtos,
   sin alterar el modo legado de una vista.
@@ -48,7 +48,7 @@ evaluación es read-only y no crea `pipeline_run` ni persiste datos.
 
 | Cambio | Suites obligatorias | Invariante principal |
 | --- | --- | --- |
-| `vaaet-core` | Ruff, Pyright, pytest core y compileall | 19 features, bundle v2 manifest-first y `Accident` sólo humano |
+| `vaaet-core` | Ruff, Pyright, pytest core y compileall | 19 features, bundle v3 manifest-first y `Accident` sólo humano |
 | Visión o `VideoViewPlan` | Suite core con fakes de detector, reloj y writer | orden, reinicio por transición y descarte de minutos mixtos |
 | `vaaet-ml/src` | Ruff, Pyright, pytest ML sin `postgres` y compileall | locks, snapshots, HITL, holdouts, gates humanos y diagnósticos redactados |
 | PostgreSQL/Alembic/roles | Suite ML e integración `postgres` | migraciones, grants, mínimo privilegio e idempotencia en PostgreSQL 17 desechable |

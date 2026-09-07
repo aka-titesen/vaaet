@@ -4,17 +4,19 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 from uuid import UUID, uuid4
 
 import pandas as pd
 from sqlalchemy import text
-from sqlalchemy.engine import Engine
+from sqlalchemy.engine import Connection, Engine
 from sqlalchemy.exc import ProgrammingError
 from vaaet.artifacts import FEATURE_SCHEMA_VERSION
+from vaaet.continuity import normalize_continuity_frame
 from vaaet.logging import get_logger
-from vaaet.settings import MODEL_VERSION, STATE_LABELS, TELEMETRY_SCHEMA_VERSION
+from vaaet.settings import FEATURE_COLS, MODEL_VERSION, STATE_LABELS, TELEMETRY_SCHEMA_VERSION
 from vaaet.timestamps import normalize_timestamp
 
 from vaaet_ml.data.database import DatabaseSettings, get_engine
@@ -63,13 +65,13 @@ def _require_migrated_schema(exc: Exception) -> RuntimeError:
 
 INSERT_RAW_SQL = f"""
 INSERT INTO {RAW_TABLE} (
-    pipeline_run_id, clip_id, record_time, avg_speed, count_car, count_truck,
+    pipeline_run_id, clip_id, continuity_id, record_time, avg_speed, count_car, count_truck,
     count_bus, count_motorcycle, count_bicycle, total_vehicles,
     near_zero_motion_count, stationary_confirmed_count, rejected_speed_count,
     recovered_track_count, speed_sample_count, speed_measurement_quality,
     optical_flow_tracking_ratio, telemetry_schema_version
 ) VALUES (
-    :pipeline_run_id, :clip_id, :record_time, :avg_speed, :count_car, :count_truck,
+    :pipeline_run_id, :clip_id, :continuity_id, :record_time, :avg_speed, :count_car, :count_truck,
     :count_bus, :count_motorcycle, :count_bicycle, :total_vehicles,
     :near_zero_motion_count, :stationary_confirmed_count, :rejected_speed_count,
     :recovered_track_count, :speed_sample_count, :speed_measurement_quality,
@@ -79,9 +81,9 @@ ON CONFLICT (clip_id, record_time) DO NOTHING
 """
 
 
-UPSERT_FEATURE_SQL = f"""
+INSERT_FEATURE_SQL = f"""
 INSERT INTO {FEATURE_TABLE} (
-    source_record_id, pipeline_run_id, clip_id, record_time, feature_schema_version,
+    source_record_id, pipeline_run_id, clip_id, continuity_id, record_time, feature_schema_version,
     avg_speed, total_vehicles, count_car, count_truck, count_bus,
     count_motorcycle, count_bicycle, heavy_vehicle_ratio, delta_speed, delta_count,
     transition_flag, speed_variance, cumulative_delta_speed, low_speed_persistence,
@@ -91,7 +93,7 @@ INSERT INTO {FEATURE_TABLE} (
     telemetry_schema_version, data_origin, synthetic_scenario, hour_of_day,
     weather_condition
 ) VALUES (
-    :source_record_id, :pipeline_run_id, :clip_id, :record_time, :feature_schema_version,
+    :source_record_id, :pipeline_run_id, :clip_id, :continuity_id, :record_time, :feature_schema_version,
     :avg_speed, :total_vehicles, :count_car, :count_truck, :count_bus,
     :count_motorcycle, :count_bicycle, :heavy_vehicle_ratio, :delta_speed, :delta_count,
     :transition_flag, :speed_variance, :cumulative_delta_speed, :low_speed_persistence,
@@ -101,68 +103,53 @@ INSERT INTO {FEATURE_TABLE} (
     :telemetry_schema_version, :data_origin, :synthetic_scenario, :hour_of_day,
     :weather_condition
 )
-ON CONFLICT (clip_id, record_time, feature_schema_version) DO UPDATE SET
-    pipeline_run_id = EXCLUDED.pipeline_run_id,
-    source_record_id = COALESCE({FEATURE_TABLE}.source_record_id, EXCLUDED.source_record_id),
-    avg_speed = EXCLUDED.avg_speed,
-    total_vehicles = EXCLUDED.total_vehicles,
-    count_car = EXCLUDED.count_car,
-    count_truck = EXCLUDED.count_truck,
-    count_bus = EXCLUDED.count_bus,
-    count_motorcycle = EXCLUDED.count_motorcycle,
-    count_bicycle = EXCLUDED.count_bicycle,
-    heavy_vehicle_ratio = EXCLUDED.heavy_vehicle_ratio,
-    delta_speed = EXCLUDED.delta_speed,
-    delta_count = EXCLUDED.delta_count,
-    transition_flag = EXCLUDED.transition_flag,
-    speed_variance = EXCLUDED.speed_variance,
-    cumulative_delta_speed = EXCLUDED.cumulative_delta_speed,
-    low_speed_persistence = EXCLUDED.low_speed_persistence,
-    speed_measurement_quality = EXCLUDED.speed_measurement_quality,
-    optical_flow_tracking_ratio = EXCLUDED.optical_flow_tracking_ratio,
-    near_zero_motion_ratio = EXCLUDED.near_zero_motion_ratio,
-    stationary_confirmed_ratio = EXCLUDED.stationary_confirmed_ratio,
-    near_zero_motion_count = EXCLUDED.near_zero_motion_count,
-    stationary_confirmed_count = EXCLUDED.stationary_confirmed_count,
-    rejected_speed_count = EXCLUDED.rejected_speed_count,
-    recovered_track_count = EXCLUDED.recovered_track_count,
-    speed_sample_count = EXCLUDED.speed_sample_count,
-    telemetry_schema_version = EXCLUDED.telemetry_schema_version,
-    data_origin = EXCLUDED.data_origin,
-    synthetic_scenario = EXCLUDED.synthetic_scenario,
-    hour_of_day = EXCLUDED.hour_of_day,
-    weather_condition = EXCLUDED.weather_condition
+ON CONFLICT (pipeline_run_id, clip_id, record_time, feature_schema_version) DO NOTHING
 RETURNING id
 """
 
 
-UPSERT_PREDICTION_SQL = f"""
+INSERT_PREDICTION_SQL = f"""
 INSERT INTO {PREDICTION_TABLE} (
     telemetry_feature_id, pipeline_run_id, classified_at, traffic_state, state_label,
-    confidence, model_version, model_traffic_state, model_state_label,
+    confidence, model_version, model_revision, model_traffic_state, model_state_label,
     model_confidence, probability_margin, decision_abstained, measurement_reliable,
     accident_rule_triggered, accident_alert_started, accident_evidence_score
 ) VALUES (
     :telemetry_feature_id, :pipeline_run_id, CURRENT_TIMESTAMP, :traffic_state, :state_label,
-    :confidence, :model_version, :model_traffic_state, :model_state_label,
+    :confidence, :model_version, :model_revision, :model_traffic_state, :model_state_label,
     :model_confidence, :probability_margin, :decision_abstained, :measurement_reliable,
     :accident_rule_triggered, :accident_alert_started, :accident_evidence_score
 )
-ON CONFLICT (telemetry_feature_id, model_version) DO UPDATE SET
-    pipeline_run_id = EXCLUDED.pipeline_run_id,
-    classified_at = EXCLUDED.classified_at,
-    traffic_state = EXCLUDED.traffic_state,
-    state_label = EXCLUDED.state_label,
-    confidence = EXCLUDED.confidence,
-    model_traffic_state = EXCLUDED.model_traffic_state,
-    model_state_label = EXCLUDED.model_state_label,
-    model_confidence = EXCLUDED.model_confidence,
-    probability_margin = EXCLUDED.probability_margin,
-    decision_abstained = EXCLUDED.decision_abstained,
-    measurement_reliable = EXCLUDED.measurement_reliable,
-    accident_rule_triggered = EXCLUDED.accident_rule_triggered,
-    accident_alert_started = EXCLUDED.accident_alert_started,
-    accident_evidence_score = EXCLUDED.accident_evidence_score
+ON CONFLICT (telemetry_feature_id, model_revision) DO NOTHING
+RETURNING id
+"""
+
+SELECT_FEATURE_SQL = f"""
+SELECT id, source_record_id, pipeline_run_id, clip_id, continuity_id, record_time,
+       feature_schema_version, avg_speed, total_vehicles, count_car, count_truck,
+       count_bus, count_motorcycle, count_bicycle, heavy_vehicle_ratio,
+       delta_speed, delta_count, transition_flag, speed_variance,
+       cumulative_delta_speed, low_speed_persistence, speed_measurement_quality,
+       optical_flow_tracking_ratio, near_zero_motion_ratio,
+       stationary_confirmed_ratio, near_zero_motion_count,
+       stationary_confirmed_count, rejected_speed_count, recovered_track_count,
+       speed_sample_count, telemetry_schema_version, data_origin,
+       synthetic_scenario, hour_of_day, weather_condition
+FROM {FEATURE_TABLE}
+WHERE pipeline_run_id = CAST(:pipeline_run_id AS UUID)
+  AND clip_id = :clip_id AND record_time = :record_time
+  AND feature_schema_version = :feature_schema_version
+"""
+
+SELECT_PREDICTION_SQL = f"""
+SELECT id, telemetry_feature_id, pipeline_run_id, traffic_state, state_label,
+       confidence, model_version, model_revision, model_traffic_state,
+       model_state_label, model_confidence, probability_margin,
+       decision_abstained, measurement_reliable, accident_rule_triggered,
+       accident_alert_started, accident_evidence_score
+FROM {PREDICTION_TABLE}
+WHERE telemetry_feature_id = :telemetry_feature_id
+  AND model_revision = :model_revision
 """
 
 
@@ -170,6 +157,7 @@ def _raw_payload(row: pd.Series, pipeline_run_id: str) -> dict[str, object]:
     return {
         "pipeline_run_id": pipeline_run_id,
         "clip_id": str(row["clip_id"]),
+        "continuity_id": str(row.get("continuity_id", f"{row['clip_id']}:continuity-0001")),
         "record_time": _utc_timestamp(row["record_time"]),
         "avg_speed": float(row["avg_speed"]),
         "count_car": int(row["count_car"]),
@@ -197,6 +185,7 @@ def _feature_payload(row: pd.Series, pipeline_run_id: str) -> dict[str, object]:
         "source_record_id": _nullable_int(source_id),
         "pipeline_run_id": pipeline_run_id,
         "clip_id": str(row["clip_id"]),
+        "continuity_id": str(row.get("continuity_id", f"{row['clip_id']}:continuity-0001")),
         "record_time": _utc_timestamp(row["record_time"]),
         "feature_schema_version": str(
             row.get("feature_schema_version", FEATURE_SCHEMA_VERSION)
@@ -238,6 +227,7 @@ def _prediction_payload(
     feature_id: int,
     pipeline_run_id: str,
     model_version: str,
+    model_revision: str,
 ) -> dict[str, object]:
     state = int(row.get("traffic_state", 0))
     model_state = int(row.get("model_traffic_state", state))
@@ -247,14 +237,19 @@ def _prediction_payload(
             "Accident belongs exclusively to vaaet_feedback.human_validations."
         )
     if bool(row.get("accident_gate_applied", False)):
-        raise ValueError("Bundle v2 forbids an automatic Accident gate override.")
+        raise ValueError("The bundle forbids an automatic Accident gate override.")
+    row_revision = row.get("model_revision")
+    exact_revision = model_revision if row_revision is None or pd.isna(row_revision) else str(row_revision)
+    row_version = row.get("model_version")
+    semantic_version = model_version if row_version is None or pd.isna(row_version) else str(row_version)
     return {
         "telemetry_feature_id": feature_id,
         "pipeline_run_id": pipeline_run_id,
         "traffic_state": state,
         "state_label": str(row.get("state_label", STATE_LABELS[state])),
         "confidence": float(row.get("confidence", 0.0)),
-        "model_version": str(row.get("model_version", model_version)),
+        "model_version": semantic_version,
+        "model_revision": exact_revision,
         "model_traffic_state": model_state,
         "model_state_label": str(row.get("model_state_label", STATE_LABELS[model_state])),
         "model_confidence": float(row.get("model_confidence", row.get("confidence", 0.0))),
@@ -324,10 +319,11 @@ def persist_raw_telemetry(
         finally:
             if owns_engine:
                 active_engine.dispose()
+    normalized = normalize_continuity_frame(df)
     inserted = 0
     try:
         with active_engine.begin() as connection:
-            for _, row in df.iterrows():
+            for _, row in normalized.iterrows():
                 result = connection.execute(text(INSERT_RAW_SQL), _raw_payload(row, run_id))
                 inserted += max(result.rowcount, 0)
     except ProgrammingError as exc:
@@ -345,6 +341,7 @@ def persist_classified_telemetry(
     config: Mapping[str, str] | None = None,
     engine: Engine | None = None,
     model_version: str = MODEL_VERSION,
+    model_revision: str | None = None,
     pipeline_run_id: UUID | str | None = None,
 ) -> PersistResult:
     """Persiste features y predicciones asociadas en una única transacción."""
@@ -352,10 +349,23 @@ def persist_classified_telemetry(
     run_id = str(pipeline_run_id or uuid4())
     if df.empty:
         return PersistResult(0, 0, run_id)
-    required = {"clip_id", "record_time", "traffic_state"}
+    required = {
+        "clip_id",
+        "continuity_id",
+        "record_time",
+        "feature_schema_version",
+        "traffic_state",
+        *FEATURE_COLS,
+    }
     missing = required - set(df.columns)
     if missing:
         raise ValueError(f"Classified telemetry is missing required columns: {sorted(missing)}")
+    schema_versions = df["feature_schema_version"].dropna().astype(str).unique()
+    if len(schema_versions) != 1 or schema_versions[0] != FEATURE_SCHEMA_VERSION:
+        raise ValueError(
+            "Operational prediction persistence requires the current feature schema."
+        )
+    resolved_revision = _resolve_model_revision(df, model_revision)
     owns_engine = engine is None
     active_engine = engine or get_engine(settings or config)
     if pipeline_run_id is None:
@@ -367,12 +377,14 @@ def persist_classified_telemetry(
                 clip_id=str(clip_ids[0]) if len(clip_ids) == 1 else None,
                 input_rows=len(df),
                 telemetry_schema_version=None,
+                model_revision=resolved_revision,
             )
             with pipeline_run(metadata, engine=active_engine) as run:
                 persisted = persist_classified_telemetry(
                     df,
                     engine=active_engine,
                     model_version=model_version,
+                    model_revision=resolved_revision,
                     pipeline_run_id=run.id,
                 )
                 run.set_output_rows(persisted.classification_rows)
@@ -382,25 +394,11 @@ def persist_classified_telemetry(
         finally:
             if owns_engine:
                 active_engine.dispose()
-    telemetry_rows = 0
-    prediction_rows = 0
     try:
         with active_engine.begin() as connection:
-            for _, row in df.iterrows():
-                feature_id = connection.execute(
-                    text(UPSERT_FEATURE_SQL), _feature_payload(row, run_id)
-                ).scalar_one()
-                telemetry_rows += 1
-                connection.execute(
-                    text(UPSERT_PREDICTION_SQL),
-                    _prediction_payload(
-                        row,
-                        feature_id=int(feature_id),
-                        pipeline_run_id=run_id,
-                        model_version=model_version,
-                    ),
-                )
-                prediction_rows += 1
+            telemetry_rows, prediction_rows = _persist_classified_rows(
+                connection, df, run_id, model_version, resolved_revision
+            )
     except ProgrammingError as exc:
         raise _require_migrated_schema(exc) from exc
     finally:
@@ -414,6 +412,90 @@ def persist_classified_telemetry(
         run_id,
     )
     return PersistResult(telemetry_rows, prediction_rows, run_id)
+
+
+def _resolve_model_revision(frame: pd.DataFrame, requested: str | None) -> str:
+    revisions = (
+        frame.get("model_revision", pd.Series(dtype="string"))
+        .dropna()
+        .astype(str)
+        .unique()
+    )
+    resolved = requested or (str(revisions[0]) if len(revisions) == 1 else None)
+    if resolved is None or re.fullmatch(r"[0-9a-f]{64}", resolved) is None:
+        raise ValueError("Classified telemetry requires one exact SHA-256 model_revision.")
+    if len(revisions) > 1 or (len(revisions) == 1 and str(revisions[0]) != resolved):
+        raise ValueError("Classified telemetry mixes or contradicts model_revision values.")
+    return resolved
+
+
+def _persist_classified_rows(
+    connection: Connection,
+    frame: pd.DataFrame,
+    run_id: str,
+    model_version: str,
+    model_revision: str,
+) -> tuple[int, int]:
+    telemetry_rows = 0
+    prediction_rows = 0
+    for _, row in frame.iterrows():
+        feature_payload = _feature_payload(row, run_id)
+        feature_id = connection.execute(
+            text(INSERT_FEATURE_SQL), feature_payload
+        ).scalar_one_or_none()
+        if feature_id is None:
+            existing = connection.execute(
+                text(SELECT_FEATURE_SQL), feature_payload
+            ).mappings().one()
+            _assert_idempotent(existing, feature_payload, "feature")
+            feature_id = existing["id"]
+        prediction_payload = _prediction_payload(
+            row,
+            feature_id=int(feature_id),
+            pipeline_run_id=run_id,
+            model_version=model_version,
+            model_revision=model_revision,
+        )
+        prediction_id = connection.execute(
+            text(INSERT_PREDICTION_SQL), prediction_payload
+        ).scalar_one_or_none()
+        if prediction_id is None:
+            existing = connection.execute(
+                text(SELECT_PREDICTION_SQL), prediction_payload
+            ).mappings().one()
+            _assert_idempotent(existing, prediction_payload, "prediction")
+        telemetry_rows += 1
+        prediction_rows += 1
+    return telemetry_rows, prediction_rows
+
+
+def _assert_idempotent(
+    existing: Mapping[str, object],
+    payload: Mapping[str, object],
+    kind: str,
+) -> None:
+    """Acepta un reintento idéntico y rechaza una colisión con otro contenido."""
+
+    ignored = {"id", "classified_at"}
+    differences = [
+        key
+        for key, value in payload.items()
+        if key not in ignored and key in existing and not _database_values_equal(existing[key], value)
+    ]
+    if differences:
+        raise ValueError(
+            f"Immutable {kind} idempotency conflict in fields: {sorted(differences)}"
+        )
+
+
+def _database_values_equal(left: object, right: object) -> bool:
+    if left is None or right is None:
+        return left is right
+    if isinstance(left, UUID) or isinstance(right, UUID):
+        return str(left) == str(right)
+    if isinstance(left, (int, float)) and isinstance(right, (int, float)):
+        return abs(float(left) - float(right)) <= 1e-9
+    return left == right
 
 
 def ensure_raw_telemetry_table(engine: Engine) -> None:

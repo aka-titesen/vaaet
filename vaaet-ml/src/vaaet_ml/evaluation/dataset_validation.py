@@ -7,6 +7,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 import pandas as pd
+from vaaet.artifacts import FEATURE_SCHEMA_VERSION
 from vaaet.settings import (
     CANONICAL_TIMEZONE,
     FEATURE_COLS,
@@ -41,7 +42,7 @@ def audit_training_dataset(
     _validate_dataset_records(df)
     origins, real_mask = _resolve_data_origins(df)
     evidence = _build_audit_evidence(df, origins, real_mask)
-    blockers = _production_blockers(evidence["coverage"], evidence["v2_coverage"])
+    blockers = _production_blockers(evidence["coverage"], evidence["canonical_coverage"])
     report = _build_audit_report(df, origins, evidence, blockers)
     audit = DatasetAudit(report, not blockers, tuple(blockers))
     if require_production_eligible and blockers:
@@ -128,13 +129,26 @@ def _build_audit_evidence(
     """Calcula agregados trazables sin exponer filas ni alterar el dataset."""
 
     real_frame = df.loc[real_mask]
-    modern_present = [column for column in TELEMETRY_QUALITY_COLUMNS if column in df]
+    processed = "feature_schema_version" in df
+    quality_columns = (
+        (
+            "speed_measurement_quality",
+            "near_zero_motion_ratio",
+            "stationary_confirmed_ratio",
+            "optical_flow_tracking_ratio",
+        )
+        if processed
+        else TELEMETRY_QUALITY_COLUMNS
+    )
+    modern_present = [column for column in quality_columns if column in df]
     coverage = {
         column: round(float(real_frame[column].notna().mean()), 4) if column in df else 0.0
-        for column in TELEMETRY_QUALITY_COLUMNS
+        for column in quality_columns
     }
-    schema = df.get("telemetry_schema_version", pd.Series(pd.NA, index=df.index))
-    v2_coverage = float(schema.loc[real_mask].eq(TELEMETRY_SCHEMA_VERSION).mean())
+    schema_column = "feature_schema_version" if processed else "telemetry_schema_version"
+    expected_schema = FEATURE_SCHEMA_VERSION if processed else TELEMETRY_SCHEMA_VERSION
+    schema = df.get(schema_column, pd.Series(pd.NA, index=df.index))
+    canonical_coverage = float(schema.loc[real_mask].eq(expected_schema).mean())
     groups = build_group_ids(df)
     gaps = df["record_time"].groupby(groups).diff().dt.total_seconds().div(60)
     numeric_columns = [
@@ -159,25 +173,19 @@ def _build_audit_evidence(
         "modern_present": modern_present,
         "numeric_summary": numeric_summary,
         "schema": schema,
-        "v2_coverage": v2_coverage,
+        "canonical_coverage": canonical_coverage,
     }
 
 
-def _production_blockers(coverage: object, v2_coverage: object) -> list[str]:
-    if not isinstance(coverage, dict) or not isinstance(v2_coverage, float):
+def _production_blockers(coverage: object, canonical_coverage: object) -> list[str]:
+    if not isinstance(coverage, dict) or not isinstance(canonical_coverage, float):
         raise TypeError("Dataset audit evidence is malformed.")
     blockers: list[str] = []
-    if v2_coverage < 0.95:
+    if canonical_coverage < 0.95:
         blockers.append(
-            f"telemetry v2 coverage is {v2_coverage:.1%}; at least 95% is required"
+            f"telemetry v3 coverage is {canonical_coverage:.1%}; at least 95% is required"
         )
-    quality_fields = (
-        "speed_measurement_quality",
-        "optical_flow_tracking_ratio",
-        "near_zero_motion_count",
-        "stationary_confirmed_count",
-    )
-    incomplete = [field for field in quality_fields if coverage.get(field, 0.0) < 0.95]
+    incomplete = [field for field, value in coverage.items() if value < 0.95]
     if incomplete:
         blockers.append(f"quality fields have insufficient coverage: {', '.join(incomplete)}")
     return blockers
@@ -203,7 +211,7 @@ def _build_audit_report(
         "records_by_schema": schema.fillna("traffic-telemetry-v1").value_counts().to_dict(),
         "modern_columns_present": evidence["modern_present"],
         "modern_column_coverage": evidence["coverage"],
-        "telemetry_v2_coverage": round(float(evidence["v2_coverage"]), 4),
+        "telemetry_v3_coverage": round(float(evidence["canonical_coverage"]), 4),
         "maximum_gap_minutes": None if gaps.dropna().empty else round(float(gaps.max()), 2),
         "median_frequency_minutes": None
         if gaps.dropna().empty

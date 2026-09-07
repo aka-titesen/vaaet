@@ -21,6 +21,7 @@ from vaaet_ml.data.ingestion import (
     RawCsvSource,
     SeedDatasetPackageSource,
     TrainingIngestionPlan,
+    _deduplicate_feedback,
     compose_supervised_dataset,
     create_dataset_package,
     load_dataset_package,
@@ -35,6 +36,7 @@ def _features(state: int = 1) -> pd.DataFrame:
     row.update(
         id=10,
         clip_id="clip-a",
+        continuity_id="clip-a:continuity-0001",
         record_time="2026-08-04T12:00:00Z",
         feature_schema_version=FEATURE_SCHEMA_VERSION,
         traffic_state=state,
@@ -46,7 +48,14 @@ def _features(state: int = 1) -> pd.DataFrame:
 def _package_tables(path: Path, state: int = 1) -> Path:
     features = _features(state).drop(columns=["traffic_state", "is_human_validated"])
     predictions = pd.DataFrame(
-        [{"id": 20, "telemetry_feature_id": 10, "model_version": "mlp-v2.0"}]
+        [
+            {
+                "id": 20,
+                "telemetry_feature_id": 10,
+                "model_version": "mlp-v3.0",
+                "model_revision": "a" * 64,
+            }
+        ]
     )
     validations = pd.DataFrame(
         [
@@ -70,6 +79,13 @@ def test_plan_requires_explicit_source() -> None:
 
 def test_only_validated_feedback_policy_exists() -> None:
     assert list(FeedbackPolicy) == [FeedbackPolicy.VALIDATED_ONLY]
+
+
+def test_feedback_requires_explicit_human_validation_evidence() -> None:
+    feedback = _features().drop(columns="is_human_validated")
+
+    with pytest.raises(ValueError, match="explicitly prove human validation"):
+        _deduplicate_feedback([feedback])
 
 
 def test_hitl_mode_requires_validated_feedback_source(tmp_path: Path) -> None:
@@ -239,7 +255,14 @@ def test_feedback_rejects_reordered_feature_contract(tmp_path: Path) -> None:
         tmp_path / "reordered.zip",
         features=reversed_features,
         predictions=pd.DataFrame(
-            [{"id": 20, "telemetry_feature_id": 10, "model_version": "mlp-v2.0"}]
+            [
+                {
+                    "id": 20,
+                    "telemetry_feature_id": 10,
+                    "model_version": "mlp-v3.0",
+                    "model_revision": "a" * 64,
+                }
+            ]
         ),
         validations=pd.DataFrame(
             [

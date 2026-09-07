@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import pandas as pd
 
+from vaaet.continuity import CONTINUITY_COLUMN
 from vaaet.settings import (
     LABELING_THRESHOLDS,
     NEAR_ZERO_RATIO_MIN,
@@ -35,13 +36,22 @@ def _optional_ratio(df: pd.DataFrame, column: str, minimum: float) -> pd.Series:
     return values >= minimum
 
 
+def _temporal_group_key(df: pd.DataFrame) -> pd.Series:
+    if "clip_id" not in df.columns:
+        return pd.Series("all", index=df.index, dtype="string")
+    clips = df["clip_id"].astype(str)
+    if CONTINUITY_COLUMN not in df.columns:
+        return clips
+    return clips + "\x1f" + df[CONTINUITY_COLUMN].astype(str)
+
+
 def build_accident_signal_frame(df: pd.DataFrame) -> pd.DataFrame:
     """Construye las señales conservadoras del detector de posibles incidentes."""
     t = LABELING_THRESHOLDS
 
     low_speed = df["avg_speed"] < float(t["accident_speed_max"])
     braking = df["delta_speed"] < float(t["accident_delta_min"])
-    group_key = df["clip_id"] if "clip_id" in df.columns else pd.Series("all", index=df.index)
+    group_key = _temporal_group_key(df)
     cumulative_braking = df["delta_speed"].groupby(group_key, sort=False).transform(
         lambda values: values.rolling(window=int(t["rolling_window"]), min_periods=1).sum()
     )
@@ -188,7 +198,7 @@ def assign_stable_traffic_state(df: pd.DataFrame) -> pd.Series:
     congestion = (df["avg_speed"] < t["congested_speed_max"]) & (
         df["total_vehicles"] >= t["congested_vehicles_min"]
     )
-    group_key = df["clip_id"] if "clip_id" in df.columns else pd.Series("all", index=df.index)
+    group_key = _temporal_group_key(df)
     consecutive = congestion.groupby(group_key, sort=False).transform(
         lambda values: values.rolling(
             window=int(t["congested_persistence"]),

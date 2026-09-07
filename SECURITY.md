@@ -39,5 +39,5 @@ de infraestructura, cifrado en reposo, parches y logs.
 
 ## Versiones soportadas
 
-La línea activa de laboratorio es 4.x y el core interno es 0.1.0. Los cambios
+La línea activa de laboratorio es 4.x y el core interno es 0.2.0. Los cambios
 de seguridad se validan contra los `pyproject.toml` y CI vigentes.

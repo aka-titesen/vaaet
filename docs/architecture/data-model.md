@@ -1,11 +1,12 @@
-# Modelo PostgreSQL — `vaaet-db-v2`
+# Modelo PostgreSQL — `vaaet-db-v3`
 
-VAAET ML 4.5.4 usa PostgreSQL 14+ y Alembic como única autoridad DDL. La
+VAAET ML 4.6.0 usa PostgreSQL 14+ y Alembic como única autoridad DDL. La
 portabilidad por capacidades y la configuración administrativa se rigen por
 [ADR-0024](decisions/0024-provider-neutral-postgresql-and-schema-as-code.md).
 Los notebooks nunca crean ni alteran tablas. La revisión vigente encadena la
 [migración base](../../vaaet-ml/migrations/versions/20260804_0001_postgres_schemas_hitl.py)
-y el [hardening 4.2](../../vaaet-ml/migrations/versions/20260806_0002_postgres_hardening_pipeline_runs.py).
+y el [hardening 4.2](../../vaaet-ml/migrations/versions/20260806_0002_postgres_hardening_pipeline_runs.py),
+seguido por la [continuidad e identidad v3](../../vaaet-ml/migrations/versions/20260905_0003_temporal_continuity_model_revision.py).
 
 ## Relaciones
 
@@ -26,12 +27,14 @@ erDiagram
       timestamptz started_at
       timestamptz completed_at
       text database_user
+      text model_revision
     }
 
     TRAFFIC_DATA {
       bigint id PK
       uuid pipeline_run_id
       text clip_id
+      text continuity_id
       timestamptz record_time
       text telemetry_schema_version
     }
@@ -41,6 +44,7 @@ erDiagram
       uuid pipeline_run_id
       text feature_schema_version
       text clip_id
+      text continuity_id
       timestamptz record_time
       string feature_cols_19
     }
@@ -49,6 +53,7 @@ erDiagram
       bigint telemetry_feature_id FK
       smallint traffic_state "0-2"
       text model_version
+      text model_revision
       boolean accident_rule_triggered
     }
     HUMAN_VALIDATIONS {
@@ -65,13 +70,16 @@ erDiagram
 
 | Objeto | Responsabilidad | Clave idempotente |
 |---|---|---|
-| `vaaet_raw.traffic_data` | Telemetría v2 y métricas de calidad | `(clip_id, record_time)` |
-| `vaaet_ml.telemetry_features` | Orden exacto de las 19 features y procedencia | `(clip_id, record_time, feature_schema_version)` |
-| `vaaet_ml.traffic_predictions` | MLP, política temporal y candidato de incidente | `(telemetry_feature_id, model_version)` |
+| `vaaet_raw.traffic_data` | Telemetría v3, continuidad y métricas de calidad | `(clip_id, record_time)` |
+| `vaaet_ml.telemetry_features` | Fotografía inmutable de las 19 features por ejecución | `(pipeline_run_id, clip_id, record_time, feature_schema_version)` |
+| `vaaet_ml.traffic_predictions` | MLP, política temporal y candidato de incidente | `(telemetry_feature_id, model_revision)` |
 | `vaaet_feedback.human_validations` | Revisión humana append-only | UUID; sustitución explícita por FK |
 | `vaaet_ops.pipeline_runs` | Ciclo redactado y auditable de cada workflow | UUID |
 
-Todas las fechas son `TIMESTAMPTZ` UTC. Ratios están restringidos a `[0,1]`,
+Todas las fechas son `TIMESTAMPTZ` UTC. `continuity_id` cambia por vista o por
+huecos superiores a 90 segundos. `model_revision` es el SHA-256 del bundle
+exacto y no reemplaza a la etiqueta semántica `model_version`. Los ratios están
+restringidos a `[0,1]`,
 conteos a valores no negativos y estados automáticos a `0–2`. El estado público
 3 sólo puede existir en una validación humana que incluya nota y confirme que se
 revisó el contexto temporal.
@@ -92,7 +100,7 @@ Las vistas `public` no son el contrato para código nuevo y se eliminarán en
 | Rol de grupo | Permisos |
 |---|---|
 | `vaaet_collection_role` | SELECT/INSERT raw |
-| `vaaet_inference_role` | SELECT/INSERT/UPDATE features y predicciones |
+| `vaaet_inference_role` | SELECT/INSERT de features y predicciones inmutables |
 | `vaaet_training_role` | SELECT en los tres schemas |
 | `vaaet_reviewer_role` | SELECT de cola/predicciones e INSERT de validaciones |
 
@@ -123,7 +131,7 @@ Backup canónico:
 ```bash
 pg_dump --format=custom --no-owner --no-acl \
   --schema=vaaet_raw --schema=vaaet_ml --schema=vaaet_feedback --schema=vaaet_ops \
-  --file=vaaet-db-v2.backup
+  --file=vaaet-db-v3.backup
 ```
 
 El cliente toma endpoint, TLS y credenciales desde variables `PG*` temporales
